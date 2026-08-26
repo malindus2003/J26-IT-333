@@ -24,3 +24,14 @@ SMART_BINS = [
 def get_waste_bins():
     """Retrieve live telemetry for all smart waste bins."""
     return {"bins": SMART_BINS, "timestamp": datetime.now().isoformat()}
+
+@router.post("/telemetry")
+def update_bin_telemetry(bin_id: str, distance_cm: float, weight_raw: float):
+    """Process ultrasonic distance (cm) and load-cell weight (kg) from ESP32."""
+    bin_obj = next((b for b in SMART_BINS if b["id"] == bin_id), None)
+    if not bin_obj:
+        raise HTTPException(status_code=404, detail="Waste bin not found")
+    fill_pct = max(0.0, min(100.0, round((100.0 - distance_cm) / 100.0 * 100.0, 1)))
+    bin_obj["fill_level_pct"] = fill_pct
+    bin_obj["current_weight_kg"] = round(weight_raw, 2)
+    return {"status": "success", "bin": bin_obj}
