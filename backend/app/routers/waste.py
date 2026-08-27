@@ -35,3 +35,20 @@ def update_bin_telemetry(bin_id: str, distance_cm: float, weight_raw: float):
     bin_obj["fill_level_pct"] = fill_pct
     bin_obj["current_weight_kg"] = round(weight_raw, 2)
     return {"status": "success", "bin": bin_obj}
+
+WASTE_CATEGORY_RATES = {
+    "Organic Food Solids": 450.0, # LKR per kg loss
+    "Liquid & Slurry Waste": 200.0,
+    "Recyclable Plastic": 80.0,
+    "Paper & Cardboard": 40.0
+}
+
+@router.get("/analytics")
+def get_waste_cost_analytics():
+    """Compute financial losses and waste reduction recommendations."""
+    total_weight = sum(b["current_weight_kg"] for b in SMART_BINS)
+    total_loss_lkr = sum(b["current_weight_kg"] * WASTE_CATEGORY_RATES.get(b["category"], 300.0) for b in SMART_BINS)
+    return {
+        "total_waste_kg_today": round(total_weight, 2),
+        "total_financial_loss_lkr": round(total_loss_lkr, 2)
+    }
