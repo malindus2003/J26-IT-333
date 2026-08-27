@@ -52,3 +52,19 @@ def get_waste_cost_analytics():
         "total_waste_kg_today": round(total_weight, 2),
         "total_financial_loss_lkr": round(total_loss_lkr, 2)
     }
+
+WASTE_INCIDENTS_DB = [
+    {
+        "id": "inc-001",
+        "produce_name": "Overripe Tomatoes",
+        "category": "Organic Food Solids",
+        "weight_kg": 3.4,
+        "reason": "Cold storage fungal mould spot contamination",
+        "financial_loss_lkr": 1530.0,
+        "timestamp": "2026-08-27 15:30:00"
+    }
+]
+
+@router.get("/incidents")
+def get_waste_incidents():
+    return {"incidents": WASTE_INCIDENTS_DB}
