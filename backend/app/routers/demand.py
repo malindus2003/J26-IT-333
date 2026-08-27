@@ -34,3 +34,19 @@ def get_demand_summary():
         "avg_forecast_confidence": 94.6,
         "items_tracked": len(MENU_ITEMS_FORECAST)
     }
+
+WEATHER_FORECAST = {
+    "condition": "Rainy / Overcast",
+    "temperature_c": 26.5,
+    "rain_probability_pct": 85,
+    "impact_coefficient": 1.18
+}
+
+EVENT_CALENDAR = [
+    {"event": "Friday Corporate Payday Dinner", "date": "Today", "impact": "+15% Dine-In Rush"}
+]
+
+@router.get("/drivers")
+def get_demand_external_drivers():
+    """Retrieve environmental, weather, and event external demand drivers."""
+    return {"weather": WEATHER_FORECAST, "events": EVENT_CALENDAR}
