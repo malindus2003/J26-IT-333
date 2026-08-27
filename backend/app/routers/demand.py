@@ -1,0 +1,36 @@
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
+from typing import List, Dict, Any, Optional
+from datetime import datetime, timedelta
+import random
+
+router = APIRouter(prefix="/api/demand", tags=["Component 1: AI Food Demand Prediction"])
+
+MENU_ITEMS_FORECAST = [
+    {
+        "id": "menu-1",
+        "name": "Sri Lankan Chicken Rice & Curry",
+        "category": "Main Course",
+        "current_stock": 45,
+        "predicted_demand_today": 120,
+        "prep_recommendation": 125,
+        "buffer_quantity": 15,
+        "price": 1200.0,
+        "historical_avg": 95,
+        "confidence": 95.8,
+        "trend": "+26%",
+        "status": "Available"
+    }
+]
+
+@router.get("/summary")
+def get_demand_summary():
+    """Returns today's aggregate meal demand prediction overview."""
+    total_pred = sum(item["predicted_demand_today"] for item in MENU_ITEMS_FORECAST)
+    total_prep = sum(item["prep_recommendation"] for item in MENU_ITEMS_FORECAST)
+    return {
+        "today_total_predicted_meals": total_pred,
+        "today_recommended_prep_portions": total_prep,
+        "avg_forecast_confidence": 94.6,
+        "items_tracked": len(MENU_ITEMS_FORECAST)
+    }
