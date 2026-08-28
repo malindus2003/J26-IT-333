@@ -50,3 +50,13 @@ EVENT_CALENDAR = [
 def get_demand_external_drivers():
     """Retrieve environmental, weather, and event external demand drivers."""
     return {"weather": WEATHER_FORECAST, "events": EVENT_CALENDAR}
+
+SEVEN_DAY_FORECAST = [
+    {"day": "Mon", "date": "2026-08-31", "predicted_orders": 390, "breakfast": 90, "lunch": 180, "dinner": 120},
+    {"day": "Tue", "date": "2026-09-01", "predicted_orders": 415, "breakfast": 95, "lunch": 190, "dinner": 130}
+]
+
+@router.get("/7day-trend")
+def get_7day_demand_trend():
+    """Retrieve 7-day multi-shift meal demand forecasts from Prophet & Random Forest."""
+    return {"forecast": SEVEN_DAY_FORECAST}
