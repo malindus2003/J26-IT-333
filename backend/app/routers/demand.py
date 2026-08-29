@@ -60,3 +60,14 @@ SEVEN_DAY_FORECAST = [
 def get_7day_demand_trend():
     """Retrieve 7-day multi-shift meal demand forecasts from Prophet & Random Forest."""
     return {"forecast": SEVEN_DAY_FORECAST}
+
+@router.get("/features/shap")
+def get_explainable_ai_weights(item_id: Optional[str] = "menu-1"):
+    """Returns SHAP-inspired feature attribution breakdown for Explainable AI."""
+    return {
+        "base_expected_portions": 95,
+        "feature_attributions": [
+            {"factor": "Rainy Weather Impact (+85% Rain Probability)", "delta": "+17 portions", "impact": "positive"},
+            {"factor": "Public Holiday / Long Weekend Surge", "delta": "+8 portions", "impact": "positive"}
+        ]
+    }
