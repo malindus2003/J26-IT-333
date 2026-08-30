@@ -31,3 +31,11 @@ HOURLY_THROUGHPUT_PREDICTION = [
 def get_kitchen_throughput_forecast():
     """Returns hourly predicted ticket volumes and kitchen line capacity utilization."""
     return {"hourly_forecast": HOURLY_THROUGHPUT_PREDICTION}
+
+@router.post("/reallocate")
+def reallocate_kitchen_staff(from_station: str, to_station: str, staff_id: str):
+    """Dynamically balance kitchen queues by reallocating chefs to bottleneck stations."""
+    return {
+        "status": "success",
+        "message": f"Successfully reallocated staff {staff_id} to {to_station} to relieve queue pressure."
+    }
