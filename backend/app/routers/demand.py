@@ -71,3 +71,11 @@ def get_explainable_ai_weights(item_id: Optional[str] = "menu-1"):
             {"factor": "Public Holiday / Long Weekend Surge", "delta": "+8 portions", "impact": "positive"}
         ]
     }
+
+@router.post("/simulate")
+def simulate_what_if_scenario(price_change_pct: float = 0.0, weather_override: str = "Rainy", promo_active: bool = True):
+    """Interactive What-If simulation engine to model price elasticity and weather shifts."""
+    base_demand = 120
+    price_factor = 1.0 - (price_change_pct * 0.008)
+    simulated_demand = int(base_demand * price_factor * (1.15 if weather_override == "Rainy" else 1.0))
+    return {"base_demand": base_demand, "simulated_demand": simulated_demand}
