@@ -12,3 +12,11 @@ POS_MENU = [
 @router.get("/menu")
 def get_pos_menu():
     return {"menu": POS_MENU}
+
+TABLES_FLOOR = [
+    {"table_number": 1, "capacity": 4, "status": "occupied", "active_order_id": "ORD-101", "guest_count": 3}
+]
+
+@router.get("/tables")
+def get_floor_tables():
+    return {"tables": TABLES_FLOOR}
