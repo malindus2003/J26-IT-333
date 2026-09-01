@@ -22,3 +22,11 @@ export function XAIFactorCards({ shapData }) {
     </div>
   );
 }
+
+export function WhatIfSimulator() {
+  return (
+    <div className="p-5 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-700 mt-4">
+      <h3 className="font-bold text-slate-900 dark:text-white">What-If Sensitivity Simulation</h3>
+    </div>
+  );
+}
