@@ -20,3 +20,8 @@ TABLES_FLOOR = [
 @router.get("/tables")
 def get_floor_tables():
     return {"tables": TABLES_FLOOR}
+
+@router.patch("/{order_id}/kds-status")
+def update_kds_status(order_id: str, new_status: str):
+    """Progress order ticket through 3-stage KDS pass (Prep -> Cooking -> Ready)."""
+    return {"status": "success", "order_id": order_id, "kds_stage": new_status}
