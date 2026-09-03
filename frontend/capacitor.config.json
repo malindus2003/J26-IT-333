@@ -1,0 +1,10 @@
+{
+  "appId": "com.research.smartrestaurant",
+  "appName": "Smart Restaurant",
+  "webDir": "dist",
+  "bundledWebRuntime": false,
+  "server": {
+    "androidScheme": "https",
+    "cleartext": true
+  }
+}
