@@ -258,23 +258,113 @@ class NewMenuItemRequest(BaseModel):
     historical_avg: int = 25
     prep_lead_time_mins: int = 25
 
-def fetch_live_weather_intelligence() -> Dict[str, Any]:
+# Firebase Service Integration for Cross-Component Sync
+try:
+    from ..services.firebase_service import firebase_service
+except Exception:
+    try:
+        from app.services.firebase_service import firebase_service
+    except Exception:
+        firebase_service = None
+
+# Centralized Restaurant Profile & Multi-Branch Architecture
+# Calibrated on empirical research data collected in Hikkaduwa (Southern Province, Sri Lanka)
+RESTAURANT_PROFILE = {
+    "restaurant_name": "Hikkaduwa Coastal Seafood Restaurant",
+    "cuisine": "Fresh Coastal Seafood, Rice & Curry & Grills",
+    "active_branch_id": "branch-hikkaduwa",
+    "branches": [
+        {
+            "id": "branch-hikkaduwa",
+            "name": "Hikkaduwa Beachfront (Main Branch)",
+            "address": "Galle Road, Hikkaduwa",
+            "city": "Hikkaduwa",
+            "district": "Galle (Southern Province)",
+            "latitude": 6.1395,
+            "longitude": 80.1063,
+            "seating_capacity": 75,
+            "phone": "+94 91 227 7890",
+            "is_active": True,
+            "is_main": True,
+            "status_badge": "Active Empirical Research Baseline"
+        },
+        {
+            "id": "branch-galle",
+            "name": "Galle Fort Heritage Bistro",
+            "address": "Church Street, Galle Fort",
+            "city": "Galle",
+            "district": "Galle",
+            "latitude": 6.0329,
+            "longitude": 80.2168,
+            "seating_capacity": 50,
+            "phone": "+94 91 224 4567",
+            "is_active": False,
+            "is_main": False,
+            "status_badge": "Secondary Outlet Ready"
+        },
+        {
+            "id": "branch-colombo",
+            "name": "Colombo Express Kitchen",
+            "address": "Galle Road, Colombo 03",
+            "city": "Colombo",
+            "district": "Colombo",
+            "latitude": 6.9271,
+            "longitude": 79.8612,
+            "seating_capacity": 40,
+            "phone": "+94 11 257 1234",
+            "is_active": False,
+            "is_main": False,
+            "status_badge": "Urban Cloud Kitchen"
+        }
+    ]
+}
+
+def sync_profile_to_firebase():
+    """Syncs restaurant profile to Firebase Realtime Database if connected."""
+    if firebase_service and firebase_service.is_connected:
+        try:
+            firebase_service.update_restaurant_profile(RESTAURANT_PROFILE)
+        except Exception as e:
+            print(f"[!] Warning syncing profile to Firebase: {e}")
+
+# Initial sync attempt
+sync_profile_to_firebase()
+
+def get_active_branch() -> Dict[str, Any]:
+    active_id = RESTAURANT_PROFILE.get("active_branch_id", "branch-hikkaduwa")
+    for b in RESTAURANT_PROFILE.get("branches", []):
+        if b["id"] == active_id:
+            return b
+    return RESTAURANT_PROFILE["branches"][0]
+
+def fetch_live_weather_intelligence(lat: Optional[float] = None, lon: Optional[float] = None) -> Dict[str, Any]:
     """
-    Fetches real-time meteorological data from Open-Meteo API for Colombo, Sri Lanka (lat: 6.9271, lon: 79.8612).
-    Dynamically computes real weather impact and condition description.
+    Fetches real-time meteorological data from Open-Meteo API for the active restaurant branch.
+    Calibrated for Hikkaduwa, Sri Lanka (lat: 6.1395, lon: 80.1063) by default.
+    Dynamically computes real weather impact and condition description based on local rainfall and temp.
     """
     import urllib.request
     import json
 
+    active_b = get_active_branch()
+    target_lat = lat if lat is not None else float(active_b.get("latitude", 6.1395))
+    target_lon = lon if lon is not None else float(active_b.get("longitude", 80.1063))
+    city = active_b.get("city", "Hikkaduwa")
+    branch_name = active_b.get("name", "Hikkaduwa Beachfront")
+
     weather_info = {
-        "weather_condition": "Partly Cloudy (26.5°C)",
+        "weather_condition": f"Coastal Weather ({city})",
         "weather_impact": "Stable baseline dining volume",
         "temperature_c": 26.5,
         "rainfall_mm": 0.0,
-        "is_live_api": True
+        "is_live_api": True,
+        "branch_name": branch_name,
+        "city": city,
+        "latitude": target_lat,
+        "longitude": target_lon
     }
     try:
-        url = "https://api.open-meteo.com/v1/forecast?latitude=6.9271&longitude=79.8612&current=temperature_2m,relative_humidity_2m,precipitation,weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum&timezone=Asia%2FColombo"
+        url = f"https://api.open-meteo.com/v1/forecast?latitude={target_lat}&longitude={target_lon}&current=temperature_2m,relative_humidity_2m,precipitation,weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum&timezone=Asia%2FColombo"
         req = urllib.request.Request(url, headers={"User-Agent": "SmartRestaurantAI/1.0"})
         with urllib.request.urlopen(req, timeout=3.5) as resp:
             data = json.loads(resp.read().decode())
@@ -286,20 +376,20 @@ def fetch_live_weather_intelligence() -> Dict[str, Any]:
             code = int(current.get("weather_code", 0))
 
             if code in [95, 96, 99]:
-                cond_desc = f"Thunderstorm Monsoon ({temp:.1f}°C, {rain_mm:.1f}mm)"
-                impact = "+20% comfort food & indoor delivery surge"
+                cond_desc = f"Coastal Thunderstorm / Rain ({temp:.1f}°C, {rain_mm:.1f}mm)"
+                impact = "+20% comfort hot foods & delivery surge"
             elif code in [61, 63, 65, 80, 81, 82] or rain_mm > 2.0:
-                cond_desc = f"Heavy Rain ({temp:.1f}°C, {rain_mm:.1f}mm rain)"
-                impact = "+16% hot soups, kottu & comfort meal surge"
+                cond_desc = f"Heavy Coastal Rain ({temp:.1f}°C, {rain_mm:.1f}mm rain)"
+                impact = "+16% hot seafood soups, fried rice & comfort meal surge"
             elif code in [51, 53, 55]:
-                cond_desc = f"Light Evening Drizzle ({temp:.1f}°C, {rain_mm:.1f}mm)"
+                cond_desc = f"Coastal Evening Drizzle ({temp:.1f}°C, {rain_mm:.1f}mm)"
                 impact = "+8% warm comfort food preference"
             elif temp >= 30.0:
-                cond_desc = f"Sunny & Hot Afternoon ({temp:.1f}°C)"
+                cond_desc = f"Sunny & Hot Beach Afternoon ({temp:.1f}°C)"
                 impact = "+14% chilled beverages, fresh juices & light salads"
             elif code in [1, 2, 3]:
                 cond_desc = f"Partly Cloudy & Pleasant ({temp:.1f}°C)"
-                impact = "Optimal dine-in patio & dinner rush weather"
+                impact = "Optimal beachside dine-in patio & dinner rush weather"
             else:
                 cond_desc = f"Clear Sky ({temp:.1f}°C)"
                 impact = "Standard dine-in customer baseline"
@@ -309,13 +399,18 @@ def fetch_live_weather_intelligence() -> Dict[str, Any]:
                 "weather_impact": impact,
                 "temperature_c": temp,
                 "rainfall_mm": rain_mm,
-                "is_live_api": True
+                "is_live_api": True,
+                "branch_name": branch_name,
+                "city": city,
+                "latitude": target_lat,
+                "longitude": target_lon
             }
     except Exception as ex:
-        print(f"[!] Warning fetching live Open-Meteo weather: {ex}")
+        print(f"[!] Warning fetching live Open-Meteo weather for {city}: {ex}")
         weather_info["is_live_api"] = False
 
     return weather_info
+
 
 def fetch_live_calendar_and_event_intelligence() -> Dict[str, Any]:
     """
@@ -521,8 +616,116 @@ def get_demand_forecasts():
         "multi_day_forecast": multi_day_trend,
         "category_breakdown": category_breakdown,
         "feature_importances": model_feature_importances[:10],
-        "retraining_history": RETRAINING_HISTORY
+        "retraining_history": RETRAINING_HISTORY,
+        "restaurant_profile": RESTAURANT_PROFILE,
+        "active_branch": get_active_branch()
     }
+
+class SwitchBranchRequest(BaseModel):
+    branch_id: str
+
+class UpdateBranchRequest(BaseModel):
+    branch_id: str
+    name: Optional[str] = None
+    address: Optional[str] = None
+    city: Optional[str] = None
+    district: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    phone: Optional[str] = None
+    seating_capacity: Optional[int] = None
+
+class AddBranchRequest(BaseModel):
+    name: str
+    address: str
+    city: str
+    district: str = "Southern Province"
+    latitude: float
+    longitude: float
+    phone: str = ""
+    seating_capacity: int = 40
+
+@router.get("/profile")
+def get_restaurant_profile_endpoint():
+    """Retrieve centralized restaurant profile and multi-branch configuration."""
+    active_b = get_active_branch()
+    live_w = fetch_live_weather_intelligence(
+        lat=float(active_b.get("latitude", 6.1395)),
+        lon=float(active_b.get("longitude", 80.1063))
+    )
+    return {
+        "status": "success",
+        "profile": RESTAURANT_PROFILE,
+        "active_branch": active_b,
+        "live_weather": live_w
+    }
+
+@router.post("/profile/switch-branch")
+def switch_active_branch_endpoint(req: SwitchBranchRequest):
+    """Switch active operating branch for live weather & demand calculations."""
+    found = False
+    for b in RESTAURANT_PROFILE.get("branches", []):
+        if b["id"] == req.branch_id:
+            b["is_active"] = True
+            found = True
+        else:
+            b["is_active"] = False
+    if not found:
+        raise HTTPException(status_code=404, detail=f"Branch '{req.branch_id}' not found")
+    RESTAURANT_PROFILE["active_branch_id"] = req.branch_id
+    sync_profile_to_firebase()
+    active_b = get_active_branch()
+    live_w = fetch_live_weather_intelligence()
+    return {
+        "status": "success",
+        "message": f"Active branch switched to {active_b.get('name')}",
+        "profile": RESTAURANT_PROFILE,
+        "active_branch": active_b,
+        "live_weather": live_w
+    }
+
+@router.put("/profile/branch")
+def update_branch_endpoint(req: UpdateBranchRequest):
+    """Update branch details, coordinates, or contact info (Admin Only)."""
+    target = None
+    for b in RESTAURANT_PROFILE.get("branches", []):
+        if b["id"] == req.branch_id:
+            target = b
+            break
+    if not target:
+        raise HTTPException(status_code=404, detail="Branch not found")
+    if req.name is not None: target["name"] = req.name
+    if req.address is not None: target["address"] = req.address
+    if req.city is not None: target["city"] = req.city
+    if req.district is not None: target["district"] = req.district
+    if req.latitude is not None: target["latitude"] = req.latitude
+    if req.longitude is not None: target["longitude"] = req.longitude
+    if req.phone is not None: target["phone"] = req.phone
+    if req.seating_capacity is not None: target["seating_capacity"] = req.seating_capacity
+    sync_profile_to_firebase()
+    return {"status": "success", "branch": target, "profile": RESTAURANT_PROFILE}
+
+@router.post("/profile/branch/add")
+def add_branch_endpoint(req: AddBranchRequest):
+    """Register a new restaurant branch into the enterprise multi-branch architecture."""
+    new_id = f"branch-{len(RESTAURANT_PROFILE.get('branches', [])) + 1}"
+    new_branch = {
+        "id": new_id,
+        "name": req.name,
+        "address": req.address,
+        "city": req.city,
+        "district": req.district,
+        "latitude": req.latitude,
+        "longitude": req.longitude,
+        "seating_capacity": req.seating_capacity,
+        "phone": req.phone,
+        "is_active": False,
+        "is_main": False,
+        "status_badge": "Newly Registered Branch"
+    }
+    RESTAURANT_PROFILE["branches"].append(new_branch)
+    sync_profile_to_firebase()
+    return {"status": "success", "branch": new_branch, "profile": RESTAURANT_PROFILE}
 
 @router.post("/simulate")
 def simulate_demand_scenario(req: ScenarioSimulateRequest):

@@ -5,7 +5,7 @@ import {
   Database, Sliders, Layers, Plus, Check, X, Printer, ChefHat, ShieldCheck, 
   Flame, Scale, PieChart, Info, HelpCircle, Activity, ChevronRight, ChevronLeft, ChevronDown, Eye, Play,
   Zap, Clock, Award, FileText, ToggleLeft, ToggleRight, Sun, Droplets, Utensils,
-  Users
+  Users, MapPin
 } from 'lucide-react';
 import { 
   ResponsiveContainer, BarChart, Bar, LineChart, Line, XAxis, YAxis, 
@@ -378,6 +378,11 @@ export default function DemandForecastingDashboard({ isDarkMode, currentRole = '
                   </span>
                   <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
                     Executive / Manager View
+                  </span>
+                  <span className="px-2.5 py-0.5 rounded text-[10px] font-black bg-emerald-50 dark:bg-emerald-950/70 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800 flex items-center gap-1 shadow-2xs">
+                    <MapPin className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
+                    <span>{data?.active_branch?.name || "Hikkaduwa Beachfront (Main Branch)"}</span>
+                    <span className="text-[9px] font-mono opacity-80">({data?.active_branch?.latitude || 6.1395}°N, {data?.active_branch?.longitude || 80.1063}°E)</span>
                   </span>
                 </>
               )}

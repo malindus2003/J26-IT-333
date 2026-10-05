@@ -24,8 +24,10 @@ import {
   Utensils,
   Briefcase,
   LogOut,
-  User
+  User,
+  Settings
 } from 'lucide-react';
+import RestaurantProfileModal from './RestaurantProfileModal';
 
 export const ROLES = [
   {
@@ -195,6 +197,7 @@ export default function Header({
   onLogout = null
 }) {
   const [roleDropdownOpen, setRoleDropdownOpen] = useState(false);
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
   const dropdownRef = useRef(null);
 
   // Close dropdown on outside click
@@ -337,6 +340,19 @@ export default function Header({
               )}
             </div>
 
+            {/* ADMIN ONLY: Restaurant Profile & Branch Settings */}
+            {currentRole === 'admin' && (
+              <button
+                type="button"
+                onClick={() => setShowSettingsModal(true)}
+                className="px-2 sm:px-2.5 py-1.5 sm:py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/60 dark:hover:bg-emerald-900/60 border border-emerald-300 dark:border-emerald-700 text-emerald-800 dark:text-emerald-300 font-extrabold text-[11px] sm:text-xs transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
+                title="Restaurant Profile & Branch Settings (Admin Only)"
+              >
+                <Settings className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-emerald-700 dark:text-emerald-400" />
+                <span className="hidden sm:inline">Settings</span>
+              </button>
+            )}
+
             {/* Theme Toggle Button */}
             <button
               onClick={onToggleTheme}
@@ -412,6 +428,14 @@ export default function Header({
         </div>
 
       </div>
+
+      {/* Restaurant Profile & Branch Settings Modal (Admin Only) */}
+      {currentRole === 'admin' && (
+        <RestaurantProfileModal 
+          isOpen={showSettingsModal} 
+          onClose={() => setShowSettingsModal(false)} 
+        />
+      )}
     </header>
   );
 }

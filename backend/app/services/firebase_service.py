@@ -218,6 +218,30 @@ class FirebaseRealtimeDBService:
             logger.error(f"[FirebaseService] Error syncing storage zones to Firebase: {e}")
             return False
 
+    def get_restaurant_profile(self) -> Optional[Dict[str, Any]]:
+        """Reads the centralized restaurant profile & multi-branch configuration from Firebase."""
+        if not self.is_connected:
+            return None
+        try:
+            ref = db.reference("restaurant_profile")
+            return ref.get()
+        except Exception as e:
+            logger.error(f"[FirebaseService] Error reading restaurant profile from Firebase: {e}")
+            return None
+
+    def update_restaurant_profile(self, profile_data: Dict[str, Any]) -> bool:
+        """Persists restaurant identity, branch locations, and active coordinates to Firebase."""
+        if not self.is_connected:
+            return False
+        try:
+            ref = db.reference("restaurant_profile")
+            ref.set(profile_data)
+            return True
+        except Exception as e:
+            logger.error(f"[FirebaseService] Error updating restaurant profile in Firebase: {e}")
+            return False
+
 
 # Global singleton instance
 firebase_service = FirebaseRealtimeDBService()
+
