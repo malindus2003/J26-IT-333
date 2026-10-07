@@ -451,7 +451,7 @@ export default function DemandForecastingDashboard({ isDarkMode, currentRole = '
     }
   ];
 
-  const visibleTabs = allTabs;
+  const visibleTabs = allTabs.filter(t => t.roles.includes(userRole));
 
   const currentTabIdx = visibleTabs.findIndex(t => t.id === activeTab);
   const handlePrevTab = () => {
@@ -468,152 +468,114 @@ export default function DemandForecastingDashboard({ isDarkMode, currentRole = '
   return (
     <div className="space-y-6">
       
-      {/* Research Header Banner */}
+      {/* Research Header Banner with Role-Adaptive View */}
       <div className="glass-panel p-3.5 sm:p-6 rounded-xl sm:rounded-2xl bg-white dark:bg-slate-900 border border-[#cbdad0] dark:border-slate-800 shadow-sm relative">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 sm:gap-5">
           <div className="space-y-1.5 sm:space-y-2 max-w-3xl">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="px-2.5 sm:px-3 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-black bg-emerald-700 text-white shadow-sm flex items-center gap-1.5">
-                <TrendingUp className="h-3 w-3 sm:h-3.5 sm:w-3.5" /> Component 1: AI Demand Prediction
-              </span>
-              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
-                Multi-Source Time-Series
-              </span>
+              {userRole === 'staff' ? (
+                <>
+                  <span className="px-2.5 sm:px-3 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-black bg-emerald-700 text-white shadow-sm flex items-center gap-1.5">
+                    <ChefHat className="h-3 w-3 sm:h-3.5 sm:w-3.5" /> Kitchen Prep Station Mode
+                  </span>
+                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
+                    Live Shift Prep Guidance
+                  </span>
+                </>
+              ) : (
+                <>
+                  <span className="px-2.5 sm:px-3 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-black bg-emerald-700 text-white shadow-sm flex items-center gap-1.5">
+                    <TrendingUp className="h-3 w-3 sm:h-3.5 sm:w-3.5" /> Component 1: AI Demand Prediction
+                  </span>
+                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                    Multi-Source Time-Series
+                  </span>
+                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
+                    Executive / Manager View
+                  </span>
+                </>
+              )}
             </div>
             
             <h2 className="text-base sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight leading-tight">
-              Multi-Source Food Demand Forecasting & Kitchen Preparation Sizing
+              {userRole === 'staff' 
+                ? "Kitchen Food Preparation & Batch Sizing Guidance"
+                : "Multi-Source Food Demand Forecasting & Kitchen Preparation Sizing"
+              }
             </h2>
             <p className="text-[11px] sm:text-xs text-slate-600 dark:text-slate-300 leading-relaxed font-medium">
-              Multi-source time-series forecasting integrating 60–90 days POS records, live weather APIs, holiday calendars, reservations, and promotions to produce item-level prep targets and dynamic safety buffers while eliminating overproduction waste.
+              {userRole === 'staff'
+                ? "Shift prep quantities and safety buffers for line cooks and prep stations. Mark items out of stock (86) or print daily kitchen prep sheets."
+                : "Multi-source time-series forecasting integrating 60–90 days POS records, live weather APIs, holiday calendars, reservations, and promotions to produce item-level prep targets and dynamic safety buffers while eliminating overproduction waste."
+              }
             </p>
           </div>
 
-          {/* Key Metric Highlight */}
-          <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-center p-3 sm:p-4 rounded-xl sm:rounded-2xl bg-[#f4f8f5] dark:bg-slate-800/90 border border-[#d5e2d9] dark:border-slate-700 shadow-sm w-full sm:w-auto min-w-0 sm:min-w-[210px]">
-            <span className="text-[9px] sm:text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider">Model Accuracy (MAPE)</span>
-            <div className="text-xl sm:text-2xl font-black text-emerald-700 dark:text-emerald-400 mt-0.5">{data.model_performance.mape}</div>
-            <div className="text-[10px] sm:text-[11px] text-slate-600 dark:text-slate-300 font-semibold mt-0.5 sm:mt-1 flex items-center gap-1">
-              <CheckCircle className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-emerald-600" />
-              <span>RMSE: {data.model_performance.rmse} • MAE: {data.model_performance.mae}</span>
+          {/* Right Header Panel: Role Selector & Adaptive KPIs */}
+          <div className="flex flex-col sm:items-end gap-2.5 w-full sm:w-auto">
+            
+            {/* Role Switcher Pill: Only accessible to Admin/Manager; Kitchen staff cannot view manager data */}
+            {currentRole === 'admin' && (
+              <div className="flex items-center gap-1 p-1 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 self-start sm:self-end">
+                <span className="text-[10px] text-slate-500 font-bold px-1.5">Preview:</span>
+                <button
+                  type="button"
+                  onClick={() => setUserRole('admin')}
+                  className={`px-2.5 py-1 rounded-lg text-[10px] font-black transition-all cursor-pointer ${
+                    userRole === 'admin'
+                      ? 'bg-emerald-700 text-white shadow-xs'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                  }`}
+                >
+                  Manager View
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setUserRole('staff'); setActiveTab('overview'); }}
+                  className={`px-2.5 py-1 rounded-lg text-[10px] font-black transition-all cursor-pointer ${
+                    userRole === 'staff'
+                      ? 'bg-emerald-700 text-white shadow-xs'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                  }`}
+                >
+                  Chef View
+                </button>
+              </div>
+            )}
+
+            {/* Key Metric Highlight */}
+            <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-center p-3 sm:p-4 rounded-xl sm:rounded-2xl bg-[#f4f8f5] dark:bg-slate-800/90 border border-[#d5e2d9] dark:border-slate-700 shadow-sm w-full min-w-0 sm:min-w-[220px]">
+              {userRole === 'staff' ? (
+                <>
+                  <span className="text-[9px] sm:text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider">Today's Kitchen Target</span>
+                  <div className="text-xl sm:text-2xl font-black text-emerald-700 dark:text-emerald-400 mt-0.5">{data.kpi_summary.total_prep_recommended} Portions</div>
+                  <div className="text-[10px] sm:text-[11px] text-slate-600 dark:text-slate-300 font-semibold mt-0.5 sm:mt-1 flex items-center gap-1">
+                    <ShieldCheck className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-amber-600" />
+                    <span>+{data.kpi_summary.total_safety_buffer} safety buffer included</span>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <span className="text-[9px] sm:text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider">Model Accuracy (MAPE)</span>
+                  <div className="text-xl sm:text-2xl font-black text-emerald-700 dark:text-emerald-400 mt-0.5">{data.model_performance.mape}</div>
+                  <div className="text-[10px] sm:text-[11px] text-slate-600 dark:text-slate-300 font-semibold mt-0.5 sm:mt-1 flex items-center gap-1">
+                    <CheckCircle className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-emerald-600" />
+                    <span>RMSE: {data.model_performance.rmse} • MAE: {data.model_performance.mae}</span>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>
       </div>
 
-      {/* Standalone Subcategory Navigation & Dropdown Bar (No Parent Clipping, High Z-Index) */}
-      <div className="p-3 sm:p-4 rounded-xl sm:rounded-2xl bg-white dark:bg-slate-900 border border-[#cbdad0] dark:border-slate-800 shadow-sm relative z-30">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
-          
-          {/* Main Dropdown Selector */}
-          <div className="relative w-full lg:w-96" ref={demandDropdownRef}>
-            <div className="flex items-center justify-between gap-2 mb-1.5 lg:hidden">
-              <span className="text-[10px] uppercase font-black text-slate-500 dark:text-slate-400">
-                Select Demand Subcategory:
-              </span>
-              <span className="text-[10px] font-bold text-emerald-700 dark:text-emerald-400">
-                6 Subcategories Available
-              </span>
-            </div>
-
-            {(() => {
-              const currentTabObj = allTabs.find(t => t.id === activeTab) || allTabs[0];
-              return (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => setDemandDropdownOpen(!demandDropdownOpen)}
-                    className="w-full px-3.5 py-2.5 rounded-xl border-2 border-emerald-600/30 hover:border-emerald-600 dark:border-emerald-500/40 dark:hover:border-emerald-500 bg-[#f8faf9] dark:bg-slate-800 flex items-center justify-between gap-3 shadow-2xs transition-all text-left cursor-pointer group"
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="p-2 rounded-xl bg-emerald-700 text-white shadow-sm flex-shrink-0 group-hover:scale-105 transition-transform">
-                        {currentTabObj.icon}
-                      </div>
-                      <div className="min-w-0">
-                        <div className="text-[9px] uppercase font-black text-emerald-700 dark:text-emerald-400 leading-tight tracking-wider">
-                          Active Demand Subcategory
-                        </div>
-                        <div className="text-xs sm:text-sm font-black text-slate-900 dark:text-white truncate">
-                          {currentTabObj.label}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-1.5 flex-shrink-0">
-                      <span className={`hidden sm:inline-block text-[9px] font-black px-2 py-0.5 rounded-full border ${currentTabObj.badgeColor}`}>
-                        {currentTabObj.badge}
-                      </span>
-                      <ChevronDown className={`h-4 w-4 text-emerald-700 dark:text-emerald-400 transition-transform duration-200 ${demandDropdownOpen ? 'rotate-180' : ''}`} />
-                    </div>
-                  </button>
-
-                  {/* Dropdown Options Popup with High Z-Index & No Clipping */}
-                  {demandDropdownOpen && (
-                    <div className="absolute left-0 right-0 lg:left-0 lg:right-auto mt-2 w-full lg:w-[420px] rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 shadow-2xl p-2 z-50 space-y-1.5 animate-fade-in max-h-[420px] overflow-y-auto no-scrollbar">
-                      <div className="px-3 py-2 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
-                        <span className="text-[10px] uppercase font-black tracking-wider text-slate-400">
-                          6 Demand Subcategories
-                        </span>
-                        <span className="text-[10px] font-bold text-emerald-700 dark:text-emerald-400">
-                          Tap to switch
-                        </span>
-                      </div>
-
-                      {allTabs.map((tab) => {
-                        const isSelected = tab.id === activeTab;
-                        return (
-                          <button
-                            key={tab.id}
-                            type="button"
-                            onClick={() => {
-                              setActiveTab(tab.id);
-                              setDemandDropdownOpen(false);
-                            }}
-                            className={`w-full p-2.5 rounded-xl text-left transition-all flex items-start gap-3 cursor-pointer ${
-                              isSelected
-                                ? 'bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-700/60 shadow-2xs'
-                                : 'hover:bg-slate-100 dark:hover:bg-slate-800 border border-transparent'
-                            }`}
-                          >
-                            <div className={`p-2 rounded-xl flex-shrink-0 mt-0.5 border ${
-                              isSelected
-                                ? 'bg-emerald-700 text-white border-emerald-700'
-                                : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700'
-                            }`}>
-                              {tab.icon}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center justify-between gap-1">
-                                <span className={`text-xs font-black truncate ${isSelected ? 'text-emerald-950 dark:text-emerald-200' : 'text-slate-900 dark:text-white'}`}>
-                                  {tab.label}
-                                </span>
-                                {isSelected ? (
-                                  <span className="text-[10px] font-black px-1.5 py-0.5 rounded bg-emerald-700 text-white flex-shrink-0 flex items-center gap-1">
-                                    <Check className="h-3 w-3" /> Active
-                                  </span>
-                                ) : (
-                                  <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full border flex-shrink-0 ${tab.badgeColor}`}>
-                                    {tab.badge}
-                                  </span>
-                                )}
-                              </div>
-                              <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 line-clamp-2 leading-tight">
-                                {tab.description}
-                              </p>
-                            </div>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
-                </>
-              );
-            })()}
-          </div>
-
-          {/* Stepper & Quick Pills Toolbar */}
-          <div className="flex items-center justify-between sm:justify-end gap-2 w-full lg:w-auto">
+      {/* Subcategory Navigation: Shown for Admin/Manager with clean selecting tabs */}
+      {userRole === 'admin' ? (
+        <div className="p-2.5 sm:p-3 rounded-xl sm:rounded-2xl bg-white dark:bg-slate-900 border border-[#cbdad0] dark:border-slate-800 shadow-sm">
+          <div className="flex items-center justify-between gap-2 overflow-x-auto no-scrollbar">
+            
             {/* Previous / Next Stepper */}
-            <div className="flex items-center bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-0.5 shadow-2xs">
+            <div className="flex items-center bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-0.5 shadow-2xs flex-shrink-0">
               <button
                 type="button"
                 onClick={handlePrevTab}
@@ -623,7 +585,7 @@ export default function DemandForecastingDashboard({ isDarkMode, currentRole = '
                 <ChevronLeft className="h-4 w-4" />
               </button>
               <span className="text-[10px] font-mono font-bold px-2.5 text-slate-600 dark:text-slate-400 select-none">
-                {currentTabIdx + 1}/{allTabs.length}
+                {currentTabIdx + 1}/{visibleTabs.length}
               </span>
               <button
                 type="button"
@@ -635,14 +597,14 @@ export default function DemandForecastingDashboard({ isDarkMode, currentRole = '
               </button>
             </div>
 
-            {/* Quick 1-Tap Pills */}
-            <div className="flex items-center gap-1 overflow-x-auto no-scrollbar py-0.5">
-              {allTabs.map((t) => (
+            {/* Selecting Pills (Tabs) */}
+            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5 flex-1 justify-start sm:justify-end">
+              {visibleTabs.map((t) => (
                 <button
                   key={t.id}
                   type="button"
                   onClick={() => setActiveTab(t.id)}
-                  className={`px-2.5 py-1.5 rounded-xl text-[11px] font-bold transition-all whitespace-nowrap border cursor-pointer ${
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap border cursor-pointer ${
                     activeTab === t.id
                       ? 'bg-emerald-700 text-white border-emerald-700 shadow-2xs'
                       : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-[#d5e2d9] dark:border-slate-700 hover:bg-emerald-50 dark:hover:bg-slate-700'
@@ -652,10 +614,36 @@ export default function DemandForecastingDashboard({ isDarkMode, currentRole = '
                 </button>
               ))}
             </div>
+
+          </div>
+        </div>
+      ) : (
+        /* Focused Clean Kitchen Station Header Bar for Chef */
+        <div className="p-3.5 sm:p-4 rounded-xl sm:rounded-2xl bg-emerald-50/70 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-xl bg-emerald-700 text-white shadow-sm flex-shrink-0">
+              <ChefHat className="h-5 w-5" />
+            </div>
+            <div>
+              <span className="text-xs font-black text-emerald-950 dark:text-emerald-200 uppercase tracking-wide">
+                Daily Shift Prep Station • Kitchen Service Active
+              </span>
+              <p className="text-[11px] text-slate-600 dark:text-slate-400 font-medium">
+                Review batch sizes below. Click the toggle to 86 / mark out-of-stock items, or print the checklist for line cooks.
+              </p>
+            </div>
           </div>
 
+          <button
+            type="button"
+            onClick={() => setShowPrepSheetModal(true)}
+            className="px-3.5 py-2 rounded-xl text-xs font-black bg-emerald-700 hover:bg-emerald-800 text-white flex items-center justify-center gap-2 shadow-sm transition-colors cursor-pointer self-start sm:self-auto"
+          >
+            <Printer className="h-4 w-4" />
+            Print Shift Prep Sheet
+          </button>
         </div>
-      </div>
+      )}
 
       {/* Multi-Source Live Contextual Drivers Bar (Always visible for quick situational awareness) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
@@ -767,13 +755,15 @@ export default function DemandForecastingDashboard({ isDarkMode, currentRole = '
                   <Printer className="h-3.5 w-3.5 text-emerald-700 dark:text-emerald-400" />
                   Export Chef Prep Sheet
                 </button>
-                <button
-                  onClick={() => setShowAddModal(true)}
-                  className="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-emerald-700 hover:bg-emerald-800 text-white shadow-sm flex items-center gap-1.5 transition-colors"
-                >
-                  <Plus className="h-3.5 w-3.5" />
-                  Add POS Menu Item
-                </button>
+                {userRole === 'admin' && (
+                  <button
+                    onClick={() => setShowAddModal(true)}
+                    className="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-emerald-700 hover:bg-emerald-800 text-white shadow-sm flex items-center gap-1.5 transition-colors"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    Add POS Menu Item
+                  </button>
+                )}
               </div>
             </div>
 
