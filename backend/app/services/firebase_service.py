@@ -241,6 +241,29 @@ class FirebaseRealtimeDBService:
             logger.error(f"[FirebaseService] Error updating restaurant profile in Firebase: {e}")
             return False
 
+    def get_menu_items(self) -> Dict[str, Any]:
+        """Reads all menu items from Firebase Realtime Database at /menu_items."""
+        if not self.is_connected:
+            return {}
+        try:
+            ref = db.reference("menu_items")
+            return ref.get() or {}
+        except Exception as e:
+            logger.error(f"[FirebaseService] Error reading menu_items from Firebase: {e}")
+            return {}
+
+    def save_menu_item(self, item_id: str, item_data: Dict[str, Any]) -> bool:
+        """Persists a new or updated menu item to Firebase at /menu_items/{item_id}."""
+        if not self.is_connected:
+            return False
+        try:
+            ref = db.reference(f"menu_items/{item_id}")
+            ref.set(item_data)
+            return True
+        except Exception as e:
+            logger.error(f"[FirebaseService] Error saving menu item {item_id} to Firebase: {e}")
+            return False
+
 
 # Global singleton instance
 firebase_service = FirebaseRealtimeDBService()
