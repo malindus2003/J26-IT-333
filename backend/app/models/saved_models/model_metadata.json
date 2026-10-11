@@ -1,0 +1,41 @@
+{
+  "best_rsl_model": "XGBoostRegressor",
+  "best_prob_model": "RandomForestRegressor",
+  "best_risk_model": "RandomForestClassifier",
+  "produce_categories": [
+    "Embul Banana (Ambul Kesel)",
+    "Gotukola (Centella Asiatica)",
+    "Green Beans (Bonchi)",
+    "Green Chillies (Amu Miris)",
+    "Kankun (Water Spinach)",
+    "Karthakolomban Mango",
+    "Local Tomatoes (Thakkali)",
+    "Mauritius Pineapple (Gampaha Annasi)",
+    "Mukunuwenna (Alternanthera)",
+    "Nuwara Eliya Carrots",
+    "Red Lady Papaya (Rathu Papol)",
+    "Sri Lankan Avocado (Butter Fruit)"
+  ],
+  "risk_label_map": {
+    "Low": 0,
+    "Medium": 1,
+    "High": 2,
+    "Critical": 3
+  },
+  "inv_risk_label_map": {
+    "0": "Low",
+    "1": "Medium",
+    "2": "High",
+    "3": "Critical"
+  },
+  "numeric_features": [
+    "temperature_celsius",
+    "humidity_percentage",
+    "ammonia_nh3_ppm",
+    "co2_ppm",
+    "voc_ethylene_ppm",
+    "storage_duration_hours",
+    "current_weight_kg",
+    "weight_loss_percentage"
+  ]
+}
