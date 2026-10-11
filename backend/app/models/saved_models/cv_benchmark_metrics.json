@@ -1,0 +1,119 @@
+{
+  "cv_dataset_summary": {
+    "total_samples": 3000,
+    "train_samples": 2400,
+    "test_samples": 600,
+    "features_dimension": 28,
+    "classes": [
+      "Fresh",
+      "Ripe",
+      "Degraded",
+      "Spoiled"
+    ]
+  },
+  "cv_classification_benchmarks": {
+    "RandomForest_CV": {
+      "accuracy": 1.0,
+      "f1_macro": 1.0,
+      "f1_weighted": 1.0,
+      "confusion_matrix": [
+        [
+          150,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          150,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          150,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          150
+        ]
+      ]
+    },
+    "XGBoost_CV": {
+      "accuracy": 1.0,
+      "f1_macro": 1.0,
+      "f1_weighted": 1.0,
+      "confusion_matrix": [
+        [
+          150,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          150,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          150,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          150
+        ]
+      ]
+    },
+    "MLP_NeuralNet_CV": {
+      "accuracy": 1.0,
+      "f1_macro": 1.0,
+      "f1_weighted": 1.0,
+      "confusion_matrix": [
+        [
+          150,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          150,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          150,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          150
+        ]
+      ]
+    }
+  },
+  "cv_regression_benchmarks": {
+    "RandomForest_Reg_CV": {
+      "r2_score": 0.9405,
+      "rmse": 7.24
+    },
+    "XGBoost_Reg_CV": {
+      "r2_score": 0.9358,
+      "rmse": 7.52
+    }
+  }
+}
