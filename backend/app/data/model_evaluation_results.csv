@@ -1,0 +1,5 @@
+Model,MAE (Portions),RMSE,MAPE (%) on Active Orders
+Baseline 1: Naïve (lag_7),0.4066,1.0613,89.66
+Baseline 2: 7-Day Moving Average,0.3657,0.8453,69.29
+Random Forest Regressor,0.4299,0.8348,67.47
+XGBoost Regressor,0.4107,0.8004,67.03
