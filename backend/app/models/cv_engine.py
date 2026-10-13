@@ -213,3 +213,4 @@ class FoodQualityVisionEngine:
         }
 
 food_vision_engine = FoodQualityVisionEngine()
+vision_engine = food_vision_engine

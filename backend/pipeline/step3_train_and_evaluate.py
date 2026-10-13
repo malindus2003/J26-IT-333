@@ -25,8 +25,17 @@ from sklearn.ensemble import RandomForestRegressor
 from xgboost import XGBRegressor
 from sklearn.metrics import mean_absolute_error, mean_squared_error
 
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+DATA_DIR = os.path.join(SCRIPT_DIR, "..", "app", "data")
+SAVED_MODELS_DIR = os.path.join(SCRIPT_DIR, "..", "app", "models", "saved_models")
+os.makedirs(SAVED_MODELS_DIR, exist_ok=True)
+os.makedirs(DATA_DIR, exist_ok=True)
+
 print("[+] Loading engineered dataset...")
-df = pd.read_csv('engineered_features_master.csv')
+csv_path = os.path.join(DATA_DIR, 'engineered_features_master.csv')
+if not os.path.exists(csv_path):
+    csv_path = 'engineered_features_master.csv'
+df = pd.read_csv(csv_path)
 df['date'] = pd.to_datetime(df['date'])
 
 # Sort chronologically
@@ -137,7 +146,7 @@ print("="*60)
 print(results_df.to_string(index=False))
 print("="*60)
 
-results_df.to_csv('model_evaluation_results.csv', index=False)
+results_df.to_csv(os.path.join(DATA_DIR, 'model_evaluation_results.csv'), index=False)
 
 # --- 6. Feature Importance ---
 importances = pd.DataFrame({
@@ -153,7 +162,7 @@ print(importances.head(10).to_string(index=False))
 best_model_name = "XGBoost Regressor" if results[-1]['MAE (Portions)'] <= results[-2]['MAE (Portions)'] else "Random Forest Regressor"
 best_model = xgb_model if best_model_name == "XGBoost Regressor" else rf_model
 
-print(f"\n[✓] Best Performing Model: {best_model_name}")
+print(f"\n[OK] Best Performing Model: {best_model_name}")
 
 # Save the trained model and feature list for the future backend API
 export_bundle = {
@@ -163,8 +172,9 @@ export_bundle = {
     'test_metrics': results_df.to_dict(orient='records'),
     'feature_importances': importances.to_dict(orient='records')
 }
-joblib.dump(export_bundle, 'best_food_demand_model.joblib')
-print("[✓] Model bundle successfully saved to: best_food_demand_model.joblib")
+output_model_path = os.path.join(SAVED_MODELS_DIR, 'best_food_demand_model.joblib')
+joblib.dump(export_bundle, output_model_path)
+print(f"[OK] Model bundle successfully saved to: {output_model_path}")
 
 # --- 8. Generate Sample Test Predictions & Kitchen Prep Recommendations ---
 test_results = test_df[['date', 'item', 'item_category', 'quantity_demanded']].copy()
@@ -176,5 +186,6 @@ test_results['recommended_prep_qty'] = np.ceil(test_results['predicted_demand'] 
 # Zero out prep if restaurant was closed
 test_results.loc[test_df['is_closed'] == 1, ['predicted_demand', 'recommended_prep_qty']] = 0
 
-test_results.to_csv('test_predictions_comparison.csv', index=False)
-print("[✓] Saved sample predictions and preparation recommendations to: test_predictions_comparison.csv")
+output_preds_path = os.path.join(DATA_DIR, 'test_predictions_comparison.csv')
+test_results.to_csv(output_preds_path, index=False)
+print(f"[OK] Saved sample predictions and preparation recommendations to: {output_preds_path}")
