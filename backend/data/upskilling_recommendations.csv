@@ -1,0 +1,70 @@
+Timestamp,Chef_ID,Chef_Name,Target_Station,Current_Skill_Score,Target_Skill_Score,Skill_Gap,Station_Risk_Level,Priority,Recommended_Action
+2026-09-29 04:11:33 PM,EMP13,Chef Anura (Salad Specialist),Hot Kitchen / Saute,1,4,3,CRITICAL,CRITICAL,Mandatory Cross-Training (Urgent: Hot Kitchen / Saute)
+2026-09-29 04:11:33 PM,EMP22,Chef Sandun (Commis II),Hot Kitchen / Saute,1,4,3,CRITICAL,CRITICAL,Mandatory Cross-Training (Urgent: Hot Kitchen / Saute)
+2026-09-29 04:11:33 PM,EMP23,Chef Chathura (Commis II),Grill Station,1,4,3,HIGH,CRITICAL,Mandatory Cross-Training (Urgent: Grill Station)
+2026-09-29 04:11:33 PM,EMP26,Trainee Oshada,Grill Station,1,4,3,HIGH,CRITICAL,Mandatory Cross-Training (Urgent: Grill Station)
+2026-09-29 04:11:33 PM,EMP27,Trainee Bimsara,Hot Kitchen / Saute,1,4,3,CRITICAL,CRITICAL,Mandatory Cross-Training (Urgent: Hot Kitchen / Saute)
+2026-09-29 04:11:33 PM,EMP28,Trainee Janith,Hot Kitchen / Saute,1,4,3,CRITICAL,CRITICAL,Mandatory Cross-Training (Urgent: Hot Kitchen / Saute)
+2026-09-29 04:11:33 PM,EMP28,Trainee Janith,Grill Station,1,4,3,HIGH,CRITICAL,Mandatory Cross-Training (Urgent: Grill Station)
+2026-09-29 04:11:33 PM,EMP29,Trainee Sachith,Hot Kitchen / Saute,1,4,3,CRITICAL,CRITICAL,Mandatory Cross-Training (Urgent: Hot Kitchen / Saute)
+2026-09-29 04:11:33 PM,EMP29,Trainee Sachith,Grill Station,1,4,3,HIGH,CRITICAL,Mandatory Cross-Training (Urgent: Grill Station)
+2026-09-29 04:11:33 PM,EMP30,Trainee Kaveen,Hot Kitchen / Saute,1,4,3,CRITICAL,CRITICAL,Mandatory Cross-Training (Urgent: Hot Kitchen / Saute)
+2026-09-29 04:11:33 PM,EMP30,Trainee Kaveen,Grill Station,1,4,3,HIGH,CRITICAL,Mandatory Cross-Training (Urgent: Grill Station)
+2026-09-29 04:11:33 PM,EMP05,Chef Amara (Italian Lead),Grill Station,2,4,2,HIGH,HIGH,Targeted Practical Workshop
+2026-09-29 04:11:33 PM,EMP06,Chef Priyantha (Pantry In-Charge),Hot Kitchen / Saute,2,4,2,CRITICAL,HIGH,Targeted Practical Workshop
+2026-09-29 04:11:33 PM,EMP06,Chef Priyantha (Pantry In-Charge),Grill Station,2,4,2,HIGH,HIGH,Targeted Practical Workshop
+2026-09-29 04:11:33 PM,EMP13,Chef Anura (Salad Specialist),Grill Station,2,4,2,HIGH,HIGH,Targeted Practical Workshop
+2026-09-29 04:11:33 PM,EMP14,Chef Nuwan (Pizza Baker),Hot Kitchen / Saute,2,4,2,CRITICAL,HIGH,Targeted Practical Workshop
+2026-09-29 04:11:33 PM,EMP14,Chef Nuwan (Pizza Baker),Grill Station,2,4,2,HIGH,HIGH,Targeted Practical Workshop
+2026-09-29 04:11:33 PM,EMP15,Chef Kelum (Fryer Tech),Hot Kitchen / Saute,2,4,2,CRITICAL,HIGH,Targeted Practical Workshop
+2026-09-29 04:11:33 PM,EMP17,Chef Lahiru (Commis I),Hot Kitchen / Saute,2,4,2,CRITICAL,HIGH,Targeted Practical Workshop
+2026-09-29 04:11:33 PM,EMP18,Chef Danushka (Commis I),Hot Kitchen / Saute,2,4,2,CRITICAL,HIGH,Targeted Practical Workshop
+2026-09-29 04:11:33 PM,EMP18,Chef Danushka (Commis I),Grill Station,2,4,2,HIGH,HIGH,Targeted Practical Workshop
+2026-09-29 04:11:33 PM,EMP19,Chef Isuru (Commis I),Hot Kitchen / Saute,2,4,2,CRITICAL,HIGH,Targeted Practical Workshop
+2026-09-29 04:11:33 PM,EMP19,Chef Isuru (Commis I),Grill Station,2,4,2,HIGH,HIGH,Targeted Practical Workshop
+2026-09-29 04:11:33 PM,EMP20,Chef Tharindu (Commis II),Hot Kitchen / Saute,2,4,2,CRITICAL,HIGH,Targeted Practical Workshop
+2026-09-29 04:11:33 PM,EMP20,Chef Tharindu (Commis II),Grill Station,2,4,2,HIGH,HIGH,Targeted Practical Workshop
+2026-09-29 04:11:33 PM,EMP21,Chef Kavinda (Commis II),Grill Station,2,4,2,HIGH,HIGH,Targeted Practical Workshop
+2026-09-29 04:11:33 PM,EMP21,Chef Kavinda (Commis II),Pizza Station,1,4,3,MODERATE,HIGH,Targeted Practical Workshop
+2026-09-29 04:11:33 PM,EMP22,Chef Sandun (Commis II),Grill Station,2,4,2,HIGH,HIGH,Targeted Practical Workshop
+2026-09-29 04:11:33 PM,EMP23,Chef Chathura (Commis II),Hot Kitchen / Saute,2,4,2,CRITICAL,HIGH,Targeted Practical Workshop
+2026-09-29 04:11:33 PM,EMP25,Chef Malith (Commis III),Hot Kitchen / Saute,2,4,2,CRITICAL,HIGH,Targeted Practical Workshop
+2026-09-29 04:11:33 PM,EMP26,Trainee Oshada,Hot Kitchen / Saute,2,4,2,CRITICAL,HIGH,Targeted Practical Workshop
+2026-09-29 04:11:33 PM,EMP26,Trainee Oshada,Pizza Station,1,4,3,MODERATE,HIGH,Targeted Practical Workshop
+2026-09-29 04:11:33 PM,EMP27,Trainee Bimsara,Grill Station,2,4,2,HIGH,HIGH,Targeted Practical Workshop
+2026-09-29 04:11:33 PM,EMP27,Trainee Bimsara,Pizza Station,1,4,3,MODERATE,HIGH,Targeted Practical Workshop
+2026-09-29 04:11:33 PM,EMP28,Trainee Janith,Fryer Station,1,4,3,MODERATE,HIGH,Targeted Practical Workshop
+2026-09-29 04:11:33 PM,EMP04,Chef Samantha (Lead Grill Master),Cold & Salad Station,2,4,2,LOW,MEDIUM,Secondary Upskilling during off-peak
+2026-09-29 04:11:33 PM,EMP06,Chef Priyantha (Pantry In-Charge),Fryer Station,2,4,2,MODERATE,MEDIUM,Secondary Upskilling during off-peak
+2026-09-29 04:11:33 PM,EMP07,Chef Sunil (Fast Food Lead),Cold & Salad Station,2,4,2,LOW,MEDIUM,Secondary Upskilling during off-peak
+2026-09-29 04:11:33 PM,EMP08,Chef Kasun (CDP - Hot Line),Cold & Salad Station,2,4,2,LOW,MEDIUM,Secondary Upskilling during off-peak
+2026-09-29 04:11:33 PM,EMP09,Chef Dilshan (CDP - Grill),Pizza Station,2,4,2,MODERATE,MEDIUM,Secondary Upskilling during off-peak
+2026-09-29 04:11:33 PM,EMP09,Chef Dilshan (CDP - Grill),Cold & Salad Station,2,4,2,LOW,MEDIUM,Secondary Upskilling during off-peak
+2026-09-29 04:11:33 PM,EMP11,Chef Chaminda (Demi CDP),Pizza Station,2,4,2,MODERATE,MEDIUM,Secondary Upskilling during off-peak
+2026-09-29 04:11:33 PM,EMP11,Chef Chaminda (Demi CDP),Cold & Salad Station,2,4,2,LOW,MEDIUM,Secondary Upskilling during off-peak
+2026-09-29 04:11:33 PM,EMP12,Chef Roshan (Demi CDP),Pizza Station,2,4,2,MODERATE,MEDIUM,Secondary Upskilling during off-peak
+2026-09-29 04:11:33 PM,EMP12,Chef Roshan (Demi CDP),Cold & Salad Station,2,4,2,LOW,MEDIUM,Secondary Upskilling during off-peak
+2026-09-29 04:11:33 PM,EMP13,Chef Anura (Salad Specialist),Pizza Station,2,4,2,MODERATE,MEDIUM,Secondary Upskilling during off-peak
+2026-09-29 04:11:33 PM,EMP13,Chef Anura (Salad Specialist),Fryer Station,2,4,2,MODERATE,MEDIUM,Secondary Upskilling during off-peak
+2026-09-29 04:11:33 PM,EMP15,Chef Kelum (Fryer Tech),Cold & Salad Station,2,4,2,LOW,MEDIUM,Secondary Upskilling during off-peak
+2026-09-29 04:11:33 PM,EMP16,Chef Mahesh (Commis I),Pizza Station,2,4,2,MODERATE,MEDIUM,Secondary Upskilling during off-peak
+2026-09-29 04:11:33 PM,EMP16,Chef Mahesh (Commis I),Cold & Salad Station,2,4,2,LOW,MEDIUM,Secondary Upskilling during off-peak
+2026-09-29 04:11:33 PM,EMP17,Chef Lahiru (Commis I),Cold & Salad Station,2,4,2,LOW,MEDIUM,Secondary Upskilling during off-peak
+2026-09-29 04:11:33 PM,EMP18,Chef Danushka (Commis I),Fryer Station,2,4,2,MODERATE,MEDIUM,Secondary Upskilling during off-peak
+2026-09-29 04:11:33 PM,EMP19,Chef Isuru (Commis I),Cold & Salad Station,2,4,2,LOW,MEDIUM,Secondary Upskilling during off-peak
+2026-09-29 04:11:33 PM,EMP20,Chef Tharindu (Commis II),Cold & Salad Station,2,4,2,LOW,MEDIUM,Secondary Upskilling during off-peak
+2026-09-29 04:11:33 PM,EMP21,Chef Kavinda (Commis II),Cold & Salad Station,2,4,2,LOW,MEDIUM,Secondary Upskilling during off-peak
+2026-09-29 04:11:33 PM,EMP22,Chef Sandun (Commis II),Pizza Station,2,4,2,MODERATE,MEDIUM,Secondary Upskilling during off-peak
+2026-09-29 04:11:33 PM,EMP22,Chef Sandun (Commis II),Fryer Station,2,4,2,MODERATE,MEDIUM,Secondary Upskilling during off-peak
+2026-09-29 04:11:33 PM,EMP23,Chef Chathura (Commis II),Cold & Salad Station,2,4,2,LOW,MEDIUM,Secondary Upskilling during off-peak
+2026-09-29 04:11:33 PM,EMP25,Chef Malith (Commis III),Pizza Station,2,4,2,MODERATE,MEDIUM,Secondary Upskilling during off-peak
+2026-09-29 04:11:33 PM,EMP25,Chef Malith (Commis III),Cold & Salad Station,1,4,3,LOW,MEDIUM,Secondary Upskilling during off-peak
+2026-09-29 04:11:33 PM,EMP26,Trainee Oshada,Fryer Station,2,4,2,MODERATE,MEDIUM,Secondary Upskilling during off-peak
+2026-09-29 04:11:33 PM,EMP26,Trainee Oshada,Cold & Salad Station,2,4,2,LOW,MEDIUM,Secondary Upskilling during off-peak
+2026-09-29 04:11:33 PM,EMP27,Trainee Bimsara,Fryer Station,2,4,2,MODERATE,MEDIUM,Secondary Upskilling during off-peak
+2026-09-29 04:11:33 PM,EMP27,Trainee Bimsara,Cold & Salad Station,1,4,3,LOW,MEDIUM,Secondary Upskilling during off-peak
+2026-09-29 04:11:33 PM,EMP28,Trainee Janith,Pizza Station,2,4,2,MODERATE,MEDIUM,Secondary Upskilling during off-peak
+2026-09-29 04:11:33 PM,EMP29,Trainee Sachith,Fryer Station,2,4,2,MODERATE,MEDIUM,Secondary Upskilling during off-peak
+2026-09-29 04:11:33 PM,EMP29,Trainee Sachith,Cold & Salad Station,2,4,2,LOW,MEDIUM,Secondary Upskilling during off-peak
+2026-09-29 04:11:33 PM,EMP30,Trainee Kaveen,Pizza Station,2,4,2,MODERATE,MEDIUM,Secondary Upskilling during off-peak
+2026-09-29 04:11:33 PM,EMP30,Trainee Kaveen,Cold & Salad Station,1,4,3,LOW,MEDIUM,Secondary Upskilling during off-peak

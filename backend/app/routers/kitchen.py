@@ -1,7 +1,10 @@
 import os
+import csv
+from datetime import datetime
+from typing import List, Dict, Any, Optional
+
 import pandas as pd
 from fastapi import APIRouter
-from typing import List, Dict, Any
 from pydantic import BaseModel
 
 router = APIRouter(prefix="/api/kitchen", tags=["Component 2: Kitchen Efficiency & Staff Optimization"])
@@ -12,9 +15,11 @@ BACKEND_DIR = os.path.abspath(os.path.join(ROUTER_DIR, "..", ".."))    # backend
 
 # Pydantic Schemas
 class ReallocationRequest(BaseModel):
-    staff_name: str
+    chef_name: Optional[str] = None
+    staff_name: Optional[str] = None
     from_station: str
     to_station: str
+    reason: str = "High order queue surge mitigation"
 
 def load_csv_data(filename: str) -> pd.DataFrame:
     p1 = os.path.join(BACKEND_DIR, filename)
@@ -333,6 +338,22 @@ def get_kitchen_metrics():
         ]
     }
 
+@router.get("/upskilling-recommendations")
+def get_upskilling_recommendations():
+    """Reads live recommendations from upskilling_recommendations.csv"""
+    df = load_csv_data("upskilling_recommendations.csv")
+    if df is not None and not df.empty:
+        return df.fillna("").to_dict(orient="records")
+    return []
+
+@router.get("/reallocation-logs")
+def get_reallocation_logs():
+    """Reads historical reallocation events from live_reallocation_log.csv"""
+    df = load_csv_data("live_reallocation_log.csv")
+    if df is not None and not df.empty:
+        return df.fillna("").to_dict(orient="records")
+    return []
+
 @router.post("/schedule/proactive")
 def apply_proactive_schedule():
     forecast = get_workload_forecast()
@@ -376,13 +397,50 @@ def reset_schedule():
     }
 
 @router.post("/reallocate")
-def reallocate_staff(payload: ReallocationRequest):
+def execute_reallocation(payload: ReallocationRequest):
+    """Dynamically reallocates staff, responds to UI, and logs to live_reallocation_log.csv"""
+    target_staff = payload.chef_name or payload.staff_name or "Assigned Cook"
+    timestamp = datetime.now().strftime("%Y-%m-%d %I:%M:%S %p")
+    
+    # Locate live_reallocation_log.csv path
+    log_path = os.path.join(BACKEND_DIR, "data", "live_reallocation_log.csv")
+    if not os.path.exists(log_path):
+        log_path = os.path.join(BACKEND_DIR, "live_reallocation_log.csv")
+        
+    log_entry = [
+        timestamp,
+        target_staff,
+        payload.from_station,
+        payload.to_station,
+        payload.reason,
+        "SUCCESS"
+    ]
+    
+    file_exists = os.path.exists(log_path)
+    logged = False
+    try:
+        with open(log_path, mode="a", newline="", encoding="utf-8") as f:
+            writer = csv.writer(f)
+            if not file_exists or os.path.getsize(log_path) == 0:
+                writer.writerow(["Timestamp", "Chef_Name", "From_Station", "To_Station", "Reason", "Status"])
+            writer.writerow(log_entry)
+        logged = True
+    except Exception:
+        logged = False
+
     return {
         "success": True,
-        "message": f"Successfully reallocated {payload.staff_name} from {payload.from_station} to {payload.to_station}.",
+        "message": f"Successfully reallocated {target_staff} from {payload.from_station} to {payload.to_station}.",
+        "logged_to_csv": logged,
         "updated_stations": {
             "from_station": {"name": payload.from_station, "change": -1},
             "to_station": {"name": payload.to_station, "change": +1}
+        },
+        "reallocation": {
+            "chef": target_staff,
+            "from": payload.from_station,
+            "to": payload.to_station,
+            "timestamp": timestamp
         }
     }
 
