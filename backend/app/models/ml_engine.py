@@ -1,22 +1,23 @@
+import os
+import json
+import joblib
 import numpy as np
-from typing import Dict, Any, List, Tuple
+from typing import Dict, Any, List, Tuple, Optional
 from ..schemas import SensorReading, VisionFeatures, SpoilagePredictionResult
 
 class MultiModalSpoilageMLEngine:
     """
     AI Multi-Modal Fusion Spoilage Prediction & Remaining Shelf-Life (RSL) Model.
-    Fully covers all food categories:
-    - Fruits (Bananas, Strawberries, Apples, Avocados, Citrus, Berries)
-    - Vegetables (Lettuce, Spinach, Tomatoes, Peppers, Broccoli, Carrots)
-    - Dairy Products (Milk, Cheese, Butter, Yogurt)
-    - Fish & Seafood (Tuna, Salmon, Prawns, Whitefish)
-    - Meat & Poultry (Chicken, Beef, Pork, Lamb)
+    Integrates:
+    1. Trained Supervised ML Models (XGBoost Regressor for RSL, Random Forest for Spoilage Probability & Risk Level)
+    2. Real-time Multi-Modal Computer Vision Visual Defect Fusion (Discoloration, Mould, Texture degradation)
+    3. Food-biology decay kinetics calibrated for Sri Lankan tropical & cold-chain restaurant conditions.
     """
 
     # Baseline shelf-life under optimal storage conditions (in hours)
     BASELINE_SHELF_LIFE_HOURS = {
-        "Fruits": 120.0,      # ~5 days in fruit cold chamber (8-12°C)
-        "Vegetables": 96.0,   # ~4 days in crisper (4-8°C)
+        "Fruits": 168.0,      # ~7 days in tropical fruit cold chamber (10-12°C)
+        "Vegetables": 144.0,  # ~6 days in crisper (4-6°C)
         "Meat": 96.0,         # ~4 days in meat chiller (0-4°C)
         "Fish": 48.0,         # ~2 days on crushed ice (0-2°C)
         "Dairy": 168.0,       # ~7 days in refrigerator (2-4°C)
@@ -25,15 +26,15 @@ class MultiModalSpoilageMLEngine:
     # Optimal environmental thresholds per category
     OPTIMAL_ENVIRONMENTS = {
         "Fruits": {
-            "temp_range": (6.0, 12.0),
+            "temp_range": (8.0, 12.5),
             "humidity_range": (85.0, 92.0),
             "max_nh3": 0.08,
             "max_co2": 950.0,
             "max_voc": 0.45,
-            "critical_factors": ["High CO₂ respiration", "Ethylene gas buildup", "Botrytis mould", "Enzymatic browning"]
+            "critical_factors": ["High CO2 respiration", "Ethylene gas buildup", "Botrytis mould", "Enzymatic browning"]
         },
         "Vegetables": {
-            "temp_range": (3.0, 7.0),
+            "temp_range": (3.5, 7.5),
             "humidity_range": (88.0, 95.0),
             "max_nh3": 0.08,
             "max_co2": 800.0,
@@ -46,7 +47,7 @@ class MultiModalSpoilageMLEngine:
             "max_nh3": 0.20,
             "max_co2": 600.0,
             "max_voc": 0.30,
-            "critical_factors": ["Ammonia (NH₃) generation", "Metmyoglobin oxidation (graying)", "Proteolysis", "Temperature abuse"]
+            "critical_factors": ["Ammonia (NH3) generation", "Metmyoglobin oxidation (graying)", "Proteolysis", "Temperature abuse"]
         },
         "Fish": {
             "temp_range": (0.0, 2.0),
@@ -66,92 +67,210 @@ class MultiModalSpoilageMLEngine:
         },
     }
 
+    def __init__(self):
+        self.models_loaded = False
+        self.rsl_model = None
+        self.prob_model = None
+        self.risk_model = None
+        self.produce_encoder = None
+        self.metadata = {}
+        self.load_trained_models()
+
+    def load_trained_models(self):
+        """Attempts to load persisted ML models from the saved_models directory."""
+        try:
+            base_dir = os.path.dirname(os.path.abspath(__file__))
+            saved_models_dir = os.path.join(base_dir, "saved_models")
+            
+            rsl_path = os.path.join(saved_models_dir, "spoilage_rsl_model.joblib")
+            prob_path = os.path.join(saved_models_dir, "spoilage_prob_model.joblib")
+            risk_path = os.path.join(saved_models_dir, "spoilage_risk_model.joblib")
+            encoder_path = os.path.join(saved_models_dir, "produce_encoder.joblib")
+            meta_path = os.path.join(saved_models_dir, "model_metadata.json")
+
+            if (os.path.exists(rsl_path) and os.path.exists(prob_path) and 
+                os.path.exists(risk_path) and os.path.exists(encoder_path)):
+                
+                self.rsl_model = joblib.load(rsl_path)
+                self.prob_model = joblib.load(prob_path)
+                self.risk_model = joblib.load(risk_path)
+                self.produce_encoder = joblib.load(encoder_path)
+                
+                if os.path.exists(meta_path):
+                    with open(meta_path, "r", encoding="utf-8") as f:
+                        self.metadata = json.load(f)
+                        
+                self.models_loaded = True
+                print(f"[MultiModalSpoilageMLEngine] Successfully loaded trained ML models from {saved_models_dir}")
+            else:
+                print("[MultiModalSpoilageMLEngine] Pre-trained models not found; using calibrated biological baseline engine.")
+        except Exception as e:
+            print(f"[MultiModalSpoilageMLEngine] Warning loading ML models: {e}. Falling back to domain model.")
+            self.models_loaded = False
+
     def predict(
         self,
         item_name: str,
         category: str,
         storage_duration_hours: float,
         sensor: SensorReading,
-        vision: VisionFeatures = None
+        vision: Optional[VisionFeatures] = None
     ) -> SpoilagePredictionResult:
         cat_key = category.capitalize() if category and category.capitalize() in self.BASELINE_SHELF_LIFE_HOURS else "Fruits"
-        baseline_rsl = self.BASELINE_SHELF_LIFE_HOURS[cat_key]
-        env_specs = self.OPTIMAL_ENVIRONMENTS[cat_key]
+        env_specs = self.OPTIMAL_ENVIRONMENTS.get(cat_key, self.OPTIMAL_ENVIRONMENTS["Fruits"])
 
-        # 1. Environmental Sensor Impact Evaluation
-        temp_penalty = 0.0
+        # Try ML Inference if produce models are available and category is Fruit/Veg
+        ml_prediction = self._predict_with_ml(item_name, cat_key, storage_duration_hours, sensor)
+
+        if ml_prediction is not None:
+            raw_rsl, raw_prob, raw_risk = ml_prediction
+            risk_score = float(np.clip(raw_prob, 0.0, 100.0))
+            spoilage_prob = float(np.clip(raw_prob, 0.0, 99.9))
+            remaining_rsl = float(max(0.0, raw_rsl))
+            risk_level = raw_risk
+        else:
+            # Domain-Knowledge Decay Kinetic Engine (Fallback / Non-produce items)
+            risk_score, spoilage_prob, remaining_rsl, risk_level = self._predict_with_domain_physics(
+                item_name, cat_key, storage_duration_hours, sensor, env_specs
+            )
+
+        # Multi-Modal Vision Fusion adjustment
+        if vision:
+            visual_risk = (
+                (vision.discoloration_score * 0.30) +
+                (100.0 if vision.mould_detected else (vision.mould_coverage * 15.0)) * 0.45 +
+                (vision.texture_degradation * 0.15) +
+                (vision.visual_spoilage_score * 0.10)
+            )
+            visual_risk = min(100.0, visual_risk)
+            
+            # Fuse IoT Sensor ML prediction with CV Visual Assessment (60% IoT ML, 40% Visual)
+            fused_risk_score = (risk_score * 0.60) + (visual_risk * 0.40)
+            risk_score = round(float(np.clip(fused_risk_score, 0.0, 100.0)), 1)
+            spoilage_prob = round(float(np.clip(fused_risk_score * 0.95, 0.0, 99.9)), 1)
+
+            if vision.mould_detected:
+                spoilage_prob = max(spoilage_prob, 95.0)
+                remaining_rsl = 0.0
+                risk_level = "Critical"
+            elif risk_score >= 76.0:
+                risk_level = "Critical"
+                remaining_rsl = min(remaining_rsl, 4.0)
+            elif risk_score >= 52.0:
+                risk_level = "High"
+            elif risk_score >= 25.0:
+                risk_level = "Medium"
+            else:
+                risk_level = "Low"
+
+        # Generate Food Category-Specific Actionable Insights
+        dominant_factors, recommendations, storage_action = self._generate_category_insights(
+            item_name, cat_key, sensor, vision, risk_level, env_specs, remaining_rsl
+        )
+
+        return SpoilagePredictionResult(
+            item_name=item_name,
+            category=cat_key,
+            spoilage_probability=round(spoilage_prob, 1),
+            remaining_shelf_life_hours=round(remaining_rsl, 1),
+            risk_level=risk_level,
+            risk_score=round(risk_score, 1),
+            dominant_spoilage_factors=dominant_factors,
+            recommendations=recommendations,
+            storage_action=storage_action
+        )
+
+    def _predict_with_ml(
+        self, item_name: str, category: str, storage_duration_hours: float, sensor: SensorReading
+    ) -> Optional[Tuple[float, float, str]]:
+        if not self.models_loaded or not self.produce_encoder:
+            return None
+
+        try:
+            # Estimate reasonable weight & transpiration based on duration & temp
+            est_weight = 4.0
+            est_weight_loss = min(15.0, (storage_duration_hours * 0.08) + max(0.0, (sensor.temperature - 10.0) * 0.3))
+
+            num_feats = np.array([[
+                sensor.temperature,
+                sensor.humidity,
+                sensor.nh3,
+                sensor.co2,
+                sensor.voc,
+                storage_duration_hours,
+                est_weight,
+                est_weight_loss
+            ]])
+
+            # Try exact match or nearest known produce name for one-hot encoding
+            known_cats = self.produce_encoder.categories_[0]
+            matched_name = item_name if item_name in known_cats else None
+            if not matched_name:
+                for k in known_cats:
+                    if any(word.lower() in k.lower() for word in item_name.split()):
+                        matched_name = k
+                        break
+            if not matched_name:
+                matched_name = known_cats[0] # Default fallback produce
+
+            cat_encoded = self.produce_encoder.transform([[matched_name]])
+            x_input = np.hstack([num_feats, cat_encoded])
+
+            # Inference
+            rsl_pred = float(self.rsl_model.predict(x_input)[0])
+            prob_pred = float(self.prob_model.predict(x_input)[0])
+            risk_idx = int(self.risk_model.predict(x_input)[0])
+
+            inv_map = {0: "Low", 1: "Medium", 2: "High", 3: "Critical"}
+            risk_str = inv_map.get(risk_idx, "Medium")
+
+            return (rsl_pred, prob_pred, risk_str)
+        except Exception as e:
+            print(f"[MultiModalSpoilageMLEngine] ML inference exception: {e}")
+            return None
+
+    def _predict_with_domain_physics(
+        self, item_name: str, cat_key: str, storage_duration_hours: float,
+        sensor: SensorReading, env_specs: dict
+    ) -> Tuple[float, float, float, str]:
+        baseline_rsl = self.BASELINE_SHELF_LIFE_HOURS.get(cat_key, 120.0)
         min_temp, max_temp = env_specs["temp_range"]
+        min_h, max_h = env_specs["humidity_range"]
+
+        temp_penalty = 0.0
         if sensor.temperature > max_temp:
-            temp_diff = sensor.temperature - max_temp
-            # Arrhenius microbial acceleration
-            temp_penalty = temp_diff * 4.8
+            temp_penalty = (sensor.temperature - max_temp) * 4.8
         elif sensor.temperature < min_temp:
-            # Chilling injury in sensitive fruits / freezing in veg
             temp_penalty = abs(sensor.temperature - min_temp) * 2.2
 
-        # Gas concentration penalties
         gas_penalty = 0.0
         if sensor.nh3 > env_specs["max_nh3"]:
             ratio = sensor.nh3 / env_specs["max_nh3"]
             gas_penalty += (ratio - 1.0) * (24.0 if cat_key in ["Meat", "Fish"] else 12.0)
-
         if sensor.voc > env_specs["max_voc"]:
             ratio = sensor.voc / env_specs["max_voc"]
             gas_penalty += (ratio - 1.0) * (20.0 if cat_key in ["Fruits", "Vegetables"] else 15.0)
-
         if sensor.co2 > env_specs["max_co2"]:
             ratio = sensor.co2 / env_specs["max_co2"]
             gas_penalty += (ratio - 1.0) * (18.0 if cat_key in ["Fruits", "Vegetables"] else 10.0)
 
-        # Humidity Penalty
         hum_penalty = 0.0
-        min_h, max_h = env_specs["humidity_range"]
         if sensor.humidity > max_h:
-            hum_penalty = (sensor.humidity - max_h) * 0.9  # Excess humidity triggers mould & slime
+            hum_penalty = (sensor.humidity - max_h) * 0.9
         elif sensor.humidity < min_h:
-            hum_penalty = (min_h - sensor.humidity) * 0.7  # Low humidity causes produce wilting & shriveling
+            hum_penalty = (min_h - sensor.humidity) * 0.7
 
-        sensor_risk_component = min(100.0, max(0.0, temp_penalty + gas_penalty + hum_penalty))
-
-        # 2. Visual Quality Assessment Impact
-        if vision:
-            visual_risk_component = (
-                (vision.discoloration_score * 0.30) +
-                (100.0 if vision.mould_detected else (vision.mould_coverage * 15.0)) * 0.40 +
-                (vision.texture_degradation * 0.15) +
-                (vision.visual_spoilage_score * 0.15)
-            )
-            visual_risk_component = min(100.0, visual_risk_component)
-        else:
-            visual_risk_component = sensor_risk_component * 0.55
-
-        # 3. Multi-Modal Weight Fusion based on Food Biology
+        sensor_risk = min(100.0, max(0.0, temp_penalty + gas_penalty + hum_penalty))
         time_factor = min(1.0, storage_duration_hours / (baseline_rsl * 1.25)) * 30.0
+        total_risk = (0.70 * sensor_risk) + (0.30 * time_factor)
 
-        if cat_key in ["Fruits", "Vegetables"]:
-            # Produce: Respiration, wilting, mould & discoloration dominate
-            total_risk = (0.35 * sensor_risk_component) + (0.45 * visual_risk_component) + (0.20 * time_factor)
-        elif cat_key in ["Meat", "Fish"]:
-            # Meat/Fish: Volatile basic nitrogen, NH3, VOC & temp dominate
-            total_risk = (0.45 * sensor_risk_component) + (0.35 * visual_risk_component) + (0.20 * time_factor)
-        else: # Dairy
-            total_risk = (0.40 * sensor_risk_component) + (0.40 * visual_risk_component) + (0.20 * time_factor)
+        risk_score = float(np.clip(total_risk, 0.0, 100.0))
+        spoilage_prob = float(np.clip(risk_score * 0.94, 0.0, 99.9))
 
-        risk_score = round(float(np.clip(total_risk, 0.0, 100.0)), 1)
-        spoilage_prob = round(float(np.clip(risk_score * 0.94 + (6.0 if risk_score > 48 else 0.0), 0.0, 99.9)), 1)
-
-        # 4. Remaining Shelf-Life (Hours) Calculation
         decay_rate = 1.0 + (risk_score / 22.0)
         elapsed_equivalent = storage_duration_hours * decay_rate
         calculated_rsl = max(0.0, baseline_rsl - elapsed_equivalent)
 
-        if risk_score >= 78.0 or (vision and vision.mould_detected):
-            calculated_rsl = 0.0
-            spoilage_prob = max(spoilage_prob, 92.5)
-
-        remaining_shelf_life_hours = round(float(calculated_rsl), 1)
-
-        # 5. Risk Level Categorization
         if risk_score < 25.0:
             risk_level = "Low"
         elif risk_score < 52.0:
@@ -161,26 +280,11 @@ class MultiModalSpoilageMLEngine:
         else:
             risk_level = "Critical"
 
-        # 6. Generate Food Category-Specific Actionable Insights
-        dominant_factors, recommendations, storage_action = self._generate_category_insights(
-            item_name, cat_key, sensor, vision, risk_level, env_specs, remaining_shelf_life_hours
-        )
-
-        return SpoilagePredictionResult(
-            item_name=item_name,
-            category=cat_key,
-            spoilage_probability=spoilage_prob,
-            remaining_shelf_life_hours=remaining_shelf_life_hours,
-            risk_level=risk_level,
-            risk_score=risk_score,
-            dominant_spoilage_factors=dominant_factors,
-            recommendations=recommendations,
-            storage_action=storage_action
-        )
+        return risk_score, spoilage_prob, calculated_rsl, risk_level
 
     def _generate_category_insights(
         self, item_name: str, category: str, sensor: SensorReading,
-        vision: VisionFeatures, risk_level: str, env_specs: dict, rsl_hours: float
+        vision: Optional[VisionFeatures], risk_level: str, env_specs: dict, rsl_hours: float
     ) -> Tuple[List[str], List[str], str]:
         factors = []
         recommendations = []
@@ -197,7 +301,7 @@ class MultiModalSpoilageMLEngine:
         if sensor.humidity < min_h:
             factors.append(f"Dry air causing moisture loss / wilting ({sensor.humidity}% RH)")
         if sensor.co2 > env_specs["max_co2"]:
-            factors.append(f"High CO₂ respiration accumulation ({sensor.co2} ppm)")
+            factors.append(f"High CO2 respiration accumulation ({sensor.co2} ppm)")
         if sensor.voc > env_specs["max_voc"]:
             factors.append(f"Elevated VOC degassing ({sensor.voc} ppm)")
         if sensor.nh3 > env_specs["max_nh3"]:

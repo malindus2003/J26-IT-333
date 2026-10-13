@@ -1,0 +1,137 @@
+{
+  "dataset_summary": {
+    "total_samples": 4695,
+    "train_samples": 3756,
+    "test_samples": 939,
+    "num_features": 20,
+    "numeric_feature_count": 8,
+    "produce_categories_count": 12
+  },
+  "regression_benchmarks": {
+    "RSL_RandomForestRegressor": {
+      "r2_score": 0.9825,
+      "rmse_hours": 9.061,
+      "mae_hours": 4.086
+    },
+    "RSL_XGBoostRegressor": {
+      "r2_score": 0.9878,
+      "rmse_hours": 7.553,
+      "mae_hours": 3.643
+    },
+    "RSL_GradientBoostingRegressor": {
+      "r2_score": 0.9865,
+      "rmse_hours": 7.95,
+      "mae_hours": 4.025
+    },
+    "Prob_RandomForestRegressor": {
+      "r2_score": 0.9988,
+      "rmse_pct": 1.328,
+      "mae_pct": 0.81
+    },
+    "Prob_XGBoostRegressor": {
+      "r2_score": 0.9986,
+      "rmse_pct": 1.421,
+      "mae_pct": 0.884
+    },
+    "Prob_GradientBoostingRegressor": {
+      "r2_score": 0.9983,
+      "rmse_pct": 1.548,
+      "mae_pct": 0.967
+    }
+  },
+  "classification_benchmarks": {
+    "Risk_RandomForestClassifier": {
+      "accuracy": 0.9894,
+      "f1_macro": 0.9842,
+      "f1_weighted": 0.9893,
+      "confusion_matrix": [
+        [
+          496,
+          1,
+          0,
+          0
+        ],
+        [
+          3,
+          123,
+          0,
+          0
+        ],
+        [
+          0,
+          1,
+          109,
+          2
+        ],
+        [
+          0,
+          0,
+          3,
+          201
+        ]
+      ]
+    },
+    "Risk_XGBoostClassifier": {
+      "accuracy": 0.9851,
+      "f1_macro": 0.9764,
+      "f1_weighted": 0.9851,
+      "confusion_matrix": [
+        [
+          495,
+          2,
+          0,
+          0
+        ],
+        [
+          3,
+          119,
+          4,
+          0
+        ],
+        [
+          0,
+          1,
+          110,
+          1
+        ],
+        [
+          0,
+          0,
+          3,
+          201
+        ]
+      ]
+    },
+    "Risk_GradientBoostingClassifier": {
+      "accuracy": 0.9851,
+      "f1_macro": 0.9759,
+      "f1_weighted": 0.9851,
+      "confusion_matrix": [
+        [
+          496,
+          1,
+          0,
+          0
+        ],
+        [
+          3,
+          119,
+          4,
+          0
+        ],
+        [
+          0,
+          1,
+          109,
+          2
+        ],
+        [
+          0,
+          0,
+          3,
+          201
+        ]
+      ]
+    }
+  }
+}
