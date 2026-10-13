@@ -67,12 +67,12 @@ export default function KitchenStaffDashboard({ isDarkMode, currentRole = 'admin
       if (backendData.ai_allocation_suggestions && backendData.ai_allocation_suggestions.length > 0) {
         const dynamicDirectives = backendData.ai_allocation_suggestions.map((sug, idx) => ({
           id: `dir-backend-${idx}`,
-          stationId: idx === 0 ? "station-1" : (idx === 1 ? "station-3" : "station-2"),
+          stationId: idx === 0 ? "station-1" : (idx === 1 ? "station-2" : "station-4"),
           priority: idx === 0 ? "CRITICAL" : (idx === 1 ? "HIGH" : "MEDIUM"),
           title: sug,
           actionText: sug.replace(/⚠️|⚡|🔥/g, '').trim(),
-          targetStaff: idx === 0 ? "S. Fernando" : (idx === 1 ? "T. Silva" : "K. Perera"),
-          targetStation: idx === 0 ? "Hot Wok & Kottu Station" : (idx === 1 ? "Grill & Seafood Station" : "Curry & Rice Assembly Bay"),
+          targetStaff: idx === 0 ? "S. Fernando" : (idx === 1 ? "T. Silva" : "A. Jayasinghe"),
+          targetStation: idx === 0 ? "Hot Kitchen" : (idx === 1 ? "Grill" : "Pizza"),
           mitigatedLoad: 50,
           mitigatedQueue: 3,
           resolved: false
@@ -86,22 +86,25 @@ export default function KitchenStaffDashboard({ isDarkMode, currentRole = 'admin
       setData({
         researcher: "Pahesara H.H.D.S (IT23349292)",
         module: "Component 2: Kitchen Efficiency and Staff Optimization Analytics",
-        overall_kitchen_efficiency: "88.5%",
-        avg_ticket_fulfillment_time: "7.4 mins",
-        active_bottlenecks_count: 1,
+        overall_kitchen_efficiency: "98.2%",
+        avg_ticket_fulfillment_time: "6.8 mins",
+        actual_total_load: 121.0,
+        predicted_total_load: 114.6,
+        active_bottlenecks_count: 2,
         stations: [
-          { id: "station-1", name: "Hot Wok & Kottu Station", active_cooks: 2, recommended_cooks: 3, avg_prep_time_mins: 8.5, target_prep_time_mins: 6.0, queue_length: 14, load_level: 92, bottleneck_status: "High Delay Risk", action: "Reallocate S. Fernando from Salad & Cold Prep Station to Hot Wok & Kottu Station based on skill matching (Enrolled in 'High-Volume Stir-Fry Optimization')" },
-          { id: "station-2", name: "Curry & Rice Assembly Bay", active_cooks: 2, recommended_cooks: 2, avg_prep_time_mins: 4.2, target_prep_time_mins: 4.5, queue_length: 4, load_level: 55, bottleneck_status: "Smooth Flow", action: "Maintain current line staffing" },
-          { id: "station-3", name: "Grill & Seafood Station", active_cooks: 1, recommended_cooks: 2, avg_prep_time_mins: 14.0, target_prep_time_mins: 10.0, queue_length: 9, load_level: 84, bottleneck_status: "Moderate Queue Load", action: "Reallocate T. Silva to Grill Station & prep protein cuts based on skill matching (Seafood Freshness Grading & Quick-Sear Techniques)" },
-          { id: "station-4", name: "Salad & Cold Prep Station", active_cooks: 2, recommended_cooks: 1, avg_prep_time_mins: 3.0, target_prep_time_mins: 4.0, queue_length: 2, load_level: 30, bottleneck_status: "Underutilized", action: "Reassign S. Fernando to Hot Wok & Kottu Station during 7 PM rush based on skill matching" }
+          { id: "station-1", name: "Hot Kitchen", actual_load: 64.1, predicted_load: 60.7, active_cooks: 2, recommended_cooks: 3, avg_prep_time_mins: 8.5, target_prep_time_mins: 6.0, queue_length: 14, load_level: 92, predicted_load_level: 87, bottleneck_status: "High Delay Risk", action: "Reallocate S. Fernando from Cold Salad to Hot Kitchen based on skill matching" },
+          { id: "station-2", name: "Grill", actual_load: 18.2, predicted_load: 17.2, active_cooks: 1, recommended_cooks: 2, avg_prep_time_mins: 14.0, target_prep_time_mins: 10.0, queue_length: 9, load_level: 84, predicted_load_level: 79, bottleneck_status: "Moderate Queue Load", action: "Reallocate T. Silva to Grill & prep protein cuts based on skill matching" },
+          { id: "station-3", name: "Cold Salad", actual_load: 16.9, predicted_load: 16.0, active_cooks: 2, recommended_cooks: 1, avg_prep_time_mins: 3.0, target_prep_time_mins: 4.0, queue_length: 2, load_level: 30, predicted_load_level: 28, bottleneck_status: "Underutilized", action: "Reassign S. Fernando to Hot Kitchen during peak rush" },
+          { id: "station-4", name: "Pizza", actual_load: 14.5, predicted_load: 13.8, active_cooks: 2, recommended_cooks: 2, avg_prep_time_mins: 5.2, target_prep_time_mins: 5.0, queue_length: 4, load_level: 55, predicted_load_level: 52, bottleneck_status: "Smooth Flow", action: "Maintain current deck oven line pacing" },
+          { id: "station-5", name: "Fryer", actual_load: 7.3, predicted_load: 6.9, active_cooks: 1, recommended_cooks: 1, avg_prep_time_mins: 3.5, target_prep_time_mins: 4.0, queue_length: 2, load_level: 40, predicted_load_level: 38, bottleneck_status: "Smooth Flow", action: "Maintain current line staffing & prep batch oil temperature" }
         ],
         staff: [
-          { id: "staff-1", name: "K. Perera (Senior Line Chef)", assigned_station: "Hot Wok & Kottu Station", shift: "11:00 AM - 09:30 PM", efficiency_rating: 94, skill_level: "Expert (Level 4)", speed_score: "4.8 / 5.0", skill_gap: "Advanced Pastry & Bakery", training_recommendation: "Executive Kitchen Leadership & Precision Temperature Control", career_progression: "Ready for Sous-Chef Promotion (88% Milestones Complete)" },
-          { id: "staff-2", name: "S. Fernando (Junior Chef)", assigned_station: "Salad & Cold Prep Station", shift: "03:00 PM - 11:00 PM", efficiency_rating: 78, skill_level: "Intermediate (Level 2)", speed_score: "3.9 / 5.0", skill_gap: "High-Heat Wok Handling & Kottu Speed", training_recommendation: "Enrolled in 'High-Volume Stir-Fry Optimization' (Module 3)", career_progression: "Target: Line Cook Specialist (62% Completed)" },
-          { id: "staff-3", name: "T. Silva (Prep Cook)", assigned_station: "Grill & Seafood Station", shift: "10:00 AM - 07:00 PM", efficiency_rating: 85, skill_level: "Intermediate (Level 3)", speed_score: "4.2 / 5.0", skill_gap: "HACCP Seafood Core Temperature Monitoring", training_recommendation: "Seafood Freshness Grading & Quick-Sear Techniques", career_progression: "Grill Master Track (74% Completed)" },
-          { id: "staff-4", name: "A. Jayasinghe (Station Lead)", assigned_station: "Curry & Rice Assembly Bay", shift: "07:00 AM - 04:00 PM", efficiency_rating: 91, skill_level: "Expert (Level 4)", speed_score: "4.7 / 5.0", skill_gap: "High-Volume Batch Inventory Planning", training_recommendation: "Mastering Sri Lankan Spice Ratios & Fast Assembly Lines", career_progression: "Head of Curry Bay Track (82% Completed)" },
-          { id: "staff-5", name: "M. Wickramasinghe (Kitchen Trainee)", assigned_station: "Salad & Cold Prep Station", shift: "11:00 AM - 08:00 PM", efficiency_rating: 64, skill_level: "Trainee (Level 1)", speed_score: "3.1 / 5.0", skill_gap: "Knife Handling, Prep Hygiene & Portion Control", training_recommendation: "Foundation Kitchen Safety, Knife Skills & Hygiene Protocols", career_progression: "Apprentice Onboarding (35% Completed)" },
-          { id: "staff-6", name: "R. Dissanayake (Kitchen Trainee)", assigned_station: "Hot Wok & Assembly Support", shift: "01:00 PM - 10:00 PM", efficiency_rating: 58, skill_level: "Trainee (Level 1)", speed_score: "2.8 / 5.0", skill_gap: "Station Setup & Order Ticket Flow", training_recommendation: "Basic Line Cooking Fundamentals & Ticket Dispatching", career_progression: "Junior Line Apprentice (25% Completed)" }
+          { id: "staff-1", name: "K. Perera (Senior Line Chef)", assigned_station: "Hot Kitchen", shift: "11:00 AM - 09:30 PM", efficiency_rating: 94, skill_level: "Expert (Level 4)", speed_score: "4.8 / 5.0", skill_gap: "Advanced Pastry & Bakery", training_recommendation: "Executive Kitchen Leadership & Precision Temperature Control", career_progression: "Ready for Sous-Chef Promotion (88% Milestones Complete)" },
+          { id: "staff-2", name: "S. Fernando (Junior Chef)", assigned_station: "Cold Salad", shift: "03:00 PM - 11:00 PM", efficiency_rating: 78, skill_level: "Intermediate (Level 2)", speed_score: "3.9 / 5.0", skill_gap: "High-Heat Saute & Wok Handling", training_recommendation: "Enrolled in 'High-Volume Stir-Fry Optimization' (Module 3)", career_progression: "Target: Line Cook Specialist (62% Completed)" },
+          { id: "staff-3", name: "T. Silva (Prep Cook)", assigned_station: "Grill", shift: "10:00 AM - 07:00 PM", efficiency_rating: 85, skill_level: "Intermediate (Level 3)", speed_score: "4.2 / 5.0", skill_gap: "HACCP Seafood Core Temperature Monitoring", training_recommendation: "Seafood Freshness Grading & Quick-Sear Techniques", career_progression: "Grill Master Track (74% Completed)" },
+          { id: "staff-4", name: "A. Jayasinghe (Station Lead)", assigned_station: "Pizza", shift: "07:00 AM - 04:00 PM", efficiency_rating: 91, skill_level: "Expert (Level 4)", speed_score: "4.7 / 5.0", skill_gap: "High-Volume Batch Inventory Planning", training_recommendation: "Wood-Fired Pizza Deck Oven Management & Crust Proofing", career_progression: "Head of Pizza Track (82% Completed)" },
+          { id: "staff-5", name: "M. Wickramasinghe (Kitchen Trainee)", assigned_station: "Fryer", shift: "11:00 AM - 08:00 PM", efficiency_rating: 64, skill_level: "Trainee (Level 1)", speed_score: "3.1 / 5.0", skill_gap: "Knife Handling, Prep Hygiene & Portion Control", training_recommendation: "Foundation Kitchen Safety, Deep Fryer Safety & Oil Filtering", career_progression: "Apprentice Onboarding (35% Completed)" },
+          { id: "staff-6", name: "R. Dissanayake (Kitchen Trainee)", assigned_station: "Hot Kitchen", shift: "01:00 PM - 10:00 PM", efficiency_rating: 58, skill_level: "Trainee (Level 1)", speed_score: "2.8 / 5.0", skill_gap: "Station Setup & Order Ticket Flow", training_recommendation: "Basic Line Cooking Fundamentals & Ticket Dispatching", career_progression: "Junior Line Apprentice (25% Completed)" }
         ],
         hourly_peak_forecast: [
           { hour: "07:00", predicted_orders: 28, staff_required: 4, actual_staff: 4 },
@@ -176,10 +179,10 @@ export default function KitchenStaffDashboard({ isDarkMode, currentRole = 'admin
       id: newId,
       stationId: "station-1",
       priority: "REAL-TIME SURGE",
-      title: `🚨 REAL-TIME QUEUE SURGE (${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}): Ticket queue at Hot Wok & Kottu Station surged to 18 tickets!`,
-      actionText: "Reallocate S. Fernando from Cold Prep to Hot Wok Station immediately to clear queue overload",
+      title: `🚨 REAL-TIME QUEUE SURGE (${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}): Ticket queue at Hot Kitchen surged to 18 tickets!`,
+      actionText: "Reallocate S. Fernando from Cold Salad to Hot Kitchen immediately to clear queue overload",
       targetStaff: "S. Fernando",
-      targetStation: "Hot Wok & Kottu Station",
+      targetStation: "Hot Kitchen",
       mitigatedLoad: 50,
       mitigatedQueue: 3,
       resolved: false
@@ -189,13 +192,14 @@ export default function KitchenStaffDashboard({ isDarkMode, currentRole = 'admin
 
     if (data && data.stations) {
       const updatedStations = data.stations.map(st => {
-        if (st.id === "station-1") {
+        if (st.id === "station-1" || st.name === "Hot Kitchen") {
           return {
             ...st,
             load_level: 98,
+            actual_load: Number(((st.actual_load || 64.1) + 12).toFixed(1)),
             queue_length: 18,
             bottleneck_status: "Critical Queue Surge",
-            action: "Reallocate S. Fernando from Salad & Cold Prep Station immediately based on skill matching"
+            action: "Reallocate S. Fernando from Cold Salad immediately based on skill matching"
           };
         }
         return st;
@@ -203,7 +207,7 @@ export default function KitchenStaffDashboard({ isDarkMode, currentRole = 'admin
       setData({ ...data, stations: updatedStations });
     }
 
-    setDismissedToast("🚨 New real-time queue alert popped up! High order volume detected at Hot Wok Station.");
+    setDismissedToast("🚨 New real-time queue alert popped up! High order volume detected at Hot Kitchen.");
     setTimeout(() => setDismissedToast(""), 4000);
   };
 
@@ -214,14 +218,19 @@ export default function KitchenStaffDashboard({ isDarkMode, currentRole = 'admin
   const [menuSearchQuery, setMenuSearchQuery] = useState("");
 
   const [menuItems, setMenuItems] = useState([
-    { id: "sl-1", name: "Chicken Fried Rice", category: "Sri Lankan", station: "Cooking Station", icon: "🍳", checked: true, size: "Medium", qty: 2, defaultStaff: "K. Perera (Senior Line Chef)" },
-    { id: "sl-2", name: "Chicken Kottu", category: "Sri Lankan", station: "Cooking Station", icon: "🍳", checked: true, size: "Medium", qty: 1, defaultStaff: "S. Fernando (Junior Chef)" },
-    { id: "sl-3", name: "Cheese Kottu Special", category: "Sri Lankan", station: "Cooking Station", icon: "🍳", checked: false, size: "Large", qty: 1, defaultStaff: "K. Perera (Senior Line Chef)" },
-    { id: "sl-4", name: "Sri Lankan Fish Curry & Rice", category: "Sri Lankan", station: "Curry & Rice Assembly Bay", icon: "🍲", checked: false, size: "Regular", qty: 1, defaultStaff: "A. Jayasinghe (Station Lead)" },
-    { id: "pz-1", name: "Devilled Chicken Pizza", category: "Pizza", station: "Cooking Station", icon: "🍕", checked: true, size: "Large (15\")", qty: 1, defaultStaff: "S. Fernando (Junior Chef)" },
-    { id: "pz-2", name: "BBQ Chicken Pizza", category: "Pizza", station: "Cooking Station", icon: "🍕", checked: false, size: "Medium (12\")", qty: 1, defaultStaff: "K. Perera (Senior Line Chef)" },
-    { id: "pz-3", name: "Seafood Supreme Pizza", category: "Pizza", station: "Grill & Seafood Station", icon: "🍕", checked: false, size: "Large (15\")", qty: 1, defaultStaff: "T. Silva (Prep Cook)" },
-    { id: "pz-4", name: "Spicy Mutton Kottu Pizza", category: "Pizza", station: "Cooking Station", icon: "🍕", checked: false, size: "Medium (12\")", qty: 1, defaultStaff: "K. Perera (Senior Line Chef)" },
+    { id: "hk-1", name: "Chicken Fried Rice", category: "Hot Kitchen", station: "Hot Kitchen", icon: "🍳", checked: true, size: "Medium", qty: 2, defaultStaff: "K. Perera (Senior Line Chef)" },
+    { id: "hk-2", name: "Chicken Kottu", category: "Hot Kitchen", station: "Hot Kitchen", icon: "🍳", checked: true, size: "Medium", qty: 1, defaultStaff: "R. Dissanayake (Kitchen Trainee)" },
+    { id: "hk-3", name: "Cheese Kottu Special", category: "Hot Kitchen", station: "Hot Kitchen", icon: "🍳", checked: false, size: "Large", qty: 1, defaultStaff: "K. Perera (Senior Line Chef)" },
+    { id: "hk-4", name: "Sri Lankan Fish Curry & Rice", category: "Hot Kitchen", station: "Hot Kitchen", icon: "🍲", checked: false, size: "Regular", qty: 1, defaultStaff: "K. Perera (Senior Line Chef)" },
+    { id: "gr-1", name: "Jumbo Grilled Seafood Platter", category: "Grill", station: "Grill", icon: "🥩", checked: true, size: "Regular", qty: 1, defaultStaff: "T. Silva (Prep Cook)" },
+    { id: "gr-2", name: "Charbroiled BBQ Chicken Steak", category: "Grill", station: "Grill", icon: "🥩", checked: false, size: "Large", qty: 1, defaultStaff: "T. Silva (Prep Cook)" },
+    { id: "cs-1", name: "Cold Avocado Garden Salad", category: "Cold Salad", station: "Cold Salad", icon: "🥗", checked: false, size: "Regular", qty: 1, defaultStaff: "S. Fernando (Junior Chef)" },
+    { id: "cs-2", name: "Mediterranean Feta Salad", category: "Cold Salad", station: "Cold Salad", icon: "🥗", checked: false, size: "Medium", qty: 1, defaultStaff: "S. Fernando (Junior Chef)" },
+    { id: "pz-1", name: "Devilled Chicken Pizza", category: "Pizza", station: "Pizza", icon: "🍕", checked: true, size: "Large (15\")", qty: 1, defaultStaff: "A. Jayasinghe (Station Lead)" },
+    { id: "pz-2", name: "BBQ Chicken Pizza", category: "Pizza", station: "Pizza", icon: "🍕", checked: false, size: "Medium (12\")", qty: 1, defaultStaff: "A. Jayasinghe (Station Lead)" },
+    { id: "pz-3", name: "Seafood Supreme Pizza", category: "Pizza", station: "Pizza", icon: "🍕", checked: false, size: "Large (15\")", qty: 1, defaultStaff: "A. Jayasinghe (Station Lead)" },
+    { id: "fy-1", name: "Hot Butter Cuttlefish", category: "Fryer", station: "Fryer", icon: "🍤", checked: true, size: "Medium", qty: 1, defaultStaff: "M. Wickramasinghe (Kitchen Trainee)" },
+    { id: "fy-2", name: "Crispy Vegetable Samosas", category: "Fryer", station: "Fryer", icon: "🥟", checked: false, size: "Portion (6 pcs)", qty: 1, defaultStaff: "M. Wickramasinghe (Kitchen Trainee)" },
     { id: "bv-1", name: "Coca-Cola / Sprite", category: "Beverages", station: "Beverage Station", icon: "🥤", checked: true, size: "500ml", qty: 2, defaultStaff: "Beverage Counter" },
     { id: "bv-2", name: "Fresh Mango Iced Tea", category: "Beverages", station: "Beverage Station", icon: "🥤", checked: false, size: "Regular Glass", qty: 2, defaultStaff: "Beverage Counter" }
   ]);
@@ -248,13 +257,15 @@ export default function KitchenStaffDashboard({ isDarkMode, currentRole = 'admin
       priority: "Normal",
       cookingTasks: [
         { item: "2 × Chicken Fried Rice (Medium)", assignedStaff: "K. Perera (Senior Line Chef)", status: "In Prep" },
-        { item: "1 × Chicken Kottu (Medium)", assignedStaff: "S. Fernando (Junior Chef)", status: "In Prep" }
+        { item: "1 × Chicken Kottu (Medium)", assignedStaff: "R. Dissanayake (Kitchen Trainee)", status: "In Prep" }
       ],
       beverageTasks: [
-        { item: "2 × Coke (500ml)", assignedStaff: "Beverage Station Counter", status: "Ready" }
+        { item: "2 × Coke (500ml)", assignedStaff: "Beverage Counter", status: "Ready" }
       ],
       grillTasks: [],
-      coldTasks: []
+      coldTasks: [],
+      pizzaTasks: [],
+      fryerTasks: []
     },
     {
       id: "ord-1043",
@@ -264,16 +275,21 @@ export default function KitchenStaffDashboard({ isDarkMode, currentRole = 'admin
       waiterApp: "Waiter Mobile Terminal #1",
       priority: "Rush / High",
       cookingTasks: [
-        { item: "1 × Cheese Kottu Special (Large)", assignedStaff: "K. Perera (Senior Line Chef)", status: "In Prep" },
-        { item: "1 × Devilled Chicken Pizza (Large 15\")", assignedStaff: "S. Fernando (Junior Chef)", status: "In Prep" }
+        { item: "1 × Cheese Kottu Special (Large)", assignedStaff: "K. Perera (Senior Line Chef)", status: "In Prep" }
+      ],
+      pizzaTasks: [
+        { item: "1 × Devilled Chicken Pizza (Large 15\")", assignedStaff: "A. Jayasinghe (Station Lead)", status: "In Prep" }
       ],
       beverageTasks: [
-        { item: "3 × Fresh Mango Iced Tea", assignedStaff: "Beverage Station Counter", status: "In Prep" }
+        { item: "3 × Fresh Mango Iced Tea", assignedStaff: "Beverage Counter", status: "In Prep" }
       ],
       grillTasks: [
         { item: "1 × Jumbo Grilled Seafood Platter", assignedStaff: "T. Silva (Prep Cook)", status: "In Prep" }
       ],
-      coldTasks: []
+      coldTasks: [],
+      fryerTasks: [
+        { item: "1 × Hot Butter Cuttlefish (Medium)", assignedStaff: "M. Wickramasinghe (Kitchen Trainee)", status: "In Prep" }
+      ]
     }
   ]);
 
@@ -290,15 +306,27 @@ export default function KitchenStaffDashboard({ isDarkMode, currentRole = 'admin
     }
 
     const newCookingTasks = selectedItems
-      .filter(i => i.station === "Cooking Station" || i.category === "Sri Lankan")
+      .filter(i => i.station === "Hot Kitchen" || i.category === "Hot Kitchen")
+      .map(i => ({ item: `${i.qty} × ${i.name} (${i.size})`, assignedStaff: i.defaultStaff, status: "In Prep" }));
+
+    const newGrillTasks = selectedItems
+      .filter(i => i.station === "Grill" || i.category === "Grill")
+      .map(i => ({ item: `${i.qty} × ${i.name} (${i.size})`, assignedStaff: i.defaultStaff, status: "In Prep" }));
+
+    const newColdTasks = selectedItems
+      .filter(i => i.station === "Cold Salad" || i.category === "Cold Salad")
+      .map(i => ({ item: `${i.qty} × ${i.name} (${i.size})`, assignedStaff: i.defaultStaff, status: "In Prep" }));
+
+    const newPizzaTasks = selectedItems
+      .filter(i => i.station === "Pizza" || i.category === "Pizza")
+      .map(i => ({ item: `${i.qty} × ${i.name} (${i.size})`, assignedStaff: i.defaultStaff, status: "In Prep" }));
+
+    const newFryerTasks = selectedItems
+      .filter(i => i.station === "Fryer" || i.category === "Fryer")
       .map(i => ({ item: `${i.qty} × ${i.name} (${i.size})`, assignedStaff: i.defaultStaff, status: "In Prep" }));
 
     const newBevTasks = selectedItems
       .filter(i => i.category === "Beverages" || i.station === "Beverage Station")
-      .map(i => ({ item: `${i.qty} × ${i.name} (${i.size})`, assignedStaff: i.defaultStaff, status: "In Prep" }));
-
-    const newGrillTasks = selectedItems
-      .filter(i => i.station === "Grill & Seafood Station")
       .map(i => ({ item: `${i.qty} × ${i.name} (${i.size})`, assignedStaff: i.defaultStaff, status: "In Prep" }));
 
     const newOrder = {
@@ -309,9 +337,11 @@ export default function KitchenStaffDashboard({ isDarkMode, currentRole = 'admin
       waiterApp: "Waiter Mobile Terminal",
       priority: selectedPriority,
       cookingTasks: newCookingTasks,
-      beverageTasks: newBevTasks,
       grillTasks: newGrillTasks,
-      coldTasks: []
+      coldTasks: newColdTasks,
+      pizzaTasks: newPizzaTasks,
+      fryerTasks: newFryerTasks,
+      beverageTasks: newBevTasks
     };
 
     setKitchenOrders(prev => [newOrder, ...prev]);
@@ -322,40 +352,28 @@ export default function KitchenStaffDashboard({ isDarkMode, currentRole = 'admin
 
     if (data && data.stations) {
       const updatedStations = data.stations.map(st => {
-        if (st.id === "station-1" && newCookingTasks.length > 0) {
-          const newQueue = st.queue_length + newCookingTasks.length;
-          const newPrepTime = (newQueue * 0.6 + 0.5).toFixed(1);
+        let addedCount = 0;
+        if (st.name === "Hot Kitchen" || st.id === "station-1") addedCount = newCookingTasks.length;
+        else if (st.name === "Grill" || st.id === "station-2") addedCount = newGrillTasks.length;
+        else if (st.name === "Cold Salad" || st.id === "station-3") addedCount = newColdTasks.length;
+        else if (st.name === "Pizza" || st.id === "station-4") addedCount = newPizzaTasks.length;
+        else if (st.name === "Fryer" || st.id === "station-5") addedCount = newFryerTasks.length;
+
+        if (addedCount > 0) {
+          const newQueue = st.queue_length + addedCount;
+          const newPrepTime = (newQueue * 0.7 + 0.5).toFixed(1);
           const newLoad = Math.min(98, Math.max(30, Math.round((newQueue / 15) * 100)));
           const targetCooks = newQueue >= 15 ? 4 : (newQueue >= 10 ? 3 : (newQueue >= 5 ? 2 : 1));
+          const newActualLoad = Number(((st.actual_load || 15) + addedCount * 1.5).toFixed(1));
 
           return {
             ...st,
             queue_length: newQueue,
+            actual_load: newActualLoad,
             avg_prep_time_mins: newPrepTime,
             recommended_cooks: targetCooks,
             load_level: newLoad,
-            bottleneck_status: newLoad >= 85 ? "Critical Queue Surge" : (newLoad >= 70 ? "High Delay Risk" : "Smooth Flow"),
-            action: newLoad >= 80
-              ? "Reallocate S. Fernando from Salad & Cold Prep Station to Hot Wok & Kottu Station based on skill matching"
-              : "Maintain current line pacing"
-          };
-        }
-        if (st.id === "station-3" && newGrillTasks.length > 0) {
-          const newQueue = st.queue_length + newGrillTasks.length;
-          const newPrepTime = (newQueue * 1.5 + 0.5).toFixed(1);
-          const newLoad = Math.min(98, Math.max(30, Math.round((newQueue / 10) * 100)));
-          const targetCooks = newQueue >= 12 ? 3 : (newQueue >= 6 ? 2 : 1);
-
-          return {
-            ...st,
-            queue_length: newQueue,
-            avg_prep_time_mins: newPrepTime,
-            recommended_cooks: targetCooks,
-            load_level: newLoad,
-            bottleneck_status: newLoad >= 80 ? "High Delay Risk" : "Smooth Flow",
-            action: newLoad >= 80
-              ? "Reallocate T. Silva to Grill & Seafood Station & prep protein cuts based on skill matching"
-              : "Maintain current line staffing"
+            bottleneck_status: newLoad >= 85 ? "Critical Queue Surge" : (newLoad >= 70 ? "High Delay Risk" : "Smooth Flow")
           };
         }
         return st;
@@ -368,20 +386,24 @@ export default function KitchenStaffDashboard({ isDarkMode, currentRole = 'admin
     setKitchenOrders(prev => {
       const updated = prev.map(ord => {
         if (ord.id === orderId) {
-          const updatedTasks = [...ord[taskType]];
-          updatedTasks[taskIdx] = { ...updatedTasks[taskIdx], status: "Prepared" };
+          const updatedTasks = [...(ord[taskType] || [])];
+          if (updatedTasks[taskIdx]) {
+            updatedTasks[taskIdx] = { ...updatedTasks[taskIdx], status: "Prepared" };
+          }
           return { ...ord, [taskType]: updatedTasks };
         }
         return ord;
       });
 
       return updated.filter(ord => {
-        const cookDone = ord.cookingTasks.length === 0 || ord.cookingTasks.every(t => t.status === "Prepared");
-        const bevDone = ord.beverageTasks.length === 0 || ord.beverageTasks.every(t => t.status === "Prepared");
-        const grillDone = ord.grillTasks.length === 0 || ord.grillTasks.every(t => t.status === "Prepared");
-        const coldDone = ord.coldTasks.length === 0 || ord.coldTasks.every(t => t.status === "Prepared");
+        const cookDone = !ord.cookingTasks || ord.cookingTasks.length === 0 || ord.cookingTasks.every(t => t.status === "Prepared");
+        const bevDone = !ord.beverageTasks || ord.beverageTasks.length === 0 || ord.beverageTasks.every(t => t.status === "Prepared");
+        const grillDone = !ord.grillTasks || ord.grillTasks.length === 0 || ord.grillTasks.every(t => t.status === "Prepared");
+        const coldDone = !ord.coldTasks || ord.coldTasks.length === 0 || ord.coldTasks.every(t => t.status === "Prepared");
+        const pizzaDone = !ord.pizzaTasks || ord.pizzaTasks.length === 0 || ord.pizzaTasks.every(t => t.status === "Prepared");
+        const fryerDone = !ord.fryerTasks || ord.fryerTasks.length === 0 || ord.fryerTasks.every(t => t.status === "Prepared");
 
-        return !(cookDone && bevDone && grillDone && coldDone);
+        return !(cookDone && bevDone && grillDone && coldDone && pizzaDone && fryerDone);
       });
     });
 
@@ -389,42 +411,34 @@ export default function KitchenStaffDashboard({ isDarkMode, currentRole = 'admin
     setTimeout(() => setDismissedToast(""), 4000);
 
     if (data && data.stations) {
-      const updatedStations = data.stations.map(st => {
-        if (st.id === "station-1" && taskType === "cookingTasks") {
-          const newQueue = Math.max(1, st.queue_length - 1);
-          const newPrepTime = (newQueue * 0.6).toFixed(1);
-          const newLoad = Math.max(25, Math.round((newQueue / 15) * 100));
-          const targetCooks = newQueue >= 15 ? 4 : (newQueue >= 10 ? 3 : (newQueue >= 5 ? 2 : 1));
+      const targetStationName =
+        taskType === "cookingTasks" ? "Hot Kitchen" :
+        taskType === "grillTasks" ? "Grill" :
+        taskType === "coldTasks" ? "Cold Salad" :
+        taskType === "pizzaTasks" ? "Pizza" :
+        taskType === "fryerTasks" ? "Fryer" : "";
 
-          return {
-            ...st,
-            queue_length: newQueue,
-            avg_prep_time_mins: newPrepTime,
-            recommended_cooks: targetCooks,
-            load_level: newLoad,
-            bottleneck_status: newLoad >= 80 ? "High Delay Risk" : "Smooth Flow",
-            action: newLoad < 80 ? "Optimal line pacing restored — queue delay eliminated" : st.action
-          };
-        }
-        if (st.id === "station-3" && taskType === "grillTasks") {
-          const newQueue = Math.max(1, st.queue_length - 1);
-          const newPrepTime = (newQueue * 1.4).toFixed(1);
-          const newLoad = Math.max(20, Math.round((newQueue / 10) * 100));
-          const targetCooks = newQueue >= 12 ? 3 : (newQueue >= 6 ? 2 : 1);
+      if (targetStationName) {
+        const updatedStations = data.stations.map(st => {
+          if (st.name === targetStationName) {
+            const newQueue = Math.max(1, st.queue_length - 1);
+            const newPrepTime = (newQueue * 0.6).toFixed(1);
+            const newLoad = Math.max(25, Math.round((newQueue / 15) * 100));
+            const targetCooks = newQueue >= 15 ? 4 : (newQueue >= 10 ? 3 : (newQueue >= 5 ? 2 : 1));
 
-          return {
-            ...st,
-            queue_length: newQueue,
-            avg_prep_time_mins: newPrepTime,
-            recommended_cooks: targetCooks,
-            load_level: newLoad,
-            bottleneck_status: newLoad >= 80 ? "High Delay Risk" : "Smooth Flow",
-            action: newLoad < 80 ? "Optimal line pacing restored" : st.action
-          };
-        }
-        return st;
-      });
-      setData({ ...data, stations: updatedStations });
+            return {
+              ...st,
+              queue_length: newQueue,
+              avg_prep_time_mins: newPrepTime,
+              recommended_cooks: targetCooks,
+              load_level: newLoad,
+              bottleneck_status: newLoad >= 80 ? "High Delay Risk" : "Smooth Flow"
+            };
+          }
+          return st;
+        });
+        setData({ ...data, stations: updatedStations });
+      }
     }
   };
 
@@ -452,10 +466,10 @@ export default function KitchenStaffDashboard({ isDarkMode, currentRole = 'admin
   const [formData, setFormData] = useState({
     staffId: "staff-1",
     name: "K. Perera (Senior Line Chef)",
-    assigned_station: "Hot Wok & Kottu Station",
+    assigned_station: "Hot Kitchen",
     skill_level: "Expert (Level 4)",
     efficiency_rating: 94,
-    skills: ["High-Volume Wok Handling & Stir-Fry", "Kottu Speed & Roti Shredding"],
+    skills: ["High-Volume Saute Handling & Stir-Fry", "Kottu Speed & Line Cooking"],
     skill_gap: "Advanced Pastry & Bakery",
     training_request: "Executive Kitchen Leadership & Precision Temperature Control"
   });
@@ -572,7 +586,7 @@ export default function KitchenStaffDashboard({ isDarkMode, currentRole = 'admin
           </div>
 
           <div className="flex flex-col items-end gap-1.5">
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-4 flex-wrap justify-end">
               <div className="text-right">
                 <span className="text-[11px] text-slate-500 dark:text-slate-400 font-bold uppercase">Kitchen Overall Efficiency</span>
                 <div className={`text-xl font-black ${isCriticalEfficiency ? 'text-rose-600 dark:text-rose-400 animate-pulse' : 'text-emerald-600 dark:text-emerald-400'}`}>
@@ -582,6 +596,20 @@ export default function KitchenStaffDashboard({ isDarkMode, currentRole = 'admin
               <div className="text-right border-l border-slate-200 dark:border-slate-800 pl-4">
                 <span className="text-[11px] text-slate-500 dark:text-slate-400 font-bold uppercase">Avg Prep Time</span>
                 <div className="text-xl font-black text-slate-900 dark:text-white">{shiftPrepTime}</div>
+              </div>
+              <div className="text-right border-l border-slate-200 dark:border-slate-800 pl-4">
+                <span className="text-[11px] text-slate-500 dark:text-slate-400 font-bold uppercase">Actual Total Load</span>
+                <div className="text-xl font-black text-orange-600 dark:text-orange-400">
+                  {data?.actual_total_load || 121.0}
+                  <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 ml-1">orders</span>
+                </div>
+              </div>
+              <div className="text-right border-l border-slate-200 dark:border-slate-800 pl-4">
+                <span className="text-[11px] text-slate-500 dark:text-slate-400 font-bold uppercase">Predicted Total Load</span>
+                <div className="text-xl font-black text-sky-600 dark:text-sky-400">
+                  {data?.predicted_total_load || 114.6}
+                  <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 ml-1">orders</span>
+                </div>
               </div>
             </div>
 
@@ -767,131 +795,60 @@ export default function KitchenStaffDashboard({ isDarkMode, currentRole = 'admin
 
               {/* Split Station Tasks */}
               <div className="space-y-3">
-                {ord.cookingTasks.length > 0 && (
-                  <div className="p-3.5 rounded-xl bg-orange-50/90 dark:bg-orange-950/40 border border-orange-200 dark:border-orange-500/30 text-xs space-y-2">
-                    <div className="flex items-center justify-between border-b border-orange-200 dark:border-orange-900/50 pb-1.5">
-                      <span className="font-extrabold text-orange-900 dark:text-orange-200 flex items-center gap-1.5 uppercase tracking-wider text-[11px]">
-                        🍳 Cooking Station Task (Order #{ord.orderNo})
-                      </span>
-                      <span className="text-[10px] font-bold text-orange-800 dark:text-orange-300">
-                        Received: {ord.timestamp}
-                      </span>
-                    </div>
+                {/* Split Tasks for 5 Stations & Beverages */}
+                {[
+                  { key: "cookingTasks", name: "Hot Kitchen Task", icon: "🍳", bg: "bg-orange-50/90 dark:bg-orange-950/40", border: "border-orange-200 dark:border-orange-500/30", text: "text-orange-900 dark:text-orange-200", dot: "bg-orange-500", btn: "bg-orange-600 hover:bg-orange-700" },
+                  { key: "grillTasks", name: "Grill Task", icon: "🥩", bg: "bg-amber-50/90 dark:bg-amber-950/40", border: "border-amber-200 dark:border-amber-500/30", text: "text-amber-900 dark:text-amber-200", dot: "bg-amber-500", btn: "bg-amber-600 hover:bg-amber-700" },
+                  { key: "coldTasks", name: "Cold Salad Task", icon: "🥗", bg: "bg-emerald-50/90 dark:bg-emerald-950/40", border: "border-emerald-200 dark:border-emerald-500/30", text: "text-emerald-900 dark:text-emerald-200", dot: "bg-emerald-500", btn: "bg-emerald-600 hover:bg-emerald-700" },
+                  { key: "pizzaTasks", name: "Pizza Task", icon: "🍕", bg: "bg-rose-50/90 dark:bg-rose-950/40", border: "border-rose-200 dark:border-rose-500/30", text: "text-rose-900 dark:text-rose-200", dot: "bg-rose-500", btn: "bg-rose-600 hover:bg-rose-700" },
+                  { key: "fryerTasks", name: "Fryer Task", icon: "🍤", bg: "bg-purple-50/90 dark:bg-purple-950/40", border: "border-purple-200 dark:border-purple-500/30", text: "text-purple-900 dark:text-purple-200", dot: "bg-purple-500", btn: "bg-purple-600 hover:bg-purple-700" },
+                  { key: "beverageTasks", name: "Beverage Station Task", icon: "🥤", bg: "bg-sky-50/90 dark:bg-sky-950/40", border: "border-sky-200 dark:border-sky-500/30", text: "text-sky-900 dark:text-sky-200", dot: "bg-sky-500", btn: "bg-sky-600 hover:bg-sky-700" }
+                ].map(({ key, name, icon, bg, border, text, dot, btn }) => {
+                  const tasks = ord[key] || [];
+                  if (tasks.length === 0) return null;
 
-                    <ul className="space-y-1 font-bold text-slate-900 dark:text-white">
-                      {ord.cookingTasks.map((t, idx) => (
-                        <li key={idx} className="flex items-center justify-between text-xs py-0.5">
-                          <span className="flex items-center gap-1.5">
-                            <span className="h-1.5 w-1.5 rounded-full bg-orange-500"></span>
-                            {t.item}
-                          </span>
-                          <div className="flex items-center gap-2">
-                            <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
-                              Assigned: <span className="font-bold text-orange-700 dark:text-orange-300">{t.assignedStaff}</span>
+                  return (
+                    <div key={key} className={`p-3.5 rounded-xl ${bg} border ${border} text-xs space-y-2`}>
+                      <div className="flex items-center justify-between border-b border-black/10 dark:border-white/10 pb-1.5">
+                        <span className={`font-extrabold ${text} flex items-center gap-1.5 uppercase tracking-wider text-[11px]`}>
+                          {icon} {name} (Order #{ord.orderNo})
+                        </span>
+                        <span className={`text-[10px] font-bold ${text}`}>
+                          Received: {ord.timestamp}
+                        </span>
+                      </div>
+
+                      <ul className="space-y-1 font-bold text-slate-900 dark:text-white">
+                        {tasks.map((t, idx) => (
+                          <li key={idx} className="flex items-center justify-between text-xs py-0.5">
+                            <span className="flex items-center gap-1.5">
+                              <span className={`h-1.5 w-1.5 rounded-full ${dot}`}></span>
+                              {t.item}
                             </span>
-                            {t.status === "Prepared" ? (
-                              <span className="px-2 py-0.5 rounded bg-emerald-600 text-white text-[10px] font-bold">
-                                ✓ Prepared
+                            <div className="flex items-center gap-2">
+                              <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                                Assigned: <span className="font-bold text-slate-900 dark:text-white">{t.assignedStaff}</span>
                               </span>
-                            ) : (
-                              <button
-                                type="button"
-                                onClick={() => handleCompleteOrderTask(ord.id, "cookingTasks", idx)}
-                                className="px-2 py-0.5 rounded bg-orange-600 hover:bg-orange-700 text-white text-[10px] font-bold cursor-pointer transition-all"
-                              >
-                                Mark Prepared
-                              </button>
-                            )}
-                          </div>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-
-                {ord.beverageTasks.length > 0 && (
-                  <div className="p-3.5 rounded-xl bg-sky-50/90 dark:bg-sky-950/40 border border-sky-200 dark:border-sky-500/30 text-xs space-y-2">
-                    <div className="flex items-center justify-between border-b border-sky-200 dark:border-sky-900/50 pb-1.5">
-                      <span className="font-extrabold text-sky-900 dark:text-sky-200 flex items-center gap-1.5 uppercase tracking-wider text-[11px]">
-                        🥤 Beverage Station Task (Order #{ord.orderNo})
-                      </span>
-                      <span className="text-[10px] font-bold text-sky-800 dark:text-sky-300">
-                        Received: {ord.timestamp}
-                      </span>
+                              {t.status === "Prepared" ? (
+                                <span className="px-2 py-0.5 rounded bg-emerald-600 text-white text-[10px] font-bold">
+                                  ✓ Prepared
+                                </span>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => handleCompleteOrderTask(ord.id, key, idx)}
+                                  className={`px-2 py-0.5 rounded text-white text-[10px] font-bold cursor-pointer transition-all ${btn}`}
+                                >
+                                  Mark Prepared
+                                </button>
+                              )}
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
                     </div>
-
-                    <ul className="space-y-1 font-bold text-slate-900 dark:text-white">
-                      {ord.beverageTasks.map((t, idx) => (
-                        <li key={idx} className="flex items-center justify-between text-xs py-0.5">
-                          <span className="flex items-center gap-1.5">
-                            <span className="h-1.5 w-1.5 rounded-full bg-sky-500"></span>
-                            {t.item}
-                          </span>
-                          <div className="flex items-center gap-2">
-                            <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
-                              Assigned: <span className="font-bold text-sky-700 dark:text-sky-300">{t.assignedStaff}</span>
-                            </span>
-                            {t.status === "Prepared" ? (
-                              <span className="px-2 py-0.5 rounded bg-emerald-600 text-white text-[10px] font-bold">
-                                ✓ Prepared
-                              </span>
-                            ) : (
-                              <button
-                                type="button"
-                                onClick={() => handleCompleteOrderTask(ord.id, "beverageTasks", idx)}
-                                className="px-2 py-0.5 rounded bg-sky-600 hover:bg-sky-700 text-white text-[10px] font-bold cursor-pointer transition-all"
-                              >
-                                Mark Prepared
-                              </button>
-                            )}
-                          </div>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-
-                {ord.grillTasks.length > 0 && (
-                  <div className="p-3.5 rounded-xl bg-amber-50/90 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-500/30 text-xs space-y-2">
-                    <div className="flex items-center justify-between border-b border-amber-200 dark:border-amber-900/50 pb-1.5">
-                      <span className="font-extrabold text-amber-900 dark:text-amber-200 flex items-center gap-1.5 uppercase tracking-wider text-[11px]">
-                        🥩 Grill & Seafood Station Task (Order #{ord.orderNo})
-                      </span>
-                      <span className="text-[10px] font-bold text-amber-800 dark:text-amber-300">
-                        Received: {ord.timestamp}
-                      </span>
-                    </div>
-
-                    <ul className="space-y-1 font-bold text-slate-900 dark:text-white">
-                      {ord.grillTasks.map((t, idx) => (
-                        <li key={idx} className="flex items-center justify-between text-xs py-0.5">
-                          <span className="flex items-center gap-1.5">
-                            <span className="h-1.5 w-1.5 rounded-full bg-amber-500"></span>
-                            {t.item}
-                          </span>
-                          <div className="flex items-center gap-2">
-                            <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
-                              Assigned: <span className="font-bold text-amber-700 dark:text-amber-300">{t.assignedStaff}</span>
-                            </span>
-                            {t.status === "Prepared" ? (
-                              <span className="px-2 py-0.5 rounded bg-emerald-600 text-white text-[10px] font-bold">
-                                ✓ Prepared
-                              </span>
-                            ) : (
-                              <button
-                                type="button"
-                                onClick={() => handleCompleteOrderTask(ord.id, "grillTasks", idx)}
-                                className="px-2 py-0.5 rounded bg-amber-600 hover:bg-amber-700 text-white text-[10px] font-bold cursor-pointer transition-all"
-                              >
-                                Mark Prepared
-                              </button>
-                            )}
-                          </div>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
+                  );
+                })}
               </div>
             </div>
           ))}
@@ -1018,10 +975,10 @@ export default function KitchenStaffDashboard({ isDarkMode, currentRole = 'admin
                 <span className="font-bold text-orange-950 dark:text-orange-200">Dinner Rush Window:</span> 07:00 PM – 08:30 PM (Highest daily revenue & family dining surge)
               </div>
               <div className="p-2.5 bg-white dark:bg-slate-900 rounded-lg border border-orange-100 dark:border-orange-900/50 shadow-2xs">
-                <span className="font-bold text-orange-900 dark:text-orange-300">Staff Allocation Required:</span> 9 Line Chefs (3 Wok, 2 Curry Bay, 2 Grill & Seafood, 2 Delivery Prep)
+                <span className="font-bold text-orange-900 dark:text-orange-300">Staff Allocation Required:</span> 9 Line Chefs (3 Hot Kitchen, 2 Grill, 2 Cold Salad, 1 Pizza, 1 Fryer)
               </div>
               <div className="p-2.5 bg-white dark:bg-slate-900 rounded-lg border border-orange-100 dark:border-orange-900/50 shadow-2xs">
-                <span className="font-bold text-orange-900 dark:text-orange-300">Menu Demand Focus:</span> Cheese Kottu Specials, Jumbo Seafood Fried Rice, Grilled Meats & Desserts
+                <span className="font-bold text-orange-900 dark:text-orange-300">Menu Demand Focus:</span> Kottu Specials, Grilled Steaks, Fresh Salads, Artisan Pizzas & Crispy Fryer Starters
               </div>
             </div>
           </div>
@@ -1127,13 +1084,141 @@ export default function KitchenStaffDashboard({ isDarkMode, currentRole = 'admin
       </div>
 
       {/* Kitchen Station Workload & Queue Monitors */}
-      <div className="glass-panel p-6 rounded-2xl space-y-4">
-        <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
+      <div className="glass-panel p-6 rounded-2xl space-y-5">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-4">
           <div>
-            <h3 className="text-base font-bold text-slate-900 dark:text-white">Real-Time Kitchen Station Workload & Queue Status</h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Monitoring queue latency and load balancing across all 4 production stations</p>
+            <div className="flex items-center gap-2">
+              <h3 className="text-base font-bold text-slate-900 dark:text-white">Real-Time Kitchen Station Workload & Queue Status</h3>
+              <span className="text-xs px-2.5 py-0.5 rounded bg-orange-50 text-orange-700 dark:bg-orange-500/10 dark:text-orange-400 border border-orange-200 dark:border-orange-500/20 font-bold">
+                5 Stations Monitored
+              </span>
+            </div>
+            <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mt-0.5">
+              Monitoring queue latency, cooks assigned, actual load vs predicted load across all 5 production stations
+            </p>
           </div>
         </div>
+
+        {/* Shift Workload Capacity: Actual Total Load & Predicted Total Load Overview Banner */}
+        {(() => {
+          const actualTotal = data.actual_total_load ?? Number(data.stations.reduce((acc, s) => acc + (Number(s.actual_load) || 0), 0).toFixed(1));
+          const predictedTotal = data.predicted_total_load ?? Number(data.stations.reduce((acc, s) => acc + (Number(s.predicted_load) || 0), 0).toFixed(1));
+          const delta = Number((actualTotal - predictedTotal).toFixed(1));
+          const deltaPct = predictedTotal > 0 ? (((actualTotal - predictedTotal) / predictedTotal) * 100).toFixed(1) : 0;
+          const accuracyPct = Math.max(0, Math.min(100, 100 - Math.abs(Number(deltaPct)))).toFixed(1);
+
+          return (
+            <div className="p-4 rounded-2xl bg-gradient-to-r from-orange-50/80 via-amber-50/60 to-emerald-50/80 dark:from-slate-900/90 dark:via-orange-950/20 dark:to-slate-900/90 border border-orange-200/80 dark:border-orange-500/30 shadow-xs space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-orange-200/60 dark:border-slate-800 pb-3">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 rounded-xl bg-orange-600 text-white shadow-xs">
+                    <TrendingUp className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-black uppercase tracking-wider text-slate-900 dark:text-white">
+                      Shift Workload Capacity: Actual vs Predicted Total Loads
+                    </h4>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
+                      ML Random Forest Regressor vs Live Dispatch Workload Pipeline
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] font-black px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800 flex items-center gap-1.5">
+                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+                    <span>{accuracyPct}% Forecast Accuracy</span>
+                  </span>
+                </div>
+              </div>
+
+              {/* KPI Cards: Actual Total Load & Predicted Total Load */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+                <div className="p-3 bg-white dark:bg-slate-900/90 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                      Actual Total Load
+                    </span>
+                    <span className="h-2 w-2 rounded-full bg-orange-500 animate-ping"></span>
+                  </div>
+                  <div className="flex items-baseline gap-2 mt-1">
+                    <span className="text-2xl font-black text-orange-600 dark:text-orange-400">
+                      {actualTotal}
+                    </span>
+                    <span className="text-xs font-bold text-slate-500 dark:text-slate-400">orders / shift</span>
+                  </div>
+                  <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 mt-1 block">
+                    Sum of actual orders across all 5 stations
+                  </span>
+                </div>
+
+                <div className="p-3 bg-white dark:bg-slate-900/90 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
+                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400 block">
+                    Predicted Total Load
+                  </span>
+                  <div className="flex items-baseline gap-2 mt-1">
+                    <span className="text-2xl font-black text-sky-600 dark:text-sky-400">
+                      {predictedTotal}
+                    </span>
+                    <span className="text-xs font-bold text-slate-500 dark:text-slate-400">orders / shift</span>
+                  </div>
+                  <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 mt-1 block">
+                    ML predicted total demand forecast
+                  </span>
+                </div>
+
+                <div className="p-3 bg-white dark:bg-slate-900/90 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
+                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400 block">
+                    Variance Delta (Actual − Pred)
+                  </span>
+                  <div className="flex items-baseline gap-2 mt-1">
+                    <span className={`text-2xl font-black ${delta >= 0 ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                      {delta >= 0 ? `+${delta}` : delta}
+                    </span>
+                    <span className="text-xs font-bold text-slate-500 dark:text-slate-400">({deltaPct > 0 ? `+${deltaPct}` : deltaPct}%)</span>
+                  </div>
+                  <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 mt-1 block">
+                    {delta >= 0 ? 'Surge volume exceeding model' : 'Within operational ceiling'}
+                  </span>
+                </div>
+
+                <div className="p-3 bg-white dark:bg-slate-900/90 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
+                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400 block">
+                    Total Cooks Assigned
+                  </span>
+                  <div className="flex items-baseline gap-2 mt-1">
+                    <span className="text-2xl font-black text-slate-900 dark:text-white">
+                      {data.stations.reduce((acc, s) => acc + (s.active_cooks || 0), 0)}
+                    </span>
+                    <span className="text-xs font-bold text-slate-500 dark:text-slate-400">
+                      / {data.stations.reduce((acc, s) => acc + (s.recommended_cooks || 0), 0)} target cooks
+                    </span>
+                  </div>
+                  <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 mt-1 block">
+                    Active across 5 production lines
+                  </span>
+                </div>
+              </div>
+
+              {/* Station Workload Share Proportion Bar */}
+              <div className="pt-1">
+                <div className="flex items-center justify-between text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1.5">
+                  <span>5-Station Workload Share Proportion:</span>
+                  <span className="text-slate-500 dark:text-slate-400 font-mono text-[10px]">
+                    Hot Kitchen (53%) • Grill (15%) • Cold Salad (14%) • Pizza (12%) • Fryer (6%)
+                  </span>
+                </div>
+                <div className="h-2.5 w-full bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden flex shadow-inner">
+                  <div style={{ width: '53%' }} className="bg-orange-500 h-full" title="Hot Kitchen: 53%" />
+                  <div style={{ width: '15%' }} className="bg-amber-500 h-full" title="Grill: 15%" />
+                  <div style={{ width: '14%' }} className="bg-emerald-500 h-full" title="Cold Salad: 14%" />
+                  <div style={{ width: '12%' }} className="bg-rose-500 h-full" title="Pizza: 12%" />
+                  <div style={{ width: '6%' }} className="bg-purple-500 h-full" title="Fryer: 6%" />
+                </div>
+              </div>
+            </div>
+          );
+        })()}
 
         {/* High Workload & Queue Alerts Panel */}
         {data.stations.some(st => st.load_level >= 80) && (
@@ -1167,7 +1252,7 @@ export default function KitchenStaffDashboard({ isDarkMode, currentRole = 'admin
                       </span>
                     </div>
                     <p className="text-xs text-slate-600 dark:text-slate-300 font-medium">
-                      Current Queue: <span className="font-bold text-slate-900 dark:text-white">{st.queue_length} orders</span> • Avg Prep Time: <span className="font-bold text-slate-900 dark:text-white">{st.avg_prep_time_mins} mins</span>
+                      Current Queue: <span className="font-bold text-slate-900 dark:text-white">{st.queue_length} orders</span> • Avg Prep Time: <span className="font-bold text-slate-900 dark:text-white">{st.avg_prep_time_mins} mins</span> • Actual: <span className="font-bold text-orange-600 dark:text-orange-400">{st.actual_load || Math.round(st.load_level * 0.7)} orders</span> • Predicted: <span className="font-bold text-sky-600 dark:text-sky-400">{st.predicted_load || Math.round(st.load_level * 0.65)} orders</span>
                     </p>
                     <div className="text-xs text-rose-800 dark:text-rose-300 font-bold flex items-center gap-1.5 pt-0.5">
                       <ArrowRight className="h-3.5 w-3.5 text-rose-600 dark:text-rose-400 flex-shrink-0" />
@@ -1177,7 +1262,7 @@ export default function KitchenStaffDashboard({ isDarkMode, currentRole = 'admin
 
                   <button
                     onClick={() => {
-                      const targetStaffName = st.id === "station-1" ? "S. Fernando" : (st.id === "station-3" ? "T. Silva" : "Staff Member");
+                      const targetStaffName = st.name === "Hot Kitchen" ? "S. Fernando" : (st.name === "Grill" ? "T. Silva" : (st.name === "Pizza" ? "A. Jayasinghe" : "Kitchen Staff"));
                       const targetStationName = st.name;
 
                       const updatedStations = data.stations.map(s => {
@@ -1226,13 +1311,14 @@ export default function KitchenStaffDashboard({ isDarkMode, currentRole = 'admin
           </div>
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* 5-Station Workload Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
           {data.stations.map((st) => {
             const isHighWorkload = st.load_level >= 80;
             return (
               <div
                 key={st.id}
-                className={`p-5 rounded-2xl border flex flex-col justify-between shadow-sm transition-all ${isHighWorkload
+                className={`p-4 rounded-2xl border flex flex-col justify-between shadow-sm transition-all ${isHighWorkload
                   ? (st.load_level >= 90
                     ? 'bg-rose-50 border-2 border-rose-400 dark:bg-rose-950/40 dark:border-rose-500/60 shadow-rose-500/10'
                     : 'bg-amber-50 border-2 border-amber-400 dark:bg-amber-950/40 dark:border-amber-500/60 shadow-amber-500/10')
@@ -1248,7 +1334,7 @@ export default function KitchenStaffDashboard({ isDarkMode, currentRole = 'admin
                   )}
 
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-xs font-extrabold text-slate-900 dark:text-white">{st.name}</span>
+                    <span className="text-sm font-extrabold text-slate-900 dark:text-white">{st.name}</span>
                     <span className={`text-[10px] font-black px-2.5 py-0.5 rounded-full ${st.load_level >= 90
                       ? 'bg-rose-600 text-white'
                       : (st.load_level >= 80 ? 'bg-amber-500 text-white' : 'bg-slate-200 dark:bg-slate-800 text-slate-800 dark:text-slate-300')
@@ -1257,7 +1343,37 @@ export default function KitchenStaffDashboard({ isDarkMode, currentRole = 'admin
                     </span>
                   </div>
 
-                  <div className="mt-4 space-y-2 text-xs">
+                  {/* Actual Load & Predicted Load Details */}
+                  <div className="mt-3 p-2.5 rounded-xl bg-white dark:bg-slate-950/70 border border-slate-200 dark:border-slate-800/80 space-y-1.5 shadow-2xs">
+                    <div className="flex items-center justify-between text-[11px]">
+                      <span className="text-slate-500 dark:text-slate-400 font-bold">Actual Load:</span>
+                      <span className="font-extrabold text-orange-600 dark:text-orange-400">
+                        {st.actual_load !== undefined ? `${st.actual_load} orders` : `${Math.round(st.load_level * 0.7)} orders`}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between text-[11px]">
+                      <span className="text-slate-500 dark:text-slate-400 font-bold">Predicted Load:</span>
+                      <span className="font-extrabold text-sky-600 dark:text-sky-400">
+                        {st.predicted_load !== undefined ? `${st.predicted_load} orders` : `${Math.round((st.predicted_load_level || st.load_level) * 0.65)} orders`}
+                      </span>
+                    </div>
+
+                    {/* Visual Comparison Progress Bar */}
+                    <div className="space-y-1 pt-1 border-t border-slate-100 dark:border-slate-800">
+                      <div className="flex items-center justify-between text-[9px] font-bold text-slate-400">
+                        <span>Load vs Capacity</span>
+                        <span>{st.load_level}%</span>
+                      </div>
+                      <div className="h-1.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden flex">
+                        <div
+                          style={{ width: `${Math.min(100, st.load_level)}%` }}
+                          className={`h-full ${st.load_level >= 90 ? 'bg-rose-500' : (st.load_level >= 80 ? 'bg-amber-500' : 'bg-emerald-500')}`}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 space-y-2 text-xs">
                     <div className="flex justify-between items-center">
                       <span className="text-slate-500 dark:text-slate-400 font-medium">Current Queue:</span>
                       <span className="font-extrabold text-slate-900 dark:text-white px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
@@ -1284,7 +1400,7 @@ export default function KitchenStaffDashboard({ isDarkMode, currentRole = 'admin
                 </div>
 
                 {st.load_level > 50 && (
-                  <div className={`mt-4 p-3 rounded-xl border ${isHighWorkload
+                  <div className={`mt-3.5 p-3 rounded-xl border ${isHighWorkload
                     ? 'bg-rose-100/70 border-rose-300 dark:bg-rose-950/80 dark:border-rose-900/80'
                     : 'bg-amber-50/70 border-amber-200 dark:bg-amber-950/60 dark:border-amber-900/80'
                     }`}>
@@ -1321,19 +1437,21 @@ export default function KitchenStaffDashboard({ isDarkMode, currentRole = 'admin
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {data.staff.map((member) => {
-            const hotWokHigh = data.stations.some(st => st.id === "station-1" && st.load_level >= 80);
-            const grillHigh = data.stations.some(st => st.id === "station-3" && st.load_level >= 80);
+            const hotKitchenHigh = data.stations.some(st => (st.name === "Hot Kitchen" || st.id === "station-1") && st.load_level >= 80);
+            const grillHigh = data.stations.some(st => (st.name === "Grill" || st.id === "station-2") && st.load_level >= 80);
+            const pizzaHigh = data.stations.some(st => (st.name === "Pizza" || st.id === "station-4") && st.load_level >= 80);
 
-            let recommendedStation = "";
-            if (member.name.includes("S. Fernando")) recommendedStation = "Hot Wok & Kottu Station";
-            else if (member.name.includes("T. Silva")) recommendedStation = "Grill & Seafood Station";
-            else if (member.name.includes("K. Perera")) recommendedStation = "Curry & Rice Assembly Bay";
-            else if (member.name.includes("A. Jayasinghe")) recommendedStation = "Hot Wok & Kottu Station";
-            else if (member.name.includes("Wickramasinghe") || member.name.includes("Dissanayake")) recommendedStation = "Hot Wok & Assembly Support";
+            let recommendedStation = "Hot Kitchen";
+            if (member.name.includes("S. Fernando")) recommendedStation = "Hot Kitchen";
+            else if (member.name.includes("T. Silva")) recommendedStation = "Grill";
+            else if (member.name.includes("K. Perera")) recommendedStation = "Hot Kitchen";
+            else if (member.name.includes("A. Jayasinghe")) recommendedStation = "Pizza";
+            else if (member.name.includes("Wickramasinghe") || member.name.includes("Dissanayake")) recommendedStation = "Fryer";
 
             const isRecommendedForReallocation =
-              (hotWokHigh && member.name.includes("S. Fernando")) ||
-              (grillHigh && member.name.includes("T. Silva"));
+              (hotKitchenHigh && member.name.includes("S. Fernando")) ||
+              (grillHigh && member.name.includes("T. Silva")) ||
+              (pizzaHigh && member.name.includes("A. Jayasinghe"));
 
             return (
               <div
@@ -1378,8 +1496,8 @@ export default function KitchenStaffDashboard({ isDarkMode, currentRole = 'admin
                         });
 
                         const updatedStations = data.stations.map(st => {
-                          if (st.name.includes(recommendedStation.split(' ')[0]) || (st.id === "station-1" && recommendedStation.includes("Hot Wok")) || (st.id === "station-3" && recommendedStation.includes("Grill"))) {
-                            const newActiveCooks = st.recommended_cooks || 3;
+                          if (st.name === recommendedStation || st.name.includes(recommendedStation)) {
+                            const newActiveCooks = (st.recommended_cooks || 2);
                             return {
                               ...st,
                               active_cooks: newActiveCooks,
@@ -1550,30 +1668,42 @@ export default function KitchenStaffDashboard({ isDarkMode, currentRole = 'admin
                 </div>
               </div>
 
-              {/* Sri Lankan Dishes */}
-              {menuItems.filter(i => i.category === "Sri Lankan" && (
-                !menuSearchQuery.trim() ||
-                i.name.toLowerCase().includes(menuSearchQuery.toLowerCase()) ||
-                i.category.toLowerCase().includes(menuSearchQuery.toLowerCase())
-              )).length > 0 && (
-                  <div className="space-y-2 pt-2 border-t border-slate-200 dark:border-slate-800">
+              {/* Render Menu Items by Production Station */}
+              {[
+                { cat: "Hot Kitchen", label: "🍳 Hot Kitchen Specialties", icon: "🍳" },
+                { cat: "Grill", label: "🥩 Grill & Charbroil Station", icon: "🥩" },
+                { cat: "Cold Salad", label: "🥗 Cold Salad & Fresh Prep", icon: "🥗" },
+                { cat: "Pizza", label: "🍕 Artisan Pizza Variety", icon: "🍕" },
+                { cat: "Fryer", label: "🍤 Fryer & Crispy Appetizers", icon: "🍤" },
+                { cat: "Beverages", label: "🥤 Beverages & Refreshers", icon: "🥤" }
+              ].map(({ cat, label }) => {
+                const filtered = menuItems.filter(i => (i.category === cat || i.station === cat) && (
+                  !menuSearchQuery.trim() ||
+                  i.name.toLowerCase().includes(menuSearchQuery.toLowerCase()) ||
+                  i.category.toLowerCase().includes(menuSearchQuery.toLowerCase())
+                ));
+
+                if (filtered.length === 0) return null;
+
+                return (
+                  <div key={cat} className="space-y-2 pt-2 border-t border-slate-200 dark:border-slate-800">
                     <div className="flex items-center gap-2">
-                      <span className="text-base">🇱🇰</span>
                       <h4 className="text-xs font-black uppercase tracking-wider text-slate-900 dark:text-white">
-                        Authentic Sri Lankan Dishes
+                        {label}
                       </h4>
                     </div>
 
                     <div className="space-y-2">
-                      {menuItems.filter(i => i.category === "Sri Lankan" && (
-                        !menuSearchQuery.trim() ||
-                        i.name.toLowerCase().includes(menuSearchQuery.toLowerCase()) ||
-                        i.category.toLowerCase().includes(menuSearchQuery.toLowerCase())
-                      )).map((item) => (
+                      {filtered.map((item) => (
                         <div
                           key={item.id}
                           className={`p-3 rounded-2xl border transition-all flex items-center justify-between gap-3 ${item.checked
-                            ? "bg-orange-50/70 border-orange-300 dark:bg-orange-950/40 dark:border-orange-800"
+                            ? (cat === 'Hot Kitchen' ? 'bg-orange-50/70 border-orange-300 dark:bg-orange-950/40 dark:border-orange-800'
+                              : cat === 'Grill' ? 'bg-amber-50/70 border-amber-300 dark:bg-amber-950/40 dark:border-amber-800'
+                              : cat === 'Pizza' ? 'bg-rose-50/70 border-rose-300 dark:bg-rose-950/40 dark:border-rose-800'
+                              : cat === 'Fryer' ? 'bg-purple-50/70 border-purple-300 dark:bg-purple-950/40 dark:border-purple-800'
+                              : cat === 'Cold Salad' ? 'bg-emerald-50/70 border-emerald-300 dark:bg-emerald-950/40 dark:border-emerald-800'
+                              : 'bg-sky-50/70 border-sky-300 dark:bg-sky-950/40 dark:border-sky-800')
                             : "bg-slate-50 dark:bg-slate-950/50 border-slate-200 dark:border-slate-800"
                             }`}
                         >
@@ -1589,7 +1719,7 @@ export default function KitchenStaffDashboard({ isDarkMode, currentRole = 'admin
                                 <span>{item.icon}</span> {item.name}
                               </span>
                               <span className="text-[10px] text-slate-500 dark:text-slate-400 block font-medium">
-                                Target: {item.station}
+                                Target Station: <span className="font-bold text-slate-700 dark:text-slate-300">{item.station}</span>
                               </span>
                             </div>
                           </div>
@@ -1601,10 +1731,26 @@ export default function KitchenStaffDashboard({ isDarkMode, currentRole = 'admin
                                 onChange={(e) => updateItemSize(item.id, e.target.value)}
                                 className="px-2.5 py-1 text-[11px] rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 font-bold"
                               >
-                                <option value="Small">Small</option>
-                                <option value="Medium">Medium</option>
-                                <option value="Large">Large</option>
-                                <option value="Regular">Regular Portion</option>
+                                {cat === 'Pizza' ? (
+                                  <>
+                                    <option value="Small (9&quot;)">Small (9")</option>
+                                    <option value="Medium (12&quot;)">Medium (12")</option>
+                                    <option value="Large (15&quot;)">Large (15")</option>
+                                  </>
+                                ) : cat === 'Beverages' ? (
+                                  <>
+                                    <option value="500ml">500ml</option>
+                                    <option value="1.5L">1.5L Bottle</option>
+                                    <option value="Regular Glass">Regular Glass</option>
+                                  </>
+                                ) : (
+                                  <>
+                                    <option value="Small">Small Portion</option>
+                                    <option value="Medium">Medium</option>
+                                    <option value="Large">Large</option>
+                                    <option value="Regular">Regular</option>
+                                  </>
+                                )}
                               </select>
 
                               <div className="flex items-center gap-1.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg p-0.5">
@@ -1630,170 +1776,8 @@ export default function KitchenStaffDashboard({ isDarkMode, currentRole = 'admin
                       ))}
                     </div>
                   </div>
-                )}
-
-              {/* Pizza Variety */}
-              {menuItems.filter(i => i.category === "Pizza" && (
-                !menuSearchQuery.trim() ||
-                i.name.toLowerCase().includes(menuSearchQuery.toLowerCase()) ||
-                i.category.toLowerCase().includes(menuSearchQuery.toLowerCase())
-              )).length > 0 && (
-                  <div className="space-y-2 pt-2 border-t border-slate-200 dark:border-slate-800">
-                    <div className="flex items-center gap-2">
-                      <Pizza className="h-4 w-4 text-orange-600 dark:text-orange-400" />
-                      <h4 className="text-xs font-black uppercase tracking-wider text-slate-900 dark:text-white">
-                        Artisan Pizza Variety
-                      </h4>
-                    </div>
-
-                    <div className="space-y-2">
-                      {menuItems.filter(i => i.category === "Pizza" && (
-                        !menuSearchQuery.trim() ||
-                        i.name.toLowerCase().includes(menuSearchQuery.toLowerCase()) ||
-                        i.category.toLowerCase().includes(menuSearchQuery.toLowerCase())
-                      )).map((item) => (
-                        <div
-                          key={item.id}
-                          className={`p-3 rounded-2xl border transition-all flex items-center justify-between gap-3 ${item.checked
-                            ? "bg-amber-50/70 border-amber-300 dark:bg-amber-950/40 dark:border-amber-800"
-                            : "bg-slate-50 dark:bg-slate-950/50 border-slate-200 dark:border-slate-800"
-                            }`}
-                        >
-                          <div className="flex items-center gap-2.5">
-                            <input
-                              type="checkbox"
-                              checked={item.checked}
-                              onChange={() => toggleMenuItem(item.id)}
-                              className="h-4 w-4 rounded accent-orange-600 cursor-pointer"
-                            />
-                            <div>
-                              <span className="font-bold text-xs text-slate-900 dark:text-white flex items-center gap-1">
-                                <span>{item.icon}</span> {item.name}
-                              </span>
-                              <span className="text-[10px] text-slate-500 dark:text-slate-400 block font-medium">
-                                Target: {item.station}
-                              </span>
-                            </div>
-                          </div>
-
-                          {item.checked && (
-                            <div className="flex items-center gap-3">
-                              <select
-                                value={item.size}
-                                onChange={(e) => updateItemSize(item.id, e.target.value)}
-                                className="px-2.5 py-1 text-[11px] rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 font-bold"
-                              >
-                                <option value="Small (9&quot;)">Small (9")</option>
-                                <option value="Medium (12&quot;)">Medium (12")</option>
-                                <option value="Large (15&quot;)">Large (15")</option>
-                              </select>
-
-                              <div className="flex items-center gap-1.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg p-0.5">
-                                <button
-                                  type="button"
-                                  onClick={() => updateItemQty(item.id, -1)}
-                                  className="p-1 rounded text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
-                                >
-                                  <Minus className="h-3 w-3" />
-                                </button>
-                                <span className="font-black text-xs px-1.5">{item.qty}</span>
-                                <button
-                                  type="button"
-                                  onClick={() => updateItemQty(item.id, 1)}
-                                  className="p-1 rounded text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
-                                >
-                                  <Plus className="h-3 w-3" />
-                                </button>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-              {/* Beverages */}
-              {menuItems.filter(i => i.category === "Beverages" && (
-                !menuSearchQuery.trim() ||
-                i.name.toLowerCase().includes(menuSearchQuery.toLowerCase()) ||
-                i.category.toLowerCase().includes(menuSearchQuery.toLowerCase())
-              )).length > 0 && (
-                  <div className="space-y-2 pt-2 border-t border-slate-200 dark:border-slate-800">
-                    <div className="flex items-center gap-2">
-                      <span className="text-base">🥤</span>
-                      <h4 className="text-xs font-black uppercase tracking-wider text-slate-900 dark:text-white">
-                        Beverages & Refreshers
-                      </h4>
-                    </div>
-
-                    <div className="space-y-2">
-                      {menuItems.filter(i => i.category === "Beverages" && (
-                        !menuSearchQuery.trim() ||
-                        i.name.toLowerCase().includes(menuSearchQuery.toLowerCase()) ||
-                        i.category.toLowerCase().includes(menuSearchQuery.toLowerCase())
-                      )).map((item) => (
-                        <div
-                          key={item.id}
-                          className={`p-3 rounded-2xl border transition-all flex items-center justify-between gap-3 ${item.checked
-                            ? "bg-sky-50/70 border-sky-300 dark:bg-sky-950/40 dark:border-sky-800"
-                            : "bg-slate-50 dark:bg-slate-950/50 border-slate-200 dark:border-slate-800"
-                            }`}
-                        >
-                          <div className="flex items-center gap-2.5">
-                            <input
-                              type="checkbox"
-                              checked={item.checked}
-                              onChange={() => toggleMenuItem(item.id)}
-                              className="h-4 w-4 rounded accent-orange-600 cursor-pointer"
-                            />
-                            <div>
-                              <span className="font-bold text-xs text-slate-900 dark:text-white flex items-center gap-1">
-                                <span>{item.icon}</span> {item.name}
-                              </span>
-                              <span className="text-[10px] text-slate-500 dark:text-slate-400 block font-medium">
-                                Target: {item.station}
-                              </span>
-                            </div>
-                          </div>
-
-                          {item.checked && (
-                            <div className="flex items-center gap-3">
-                              <select
-                                value={item.size}
-                                onChange={(e) => updateItemSize(item.id, e.target.value)}
-                                className="px-2.5 py-1 text-[11px] rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 font-bold"
-                              >
-                                <option value="500ml">500ml</option>
-                                <option value="1.5L">1.5L Bottle</option>
-                                <option value="Regular Glass">Regular Glass</option>
-                                <option value="Large Pitcher">Large Pitcher</option>
-                              </select>
-
-                              <div className="flex items-center gap-1.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg p-0.5">
-                                <button
-                                  type="button"
-                                  onClick={() => updateItemQty(item.id, -1)}
-                                  className="p-1 rounded text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
-                                >
-                                  <Minus className="h-3 w-3" />
-                                </button>
-                                <span className="font-black text-xs px-1.5">{item.qty}</span>
-                                <button
-                                  type="button"
-                                  onClick={() => updateItemQty(item.id, 1)}
-                                  className="p-1 rounded text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
-                                >
-                                  <Plus className="h-3 w-3" />
-                                </button>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
+                );
+              })}
 
               <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-200 dark:border-slate-800">
                 <button
@@ -1980,12 +1964,11 @@ export default function KitchenStaffDashboard({ isDarkMode, currentRole = 'admin
                       onChange={(e) => setFormData({ ...formData, assigned_station: e.target.value })}
                       className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white font-medium focus:ring-2 focus:ring-orange-500 focus:outline-hidden"
                     >
-                      <option value="Hot Wok & Kottu Station">Hot Wok & Kottu Station</option>
-                      <option value="Curry & Rice Assembly Bay">Curry & Rice Assembly Bay</option>
-                      <option value="Grill & Seafood Station">Grill & Seafood Station</option>
-                      <option value="Salad & Cold Prep Station">Salad & Cold Prep Station</option>
-                      <option value="Pastry & Bakery Bay">Pastry & Bakery Bay</option>
-                      <option value="Hot Wok & Assembly Support">Hot Wok & Assembly Support</option>
+                      <option value="Hot Kitchen">Hot Kitchen</option>
+                      <option value="Grill">Grill</option>
+                      <option value="Cold Salad">Cold Salad</option>
+                      <option value="Pizza">Pizza</option>
+                      <option value="Fryer">Fryer</option>
                     </select>
                   </div>
 
