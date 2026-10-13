@@ -5,12 +5,11 @@ from typing import List, Dict, Any
 
 router = APIRouter(prefix="/api/kitchen", tags=["Component 2: Kitchen Efficiency & Staff Optimization"])
 
-# නිවැරදි backend folder path එක ලබා ගැනීම (app ෆෝල්ඩරයෙන් පිටතට)
+# backend folder path resolution
 ROUTER_DIR = os.path.dirname(os.path.abspath(__file__))               # backend/app/routers
 BACKEND_DIR = os.path.abspath(os.path.join(ROUTER_DIR, "..", ".."))    # backend
 
 def load_csv_data(filename: str) -> pd.DataFrame:
-    # පළමුව backend ෆෝල්ඩරයේද, නැතිනම් backend/data ෆෝල්ඩරයේද සොයා බලයි
     p1 = os.path.join(BACKEND_DIR, filename)
     p2 = os.path.join(BACKEND_DIR, "data", filename)
     
@@ -23,7 +22,72 @@ def load_csv_data(filename: str) -> pd.DataFrame:
 def get_stations_data() -> List[Dict[str, Any]]:
     df = load_csv_data("kitchen_bottlenecks_detected.csv")
     if not df.empty:
-        return df.to_dict(orient="records")
+        # Latest day snapshot
+        latest_row = df.iloc[-1]
+        
+        # Prathi station-na overload aada dinagala count
+        overload_counts = {
+            "Hot Kitchen": int((df['Bottleneck_Stations'].str.contains("Hot Kitchen", na=False)).sum()),
+            "Grill": int((df['Bottleneck_Stations'].str.contains("Grill", na=False)).sum()),
+            "Cold Salad": int((df['Bottleneck_Stations'].str.contains("Cold", na=False)).sum()),
+            "Pizza": int((df['Bottleneck_Stations'].str.contains("Pizza", na=False)).sum()),
+            "Fryer": int((df['Bottleneck_Stations'].str.contains("Fryer", na=False)).sum())
+        }
+
+        # Thresholds (detect_bottlenecks.py moolaka bandha seemegalu)
+        thresholds = {
+            "Hot Kitchen": 76.5,
+            "Grill": 17.9,
+            "Cold Salad": 17.6,
+            "Pizza": 16.3,
+            "Fryer": 10.0
+        }
+
+        # Station configurations mathu dynamic mapping
+        stations_config = [
+            {"id": "station-1", "name": "Hot Kitchen", "col": "Hot_Kitchen_Load", "default_cooks": 3, "target_prep": 8.0},
+            {"id": "station-2", "name": "Grill", "col": "Grill_Load", "default_cooks": 2, "target_prep": 10.0},
+            {"id": "station-3", "name": "Cold Salad", "col": "Cold_Salad_Load", "default_cooks": 1, "target_prep": 4.0},
+            {"id": "station-4", "name": "Pizza", "col": "Pizza_Load", "default_cooks": 2, "target_prep": 7.0},
+            {"id": "station-5", "name": "Fryer", "col": "Fryer_Load", "default_cooks": 1, "target_prep": 5.0}
+        ]
+
+        mapped_stations = []
+        for st in stations_config:
+            current_load = float(latest_row.get(st["col"], 10))
+            thresh = thresholds[st["name"]]
+            load_percentage = min(100, int(round((current_load / thresh) * 80)))
+            is_bottleneck = current_load >= thresh
+            
+            status = "High Delay Risk" if is_bottleneck else ("Moderate Load" if load_percentage > 65 else "Smooth Flow")
+            recommended_cooks = st["default_cooks"] + (1 if is_bottleneck else 0)
+            avg_prep = round(st["target_prep"] * (1.35 if is_bottleneck else 1.0), 1)
+
+            action = f"Add +1 Cook to {st['name']} due to peak backlog" if is_bottleneck else "Maintain current station staffing"
+
+            # Predicted load mathu actual load frontend-ge mukhya
+            pred_load = round(current_load * 0.95, 1)
+
+            mapped_stations.append({
+                "id": st["id"],
+                "name": st["name"],
+                "actual_load": round(current_load, 1),
+                "predicted_load": pred_load,
+                "load_level": load_percentage,
+                "predicted_load_level": max(10, load_percentage - 5),
+                "active_cooks": st["default_cooks"],
+                "recommended_cooks": recommended_cooks,
+                "avg_prep_time_mins": avg_prep,
+                "target_prep_time_mins": st["target_prep"],
+                "queue_length": int(round(current_load / 2.5)),
+                "bottleneck_status": status,
+                "action": action,
+                "overload_days_count": overload_counts[st["name"]]
+            })
+
+        return mapped_stations
+
+    # CSV sigadidhdare fallback data
     return [
         {
             "id": "station-1",
@@ -185,7 +249,6 @@ def get_workload_forecast() -> List[Dict[str, Any]]:
     df = load_csv_data("predicted_daily_workload.csv")
     if not df.empty:
         records = []
-        # සැබෑ ML prediction දත්ත වලින් අවසන් පේළි 15 ලබා ගැනීම
         sample_df = df.tail(15)
         for _, row in sample_df.iterrows():
             pred = int(round(float(row.get('Predicted_Total_Load', 20))))
@@ -199,7 +262,6 @@ def get_workload_forecast() -> List[Dict[str, Any]]:
                 "actual_orders": actual,
                 "staff_required": req_staff,
                 "actual_staff": act_staff,
-                # Station load breakdowns (දශමස්ථාන 1කට round කර ඇත)
                 "hot_kitchen_est_load": round(float(row.get('Hot_Kitchen_Est_Load', 0)), 1),
                 "grill_est_load": round(float(row.get('Grill_Est_Load', 0)), 1),
                 "cold_salad_est_load": round(float(row.get('Cold_Salad_Est_Load', 0)), 1),
@@ -208,7 +270,6 @@ def get_workload_forecast() -> List[Dict[str, Any]]:
             })
         return records
 
-    # CSV නොමැති නම් පමණක් mock data fallback එකක් ලෙස ක්‍රියාත්මක වේ
     return [
         {"hour": "07:00", "predicted_orders": 28, "staff_required": 4, "actual_staff": 4},
         {"hour": "08:00 (Breakfast Peak)", "predicted_orders": 76, "staff_required": 6, "actual_staff": 6},
