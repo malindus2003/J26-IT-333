@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { 
   Menu, X, Sparkles, Bell, RefreshCw, Sun, Moon, Check, 
   ChevronRight, Layers, ShoppingBag, Package, Cpu, Users, 
-  TrendingUp, Trash2, Crown, CreditCard, ChefHat
+  TrendingUp, Trash2, Crown, CreditCard, ChefHat, LogOut
 } from 'lucide-react';
 import { ROLES } from './Header';
 
@@ -16,7 +16,9 @@ export default function MobileBottomNav({
   activeAlertCount = 0,
   onOpenAlerts,
   isDarkMode,
-  onToggleTheme
+  onToggleTheme,
+  currentUser = null,
+  onLogout = null
 }) {
   const [moreSheetOpen, setMoreSheetOpen] = useState(false);
 
@@ -256,8 +258,41 @@ export default function MobileBottomNav({
             </div>
 
             {/* Quick Workspace Switcher & Utilities */}
-            <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-2">
-              <span className="text-[10px] uppercase font-black text-slate-400 tracking-wider">
+            <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-2.5">
+              
+              {/* User Profile Info Card in Mobile Sheet */}
+              <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-850 border border-slate-200/80 dark:border-slate-800 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="p-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-xs flex-shrink-0">
+                    {ROLES.find(r => r.id === currentRole)?.icon || <Crown className="h-4 w-4 text-emerald-500" />}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-xs font-black text-slate-900 dark:text-white truncate">
+                      {currentUser?.name || ROLES.find(r => r.id === currentRole)?.title}
+                    </div>
+                    <div className="text-[10px] font-mono text-slate-500 dark:text-slate-400 truncate">
+                      {currentUser?.email || (currentRole === 'admin' ? 'admin@gmail.com' : currentRole === 'staff' ? 'kitchen@gmail.com' : 'cashier@gmail.com')}
+                    </div>
+                  </div>
+                </div>
+
+                {onLogout && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMoreSheetOpen(false);
+                      onLogout();
+                    }}
+                    className="px-2.5 py-1.5 rounded-xl bg-rose-100 hover:bg-rose-200 dark:bg-rose-950/70 text-rose-800 dark:text-rose-300 font-extrabold text-[10px] flex items-center gap-1 cursor-pointer flex-shrink-0"
+                    title="Sign Out"
+                  >
+                    <LogOut className="h-3 w-3 text-rose-600 dark:text-rose-400" />
+                    <span>Logout</span>
+                  </button>
+                )}
+              </div>
+
+              <span className="text-[10px] uppercase font-black text-slate-400 tracking-wider block">
                 Workspace Persona & Tools
               </span>
 

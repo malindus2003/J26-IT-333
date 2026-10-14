@@ -16,6 +16,7 @@ import KitchenStaffDashboard from './components/KitchenStaffDashboard';
 import SmartWasteBinDashboard from './components/SmartWasteBinDashboard';
 import CentralExecutiveDashboard from './components/CentralExecutiveDashboard';
 import OrderManagementDashboard from './components/OrderManagementDashboard';
+import LoginScreen, { DEMO_CREDENTIALS } from './components/LoginScreen';
 import { Activity, LayoutDashboard, Camera, Cpu, ListFilter, AlertTriangle, Sparkles, X, TrendingUp, Users, Trash2, Layers, Check, ShoppingBag, Package, Truck, ShieldCheck, DollarSign, ChevronDown } from 'lucide-react';
 import { DEFAULT_ZONES, DEFAULT_INVENTORY, DEFAULT_RECOMMENDATIONS, DEFAULT_DASHBOARD_STATS } from './data/mockData';
 
@@ -69,11 +70,45 @@ export default function App() {
   // Theme state: defaults to false (Light Mode) for bright, clear visibility
   const [isDarkMode, setIsDarkMode] = useState(false);
   
+  // Authenticated User Session: loaded from localStorage or null (prompts LoginScreen)
+  const [currentUser, setCurrentUser] = useState(() => {
+    try {
+      const saved = localStorage.getItem('smart_restaurant_user');
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
+
   // Active User Role: 'admin' (Executive/All), 'cashier' (POS/Billing), 'staff' (Kitchen KDS/Ops)
-  const [currentRole, setCurrentRole] = useState('admin');
+  const [currentRole, setCurrentRole] = useState(() => {
+    try {
+      const saved = localStorage.getItem('smart_restaurant_user');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed?.role) return parsed.role;
+      }
+    } catch {
+      // fallback
+    }
+    return 'admin';
+  });
   
-  // Top Level Navigation Module: 'executive', 'orders', 'inventory', 'spoilage', 'kitchen', 'demand', 'waste'
-  const [activeModule, setActiveModule] = useState('executive');
+  // Top Level Navigation Module: 'executive', 'orders', 'inventory', 'spoilage', 'kitchen', 'demand', 'waste', 'pos_menu', 'kds'
+  const [activeModule, setActiveModule] = useState(() => {
+    try {
+      const saved = localStorage.getItem('smart_restaurant_user');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed?.defaultModule) return parsed.defaultModule;
+        if (parsed?.role === 'cashier') return 'pos_menu';
+        if (parsed?.role === 'staff') return 'kds';
+      }
+    } catch {
+      // fallback
+    }
+    return 'executive';
+  });
   
   // Spoilage Sub-Tabs: 'vision', 'assessor', 'sensors', 'simulator'
   const [spoilageSubTab, setSpoilageSubTab] = useState('vision');
@@ -157,6 +192,33 @@ export default function App() {
     setCurrentVisionFeatures(features);
   };
 
+  const handleLoginSuccess = (user) => {
+    setCurrentUser(user);
+    try {
+      localStorage.setItem('smart_restaurant_user', JSON.stringify(user));
+    } catch (e) {
+      console.error("Failed to save auth session to localStorage", e);
+    }
+    const role = user.role || 'admin';
+    setCurrentRole(role);
+    const targetModule = user.defaultModule || (
+      role === 'cashier' ? 'pos_menu' :
+      role === 'staff' ? 'kds' : 'executive'
+    );
+    setActiveModule(targetModule);
+  };
+
+  const handleLogout = () => {
+    try {
+      localStorage.removeItem('smart_restaurant_user');
+    } catch (e) {
+      console.error("Failed to remove auth session from localStorage", e);
+    }
+    setCurrentUser(null);
+    setCurrentRole('admin');
+    setActiveModule('executive');
+  };
+
   const activeCriticalCount = recommendations.filter(
     r => r.severity === 'critical' && r.status !== 'resolved'
   ).length;
@@ -164,6 +226,17 @@ export default function App() {
   const totalActiveAlertCount = recommendations.filter(
     r => r.status !== 'resolved'
   ).length;
+
+  // If not authenticated, display the dedicated login screen with role credentials
+  if (!currentUser) {
+    return (
+      <LoginScreen
+        onLoginSuccess={handleLoginSuccess}
+        isDarkMode={isDarkMode}
+        onToggleTheme={() => setIsDarkMode(!isDarkMode)}
+      />
+    );
+  }
 
   return (
     <div className={`min-h-screen ${isDarkMode ? 'dark bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-900'} flex flex-col font-['Plus_Jakarta_Sans',sans-serif] transition-colors duration-200`}>
@@ -180,6 +253,8 @@ export default function App() {
         onOpenAlerts={() => setShowAlertsCenter(true)}
         isDarkMode={isDarkMode}
         onToggleTheme={() => setIsDarkMode(!isDarkMode)}
+        currentUser={currentUser}
+        onLogout={handleLogout}
       />
 
       {/* Main Container with generous bottom safe clearance */}
@@ -494,6 +569,8 @@ export default function App() {
         onOpenAlerts={() => setShowAlertsCenter(true)}
         isDarkMode={isDarkMode}
         onToggleTheme={() => setIsDarkMode(!isDarkMode)}
+        currentUser={currentUser}
+        onLogout={handleLogout}
       />
 
     </div>
