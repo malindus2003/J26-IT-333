@@ -1,4 +1,6 @@
+import os
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from .routers import sensors, vision, predictions, inventory, recommendations, demand, kitchen, waste, orders
 from .data.mock_data import STORAGE_ZONES
@@ -10,6 +12,14 @@ app = FastAPI(
     description="Integrated 4-Component System for Food Demand Prediction, Smart Waste Sorting, Multi-Modal Spoilage Detection, Kitchen Efficiency, and Order & Inventory Management.",
     version="2.1.0"
 )
+
+# Mount static assets for dish images
+_static_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static")
+if os.path.exists(_static_dir):
+    app.mount("/static", StaticFiles(directory=_static_dir), name="static")
+_dishes_dir = os.path.join(_static_dir, "dishes")
+if os.path.exists(_dishes_dir):
+    app.mount("/dishes", StaticFiles(directory=_dishes_dir), name="dishes")
 
 app.add_middleware(
     CORSMiddleware,

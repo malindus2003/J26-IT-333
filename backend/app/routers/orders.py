@@ -17,7 +17,7 @@ MENU_ITEMS = [
         "prep_time_mins": 8,
         "station_id": "station-1",
         "station_name": "Hot Kitchen",
-        "image_url": "https://images.unsplash.com/photo-1603894584373-5ac82b2ae398?w=500&auto=format&fit=crop&q=80",
+        "image_url": "/dishes/chicken_kottu.jpg",
         "description": "Flaky godamba roti shredded with spiced fresh chicken breast, carrots, leeks, and egg.",
         "recipe_bom": [
             {"ingredient_name": "Fresh Chicken Breast (Chilled)", "category": "Meat", "required_kg": 0.30},
@@ -32,7 +32,7 @@ MENU_ITEMS = [
         "prep_time_mins": 14,
         "station_id": "station-2",
         "station_name": "Grill",
-        "image_url": "https://images.unsplash.com/photo-1519708227418-c8fd9a32b7a2?w=500&auto=format&fit=crop&q=80",
+        "image_url": "/dishes/salmon_steak.jpg",
         "description": "Pan-seared Atlantic salmon fillet served with garlic herb butter and fresh garden greens.",
         "recipe_bom": [
             {"ingredient_name": "Fresh Atlantic Salmon Fillet", "category": "Fish", "required_kg": 0.35},
@@ -47,7 +47,7 @@ MENU_ITEMS = [
         "prep_time_mins": 6,
         "station_id": "station-1",
         "station_name": "Hot Kitchen",
-        "image_url": "https://images.unsplash.com/photo-1562376552-0d160a2f238d?w=500&auto=format&fit=crop&q=80",
+        "image_url": "/dishes/berry_waffle.jpg",
         "description": "Crisp Belgian waffle topped with sliced ripe bananas, wild berries, honey, and fresh whipped cream.",
         "recipe_bom": [
             {"ingredient_name": "Cavendish Ripe Bananas (Crate)", "category": "Fruits", "required_kg": 0.25},
@@ -63,7 +63,7 @@ MENU_ITEMS = [
         "prep_time_mins": 4,
         "station_id": "station-3",
         "station_name": "Cold Salad",
-        "image_url": "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=500&auto=format&fit=crop&q=80",
+        "image_url": "/dishes/garden_salad.jpg",
         "description": "Fresh romaine lettuce, baby spinach leaves, ripe vine tomatoes, and aged cheese shavings.",
         "recipe_bom": [
             {"ingredient_name": "Hydroponic Romaine Lettuce (Crisp)", "category": "Vegetables", "required_kg": 0.20},
@@ -79,7 +79,7 @@ MENU_ITEMS = [
         "prep_time_mins": 15,
         "station_id": "station-2",
         "station_name": "Grill",
-        "image_url": "https://images.unsplash.com/photo-1603048588665-791ca8aea617?w=500&auto=format&fit=crop&q=80",
+        "image_url": "/dishes/beef_sirloin.jpg",
         "description": "Chargrilled prime grass-fed beef sirloin with roasted tomatoes, red wine reduction, and herbs.",
         "recipe_bom": [
             {"ingredient_name": "Prime Beef Sirloin (Vac-Pack)", "category": "Meat", "required_kg": 0.35},
@@ -94,7 +94,7 @@ MENU_ITEMS = [
         "prep_time_mins": 5,
         "station_id": "station-3",
         "station_name": "Cold Salad",
-        "image_url": "https://images.unsplash.com/photo-1590080875515-8a3a8dc5735e?w=500&auto=format&fit=crop&q=80",
+        "image_url": "/dishes/smoothie_bowl.jpg",
         "description": "Blended ripe bananas and fresh strawberries with pasteurized whole milk, chia seeds, and granola.",
         "recipe_bom": [
             {"ingredient_name": "Cavendish Ripe Bananas (Crate)", "category": "Fruits", "required_kg": 0.20},
@@ -110,7 +110,7 @@ MENU_ITEMS = [
         "prep_time_mins": 11,
         "station_id": "station-4",
         "station_name": "Pizza",
-        "image_url": "https://images.unsplash.com/photo-1604382354936-07c5d9983bd3?w=500&auto=format&fit=crop&q=80",
+        "image_url": "/dishes/margherita_pizza.jpg",
         "description": "Stone-baked sourdough crust topped with San Marzano tomatoes, fresh mozzarella, and sweet basil.",
         "recipe_bom": [
             {"ingredient_name": "Aged Cheddar & Mozzarella Blocks", "category": "Dairy", "required_kg": 0.20}
@@ -124,7 +124,7 @@ MENU_ITEMS = [
         "prep_time_mins": 7,
         "station_id": "station-5",
         "station_name": "Fryer",
-        "image_url": "https://images.unsplash.com/photo-1599488615731-7e5c2823ff28?w=500&auto=format&fit=crop&q=80",
+        "image_url": "/dishes/calamari_fries.jpg",
         "description": "Golden battered flash-fried calamari and hand-cut fries dusted with sea salt and smoked paprika.",
         "recipe_bom": [
             {"ingredient_name": "Fresh Atlantic Salmon Fillet", "category": "Fish", "required_kg": 0.20}
