@@ -22,19 +22,19 @@ export default function App() {
   const [selectedZoneId, setSelectedZoneId] = useState("zone-fruit");
   const [inventoryItems, setInventoryItems] = useState([]);
   const [recommendations, setRecommendations] = useState([]);
-  
+
   // Theme state: defaults to false (Light Mode) for bright, clear visibility
   const [isDarkMode, setIsDarkMode] = useState(false);
-  
+
   // Active User Role: 'admin' (Executive/All), 'cashier' (POS/Billing), 'staff' (Kitchen KDS/Ops)
   const [currentRole, setCurrentRole] = useState('admin');
-  
+
   // Top Level Navigation Module: 'executive', 'orders', 'inventory', 'spoilage', 'kitchen', 'demand', 'waste'
   const [activeModule, setActiveModule] = useState('executive');
-  
+
   // Spoilage Sub-Tabs: 'vision', 'assessor', 'inventory', 'sensors', 'simulator'
   const [spoilageSubTab, setSpoilageSubTab] = useState('vision');
-  
+
   const [currentVisionFeatures, setCurrentVisionFeatures] = useState(null);
   const [showAlertsCenter, setShowAlertsCenter] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -105,7 +105,7 @@ export default function App() {
 
   return (
     <div className={`min-h-screen ${isDarkMode ? 'dark bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-900'} flex flex-col font-['Plus_Jakarta_Sans',sans-serif] transition-colors duration-200`}>
-      
+
       {/* Clean Navigation Header with Live Alert Counter, Role Switcher & Theme Toggle */}
       <Header
         activeModule={activeModule}
@@ -122,7 +122,7 @@ export default function App() {
 
       {/* Main Container */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6 space-y-6">
-        
+
         {/* Module 1: Executive Integration Hub */}
         {activeModule === 'executive' && (
           <CentralExecutiveDashboard
@@ -150,7 +150,7 @@ export default function App() {
         {/* Module 3: Dedicated Inventory & Stock Management */}
         {activeModule === 'inventory' && (
           <div className="space-y-6">
-            
+
             {/* Inventory Overview Summary Banner */}
             <div className="glass-panel p-6 rounded-2xl relative overflow-hidden bg-white dark:bg-slate-900 border border-[#d1ded5] dark:border-slate-800 shadow-sm space-y-4">
               <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
@@ -217,7 +217,7 @@ export default function App() {
         {/* Module 4: Food Spoilage & Quality Assessment */}
         {activeModule === 'spoilage' && (
           <div className="space-y-6">
-            
+
             {/* Spoilage Module Sub-Header */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white dark:bg-slate-900/80 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
               <div>
@@ -231,44 +231,40 @@ export default function App() {
               <div className="flex items-center gap-1.5 overflow-x-auto">
                 <button
                   onClick={() => setSpoilageSubTab('vision')}
-                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap ${
-                    spoilageSubTab === 'vision'
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap ${spoilageSubTab === 'vision'
                       ? 'bg-purple-600 text-white shadow-md shadow-purple-600/30'
                       : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white border border-slate-200 dark:border-slate-700'
-                  }`}
+                    }`}
                 >
                   <Camera className="h-3.5 w-3.5" /> Container Camera Scanner
                 </button>
 
                 <button
                   onClick={() => setSpoilageSubTab('assessor')}
-                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap ${
-                    spoilageSubTab === 'assessor'
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap ${spoilageSubTab === 'assessor'
                       ? 'bg-purple-600 text-white shadow-md shadow-purple-600/30'
                       : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white border border-slate-200 dark:border-slate-700'
-                  }`}
+                    }`}
                 >
                   <Cpu className="h-3.5 w-3.5" /> Multi-Modal Assessor
                 </button>
 
                 <button
                   onClick={() => setSpoilageSubTab('sensors')}
-                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap ${
-                    spoilageSubTab === 'sensors'
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap ${spoilageSubTab === 'sensors'
                       ? 'bg-purple-600 text-white shadow-md shadow-purple-600/30'
                       : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white border border-slate-200 dark:border-slate-700'
-                  }`}
+                    }`}
                 >
                   <Activity className="h-3.5 w-3.5" /> IoT Telemetry
                 </button>
 
                 <button
                   onClick={() => setSpoilageSubTab('simulator')}
-                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap ${
-                    spoilageSubTab === 'simulator'
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap ${spoilageSubTab === 'simulator'
                       ? 'bg-purple-600 text-white shadow-md shadow-purple-600/30'
                       : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white border border-slate-200 dark:border-slate-700'
-                  }`}
+                    }`}
                 >
                   <Sparkles className="h-3.5 w-3.5" /> ESP32 Sim
                 </button>
@@ -282,9 +278,9 @@ export default function App() {
             {spoilageSubTab === 'vision' && (
               <div className="space-y-6">
                 <VisionInspector onInspectionComplete={handleVisionInspectionComplete} isDarkMode={isDarkMode} />
-                <ActionRecommendations 
-                  recommendations={recommendations} 
-                  isDarkMode={isDarkMode} 
+                <ActionRecommendations
+                  recommendations={recommendations}
+                  isDarkMode={isDarkMode}
                   onOpenAlertsCenter={() => setShowAlertsCenter(true)}
                   onRefresh={fetchAllData}
                 />
@@ -299,9 +295,9 @@ export default function App() {
                   selectedZone={selectedZone}
                   isDarkMode={isDarkMode}
                 />
-                <ActionRecommendations 
-                  recommendations={recommendations} 
-                  isDarkMode={isDarkMode} 
+                <ActionRecommendations
+                  recommendations={recommendations}
+                  isDarkMode={isDarkMode}
                   onOpenAlertsCenter={() => setShowAlertsCenter(true)}
                   onRefresh={fetchAllData}
                 />
