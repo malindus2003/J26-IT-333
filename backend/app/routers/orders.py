@@ -824,6 +824,15 @@ def update_order_status(order_id: str, payload: UpdateOrderStatusPayload):
     
     return {"status": "success", "order": order}
 
+@router.delete("/{order_id}")
+def delete_order(order_id: str):
+    """Cancel or remove an order."""
+    order = next((o for o in orders_db if o["id"] == order_id), None)
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+    orders_db.remove(order)
+    return {"status": "success", "message": f"Order {order_id} removed"}
+
 @router.get("/stats")
 def get_order_stats():
     """Retrieve operational metrics."""

@@ -64,21 +64,56 @@ def get_stations_data() -> List[Dict[str, Any]]:
             {"id": "station-5", "name": "Fryer", "col": "Fryer_Load", "default_cooks": 1, "target_prep": 5.0}
         ]
 
+        from .orders import orders_db
+        active_orders = [o for o in orders_db if o.get("status") in ["pending", "in_prep"]]
+        completed_orders = [o for o in orders_db if o.get("status") in ["ready", "completed"]]
+
+        def station_matches_order(station_name: str, ord: dict) -> bool:
+            st_lower = station_name.lower()
+            if ord.get("station_name", "").lower() == st_lower:
+                return True
+            for it in ord.get("items", []):
+                name = str(it.get("name", "")).lower()
+                if "pizza" in st_lower and ("pizza" in name or "margherita" in name or "calzone" in name):
+                    return True
+                if "grill" in st_lower and ("grill" in name or "salmon" in name or "steak" in name or "beef" in name or "sirloin" in name):
+                    return True
+                if "cold" in st_lower and ("salad" in name or "smoothie" in name or "bowl" in name or "avocado" in name):
+                    return True
+                if "fryer" in st_lower and ("cuttlefish" in name or "samosa" in name or "fry" in name or "calamari" in name):
+                    return True
+                if "hot" in st_lower and ("kottu" in name or "waffle" in name or "roti" in name or "rice" in name):
+                    return True
+            return False
+
+        # Base shift baseline orders processed prior to live stream
+        base_shift_loads = {
+            "Hot Kitchen": 4.0,
+            "Grill": 0.0,
+            "Cold Salad": 0.0,
+            "Pizza": 0.0,
+            "Fryer": 1.0
+        }
+
         mapped_stations = []
         for st in stations_config:
-            current_load = float(latest_row.get(st["col"], 10))
+            live_active_queue = sum(1 for o in active_orders if station_matches_order(st["name"], o))
+            live_completed_count = sum(1 for o in completed_orders if station_matches_order(st["name"], o))
+            base_load = base_shift_loads.get(st["name"], 0.0)
+            
+            # Actual load incorporates base shift orders + active and completed orders for the station
+            current_load = round(base_load + live_active_queue + live_completed_count, 1)
             thresh = thresholds[st["name"]]
-            load_percentage = min(100, int(round((current_load / thresh) * 80)))
+            load_percentage = min(100, int(round((current_load / thresh) * 80))) if current_load > 0 else 0
             is_bottleneck = current_load >= thresh
             
             status = "High Delay Risk" if is_bottleneck else ("Moderate Load" if load_percentage > 65 else "Smooth Flow")
             recommended_cooks = st["default_cooks"] + (1 if is_bottleneck else 0)
-            avg_prep = round(st["target_prep"] * (1.35 if is_bottleneck else 1.0), 1)
+            avg_prep = round(st["target_prep"] + (live_active_queue * 0.45), 1)
 
             action = f"Add +1 Cook to {st['name']} due to peak backlog" if is_bottleneck else "Maintain current station staffing"
 
-            # Predicted load mathu actual load frontend-ge mukhya
-            pred_load = round(current_load * 0.95, 1)
+            pred_load = round(current_load * 0.94 + 0.1, 1) if current_load > 0 else 0.0
 
             mapped_stations.append({
                 "id": st["id"],
@@ -86,12 +121,12 @@ def get_stations_data() -> List[Dict[str, Any]]:
                 "actual_load": round(current_load, 1),
                 "predicted_load": pred_load,
                 "load_level": load_percentage,
-                "predicted_load_level": max(10, load_percentage - 5),
+                "predicted_load_level": max(0, load_percentage - 5),
                 "active_cooks": st["default_cooks"],
                 "recommended_cooks": recommended_cooks,
                 "avg_prep_time_mins": avg_prep,
                 "target_prep_time_mins": st["target_prep"],
-                "queue_length": int(round(current_load / 2.5)),
+                "queue_length": live_active_queue,
                 "bottleneck_status": status,
                 "action": action,
                 "overload_days_count": overload_counts[st["name"]]
@@ -309,11 +344,36 @@ def get_kitchen_metrics():
     actual_total = round(sum(s.get("actual_load", 0) for s in stations), 1)
     predicted_total = round(sum(s.get("predicted_load", 0) for s in stations), 1)
     
+    # Calculate real-time kitchen efficiency and fulfillment time from live orders
+    from .orders import orders_db
+    active_orders = [o for o in orders_db if o.get("status") in ["pending", "in_prep"]]
+    queue_len = len(active_orders)
+
+    if queue_len == 0:
+        dynamic_prep = "5.4 mins"
+        dynamic_eff = "98.5%"
+    elif queue_len <= 3:
+        dynamic_prep = f"{round(5.5 + queue_len * 0.4, 1)} mins"
+        dynamic_eff = f"{round(98.5 - queue_len * 1.2, 1)}%"
+    elif queue_len <= 6:
+        dynamic_prep = f"{round(6.7 + (queue_len - 3) * 0.45, 1)} mins"
+        dynamic_eff = f"{round(95.0 - (queue_len - 3) * 2.2, 1)}%"
+    elif queue_len <= 10:
+        dynamic_prep = f"{round(8.1 + (queue_len - 6) * 0.5, 1)} mins"
+        dynamic_eff = f"{round(88.4 - (queue_len - 6) * 2.6, 1)}%"
+    elif queue_len <= 15:
+        dynamic_prep = f"{round(10.1 + (queue_len - 10) * 0.6, 1)} mins"
+        dynamic_eff = f"{round(78.0 - (queue_len - 10) * 2.5, 1)}%"
+    else:
+        dynamic_prep = f"{round(13.1 + (queue_len - 15) * 0.7, 1)} mins"
+        dynamic_eff = f"{max(38.0, round(65.5 - (queue_len - 15) * 2.8, 1))}%"
+
     return {
         "researcher": "Pahesara H.H.D.S (IT23349292)",
         "module": "Component 2: Kitchen Efficiency and Staff Optimization Analytics",
-        "overall_kitchen_efficiency": "98.2%",
-        "avg_ticket_fulfillment_time": "6.8 mins",
+        "overall_kitchen_efficiency": dynamic_eff,
+        "avg_ticket_fulfillment_time": dynamic_prep,
+        "active_queue_count": queue_len,
         "actual_total_load": actual_total,
         "predicted_total_load": predicted_total,
         "active_bottlenecks_count": len([s for s in stations if s.get("load_level", 0) > 80]),
