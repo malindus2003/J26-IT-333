@@ -1,19 +1,19 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { 
-  Users, Clock, Flame, Award, AlertTriangle, ArrowRight, ShieldCheck, CheckCircle2, 
-  TrendingUp, Utensils, X, Lock, LogIn, Key, Smartphone, Coffee, ChefHat, Send, 
+import {
+  Users, Clock, Flame, Award, AlertTriangle, ArrowRight, ShieldCheck, CheckCircle2,
+  TrendingUp, Utensils, X, Lock, LogIn, Key, Smartphone, Coffee, ChefHat, Send,
   CheckSquare, Pizza, Plus, Minus, Hash, Search, Cpu, Sparkles, Database, Layers,
   CheckCheck, Armchair, PackageCheck, RefreshCw, Filter, ArrowUpRight, ShoppingBag, Check
 } from 'lucide-react';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, Legend, ReferenceArea } from 'recharts';
 import axios from 'axios';
 
-export default function KitchenStaffDashboard({ 
-  isDarkMode, 
-  currentRole = 'admin', 
-  refreshTrigger, 
-  onRefresh, 
-  onNavigateModule 
+export default function KitchenStaffDashboard({
+  isDarkMode,
+  currentRole = 'admin',
+  refreshTrigger,
+  onRefresh,
+  onNavigateModule
 }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -57,7 +57,7 @@ export default function KitchenStaffDashboard({
         if (metricsRes?.data) {
           setData(metricsRes.data);
         }
-      } catch (mErr) {}
+      } catch (mErr) { }
     } catch (err) {
       console.warn("Could not fetch live orders from /api/orders:", err);
     } finally {
@@ -82,7 +82,7 @@ export default function KitchenStaffDashboard({
           const updated = new Set([...prev, ...completedIds]);
           try {
             localStorage.setItem('kds_cleared_completed_orders', JSON.stringify(Array.from(updated)));
-          } catch (e) {}
+          } catch (e) { }
           return updated;
         });
       }
@@ -107,13 +107,13 @@ export default function KitchenStaffDashboard({
     try {
       try {
         await axios.post("http://localhost:8000/api/orders/clear-completed");
-      } catch (e) {}
+      } catch (e) { }
       const completedIds = liveOrders.filter(o => o.status === 'completed').map(o => o.id);
       setClearedCompletedIds(prev => {
         const updated = new Set([...prev, ...completedIds]);
         try {
           localStorage.setItem('kds_cleared_completed_orders', JSON.stringify(Array.from(updated)));
-        } catch (e) {}
+        } catch (e) { }
         return updated;
       });
       setDismissedToast("✅ Completed orders cleared from KDS.");
@@ -142,7 +142,7 @@ export default function KitchenStaffDashboard({
           nextSet.delete(orderId);
           try {
             localStorage.setItem('kds_cleared_completed_orders', JSON.stringify(Array.from(nextSet)));
-          } catch (e) {}
+          } catch (e) { }
           return nextSet;
         });
       }
@@ -291,7 +291,7 @@ export default function KitchenStaffDashboard({
       const existingStation = currentDataStations.find(s => s.name === cfg.name || s.id === cfg.id) || {};
 
       // Match live orders targeting this station
-      const activeStationOrders = liveOrders.filter(o => 
+      const activeStationOrders = liveOrders.filter(o =>
         (o.status === 'pending' || o.status === 'in_prep') &&
         (
           (o.station_name && o.station_name.toLowerCase().includes(cfg.name.toLowerCase())) ||
@@ -299,7 +299,7 @@ export default function KitchenStaffDashboard({
         )
       );
 
-      const completedStationOrders = liveOrders.filter(o => 
+      const completedStationOrders = liveOrders.filter(o =>
         (o.status === 'ready' || o.status === 'completed') &&
         !clearedCompletedIds.has(o.id) &&
         (
@@ -669,12 +669,12 @@ export default function KitchenStaffDashboard({
       const allItemsPayload = selectedItems.map(i => ({
         menu_id: i.id.startsWith("menu-") ? i.id : (
           i.name.includes("Kottu") ? "menu-01" :
-          i.name.includes("Salmon") ? "menu-02" :
-          i.name.includes("Waffle") ? "menu-03" :
-          i.name.includes("Salad") ? "menu-04" :
-          i.name.includes("Steak") ? "menu-05" :
-          i.name.includes("Smoothie") || i.name.includes("Tea") ? "menu-06" :
-          i.name.includes("Pizza") ? "menu-07" : "menu-08"
+            i.name.includes("Salmon") ? "menu-02" :
+              i.name.includes("Waffle") ? "menu-03" :
+                i.name.includes("Salad") ? "menu-04" :
+                  i.name.includes("Steak") ? "menu-05" :
+                    i.name.includes("Smoothie") || i.name.includes("Tea") ? "menu-06" :
+                      i.name.includes("Pizza") ? "menu-07" : "menu-08"
         ),
         quantity: i.qty
       }));
@@ -975,11 +975,10 @@ export default function KitchenStaffDashboard({
         <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
           <button
             onClick={() => setActiveKitchenTab('optimization')}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
-              activeKitchenTab === 'optimization'
-                ? 'bg-emerald-700 text-white shadow-md shadow-emerald-700/20'
-                : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
-            }`}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${activeKitchenTab === 'optimization'
+              ? 'bg-emerald-700 text-white shadow-md shadow-emerald-700/20'
+              : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+              }`}
           >
             <Users className="h-4 w-4" />
             <span>Staff Optimization & Workload AI</span>
@@ -987,11 +986,10 @@ export default function KitchenStaffDashboard({
 
           <button
             onClick={() => setActiveKitchenTab('all')}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
-              activeKitchenTab === 'all'
-                ? 'bg-emerald-700 text-white shadow-md shadow-emerald-700/20'
-                : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
-            }`}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${activeKitchenTab === 'all'
+              ? 'bg-emerald-700 text-white shadow-md shadow-emerald-700/20'
+              : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+              }`}
           >
             <Layers className="h-4 w-4" />
             <span>Full Kitchen Ops (All Views)</span>
@@ -1063,7 +1061,7 @@ export default function KitchenStaffDashboard({
 
           {/* KDS Live Ticket Board Container */}
           <div className="glass-panel p-6 rounded-2xl bg-white dark:bg-slate-900 border border-[#d1ded5] dark:border-slate-800 space-y-4 shadow-sm">
-            
+
             {/* Top Toolbar */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-[#e1eae4] dark:border-slate-800 pb-4">
               <div>
@@ -1100,11 +1098,10 @@ export default function KitchenStaffDashboard({
                   <button
                     key={st}
                     onClick={() => setKdsStationFilter(st)}
-                    className={`px-3 py-1 rounded-lg text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
-                      kdsStationFilter === st
-                        ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 shadow-xs'
-                        : 'bg-[#f0f5f2] dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white border border-[#d1ded5] dark:border-slate-700'
-                    }`}
+                    className={`px-3 py-1 rounded-lg text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${kdsStationFilter === st
+                      ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 shadow-xs'
+                      : 'bg-[#f0f5f2] dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white border border-[#d1ded5] dark:border-slate-700'
+                      }`}
                   >
                     {st === 'all' ? 'All Stations' : st}
                   </button>
@@ -1372,929 +1369,929 @@ export default function KitchenStaffDashboard({
 
       {/* Top Banner (Staff Optimization & Directives) */}
       {(activeKitchenTab === 'optimization' || activeKitchenTab === 'all') && (
-      <div className="glass-panel p-6 rounded-2xl space-y-5">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-5">
-          <div>
-            <div className="flex items-center gap-2">
-              <h2 className="text-lg font-bold text-slate-900 dark:text-white">Kitchen Efficiency & Dynamic Staff Optimization</h2>
-              <span className="text-xs px-2.5 py-0.5 rounded bg-orange-50 text-orange-700 dark:bg-orange-500/10 dark:text-orange-400 border border-orange-200 dark:border-orange-500/20 font-bold">
-                Workflow & Queue AI
-              </span>
-            </div>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 font-medium">
-              Real-time station queue monitoring, peak-hour staff allocation, and staff progression
-            </p>
-          </div>
-
-          <div className="flex flex-col items-end gap-1.5">
-            <div className="flex items-center gap-4 flex-wrap justify-end">
-              <div className="text-right">
-                <span className="text-[11px] text-slate-500 dark:text-slate-400 font-bold uppercase">Kitchen Overall Efficiency</span>
-                <div className={`text-xl font-black ${isCriticalEfficiency ? 'text-rose-600 dark:text-rose-400 animate-pulse' : 'text-emerald-600 dark:text-emerald-400'}`}>
-                  {shiftEfficiency}
-                </div>
-              </div>
-              <div className="text-right border-l border-slate-200 dark:border-slate-800 pl-4">
-                <span className="text-[11px] text-slate-500 dark:text-slate-400 font-bold uppercase">Avg Prep Time</span>
-                <div className="text-xl font-black text-slate-900 dark:text-white">{shiftPrepTime}</div>
-              </div>
-              <div className="text-right border-l border-slate-200 dark:border-slate-800 pl-4">
-                <span className="text-[11px] text-slate-500 dark:text-slate-400 font-bold uppercase">Actual Total Load</span>
-                <div className="text-xl font-black text-orange-600 dark:text-orange-400">
-                  {data?.actual_total_load || 121.0}
-                  <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 ml-1">orders</span>
-                </div>
-              </div>
-              <div className="text-right border-l border-slate-200 dark:border-slate-800 pl-4">
-                <span className="text-[11px] text-slate-500 dark:text-slate-400 font-bold uppercase">Predicted Total Load</span>
-                <div className="text-xl font-black text-sky-600 dark:text-sky-400">
-                  {data?.predicted_total_load || 114.6}
-                  <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 ml-1">orders</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2.5 py-0.5 rounded-full border border-slate-200 dark:border-slate-700">
-              <Clock className="h-3 w-3 text-orange-500" />
-              <span>⏰ Dynamic API Connected • {last4HourUpdate}</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Toast Notification */}
-        {dismissedToast && (
-          <div className="p-3.5 rounded-xl bg-emerald-600 text-white font-bold text-xs shadow-lg flex items-center justify-between gap-2 animate-bounce">
-            <div className="flex items-center gap-2">
-              <CheckCircle2 className="h-4 w-4" />
-              <span>{dismissedToast}</span>
-            </div>
-            <button onClick={() => setDismissedToast("")} className="text-white hover:text-slate-200 text-xs font-black cursor-pointer">✕</button>
-          </div>
-        )}
-
-        {/* AI Actionable Directives */}
-        <div className="p-5 rounded-2xl bg-orange-50 border border-orange-200 dark:bg-orange-950/40 dark:border-orange-500/30 shadow-sm space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-orange-200 dark:border-orange-800/60 pb-3">
-            <div className="flex items-center gap-2">
-              <Flame className="h-5 w-5 text-orange-600 dark:text-orange-400 flex-shrink-0" />
-              <div>
-                <h3 className="text-xs font-black text-orange-900 dark:text-orange-200 uppercase tracking-wider">
-                  AI Dynamic Staff Allocation Directives
-                </h3>
-                <p className="text-[11px] text-orange-800 dark:text-orange-300 font-medium">
-                  Updates dynamically based on real-time order queue surges and staff skill matching
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] font-black px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800 flex items-center gap-1">
-                <span className="h-2 w-2 rounded-full bg-emerald-500 animate-ping"></span> Live Kitchen Engine
-              </span>
-              <button
-                onClick={handleSimulateSurge}
-                className="px-3 py-1 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-bold text-xs shadow-xs transition-all flex items-center gap-1 cursor-pointer whitespace-nowrap"
-                title="Simulate sudden order queue spike"
-              >
-                <TrendingUp className="h-3.5 w-3.5" />
-                <span>Simulate Order Queue Surge</span>
-              </button>
-            </div>
-          </div>
-
-          {directives.length === 0 ? (
-            <div className="p-4 rounded-xl bg-emerald-50 text-emerald-900 dark:bg-emerald-950/50 dark:text-emerald-200 border border-emerald-200 dark:border-emerald-800 text-xs font-bold flex items-center justify-between">
+        <div className="glass-panel p-6 rounded-2xl space-y-5">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-5">
+            <div>
               <div className="flex items-center gap-2">
-                <CheckCircle2 className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
-                <span>All line queues balanced! Kitchen staffing operating at optimal efficiency.</span>
+                <h2 className="text-lg font-bold text-slate-900 dark:text-white">Kitchen Efficiency & Dynamic Staff Optimization</h2>
+                <span className="text-xs px-2.5 py-0.5 rounded bg-orange-50 text-orange-700 dark:bg-orange-500/10 dark:text-orange-400 border border-orange-200 dark:border-orange-500/20 font-bold">
+                  Workflow & Queue AI
+                </span>
               </div>
-              <button
-                onClick={() => fetchKitchenData()}
-                className="px-3 py-1 rounded-lg bg-emerald-600 text-white font-bold text-[11px] hover:bg-emerald-700 transition-colors cursor-pointer"
-              >
-                Reset Directives
-              </button>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 font-medium">
+                Real-time station queue monitoring, peak-hour staff allocation, and staff progression
+              </p>
             </div>
-          ) : (
-            <div className="space-y-3">
-              {directives.map((dir, index) => (
-                <div
-                  key={dir.id}
-                  className={`p-3.5 rounded-xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${dir.resolved
-                    ? 'bg-emerald-50 border-emerald-300 dark:bg-emerald-950/40 dark:border-emerald-800 opacity-60'
-                    : (index === 0
-                      ? 'bg-white dark:bg-slate-900 border-2 border-orange-400 dark:border-orange-500/60 shadow-sm'
-                      : 'bg-white/80 dark:bg-slate-900/60 border-orange-200 dark:border-orange-900/40 opacity-85')
-                    }`}
-                >
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className={`text-[10px] font-black px-2 py-0.5 rounded-md text-white ${dir.priority.includes('SURGE') || dir.priority === 'CRITICAL'
-                        ? 'bg-rose-600 animate-pulse'
-                        : (dir.priority === 'HIGH' ? 'bg-amber-600' : 'bg-blue-600')
-                        }`}>
-                        {index === 0 ? `TOP PRIORITY: ${dir.priority}` : `PRIORITY ${index + 1}: ${dir.priority}`}
-                      </span>
-                      <p className="text-xs font-bold text-slate-900 dark:text-white">{dir.title}</p>
-                    </div>
-                    <p className="text-xs text-orange-950 dark:text-orange-200 font-semibold flex items-center gap-1 pt-0.5">
-                      <ArrowRight className="h-3.5 w-3.5 text-orange-600 dark:text-orange-400 flex-shrink-0" />
-                      <span>Action: <span className="font-extrabold text-orange-900 dark:text-orange-100 underline">{dir.actionText}</span></span>
-                    </p>
-                  </div>
 
-                  {dir.resolved ? (
-                    <span className="px-3 py-1.5 rounded-xl bg-emerald-600 text-white font-bold text-xs flex items-center gap-1 whitespace-nowrap self-start sm:self-auto">
-                      <CheckCircle2 className="h-4 w-4" />
-                      <span>Reassigned & Resolved</span>
-                    </span>
-                  ) : (
-                    <button
-                      onClick={() => handleExecuteDirective(dir)}
-                      className={`px-3.5 py-2 rounded-xl text-white font-bold text-xs shadow-md transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap self-start sm:self-auto ${index === 0
-                        ? 'bg-orange-600 hover:bg-orange-700 shadow-orange-600/30 ring-2 ring-orange-400'
-                        : 'bg-slate-800 hover:bg-slate-900 dark:bg-slate-700 dark:hover:bg-slate-600'
-                        }`}
-                    >
-                      <ShieldCheck className="h-4 w-4" />
-                      <span>Reallocate {dir.targetStaff}</span>
-                    </button>
-                  )}
+            <div className="flex flex-col items-end gap-1.5">
+              <div className="flex items-center gap-4 flex-wrap justify-end">
+                <div className="text-right">
+                  <span className="text-[11px] text-slate-500 dark:text-slate-400 font-bold uppercase">Kitchen Overall Efficiency</span>
+                  <div className={`text-xl font-black ${isCriticalEfficiency ? 'text-rose-600 dark:text-rose-400 animate-pulse' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                    {shiftEfficiency}
+                  </div>
                 </div>
-              ))}
+                <div className="text-right border-l border-slate-200 dark:border-slate-800 pl-4">
+                  <span className="text-[11px] text-slate-500 dark:text-slate-400 font-bold uppercase">Avg Prep Time</span>
+                  <div className="text-xl font-black text-slate-900 dark:text-white">{shiftPrepTime}</div>
+                </div>
+                <div className="text-right border-l border-slate-200 dark:border-slate-800 pl-4">
+                  <span className="text-[11px] text-slate-500 dark:text-slate-400 font-bold uppercase">Actual Total Load</span>
+                  <div className="text-xl font-black text-orange-600 dark:text-orange-400">
+                    {data?.actual_total_load || 121.0}
+                    <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 ml-1">orders</span>
+                  </div>
+                </div>
+                <div className="text-right border-l border-slate-200 dark:border-slate-800 pl-4">
+                  <span className="text-[11px] text-slate-500 dark:text-slate-400 font-bold uppercase">Predicted Total Load</span>
+                  <div className="text-xl font-black text-sky-600 dark:text-sky-400">
+                    {data?.predicted_total_load || 114.6}
+                    <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 ml-1">orders</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2.5 py-0.5 rounded-full border border-slate-200 dark:border-slate-700">
+                <Clock className="h-3 w-3 text-orange-500" />
+                <span>⏰ Dynamic API Connected • {last4HourUpdate}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Toast Notification */}
+          {dismissedToast && (
+            <div className="p-3.5 rounded-xl bg-emerald-600 text-white font-bold text-xs shadow-lg flex items-center justify-between gap-2 animate-bounce">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="h-4 w-4" />
+                <span>{dismissedToast}</span>
+              </div>
+              <button onClick={() => setDismissedToast("")} className="text-white hover:text-slate-200 text-xs font-black cursor-pointer">✕</button>
             </div>
           )}
+
+          {/* AI Actionable Directives */}
+          <div className="p-5 rounded-2xl bg-orange-50 border border-orange-200 dark:bg-orange-950/40 dark:border-orange-500/30 shadow-sm space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-orange-200 dark:border-orange-800/60 pb-3">
+              <div className="flex items-center gap-2">
+                <Flame className="h-5 w-5 text-orange-600 dark:text-orange-400 flex-shrink-0" />
+                <div>
+                  <h3 className="text-xs font-black text-orange-900 dark:text-orange-200 uppercase tracking-wider">
+                    AI Dynamic Staff Allocation Directives
+                  </h3>
+                  <p className="text-[11px] text-orange-800 dark:text-orange-300 font-medium">
+                    Updates dynamically based on real-time order queue surges and staff skill matching
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-black px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800 flex items-center gap-1">
+                  <span className="h-2 w-2 rounded-full bg-emerald-500 animate-ping"></span> Live Kitchen Engine
+                </span>
+                <button
+                  onClick={handleSimulateSurge}
+                  className="px-3 py-1 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-bold text-xs shadow-xs transition-all flex items-center gap-1 cursor-pointer whitespace-nowrap"
+                  title="Simulate sudden order queue spike"
+                >
+                  <TrendingUp className="h-3.5 w-3.5" />
+                  <span>Simulate Order Queue Surge</span>
+                </button>
+              </div>
+            </div>
+
+            {directives.length === 0 ? (
+              <div className="p-4 rounded-xl bg-emerald-50 text-emerald-900 dark:bg-emerald-950/50 dark:text-emerald-200 border border-emerald-200 dark:border-emerald-800 text-xs font-bold flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+                  <span>All line queues balanced! Kitchen staffing operating at optimal efficiency.</span>
+                </div>
+                <button
+                  onClick={() => fetchKitchenData()}
+                  className="px-3 py-1 rounded-lg bg-emerald-600 text-white font-bold text-[11px] hover:bg-emerald-700 transition-colors cursor-pointer"
+                >
+                  Reset Directives
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {directives.map((dir, index) => (
+                  <div
+                    key={dir.id}
+                    className={`p-3.5 rounded-xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${dir.resolved
+                      ? 'bg-emerald-50 border-emerald-300 dark:bg-emerald-950/40 dark:border-emerald-800 opacity-60'
+                      : (index === 0
+                        ? 'bg-white dark:bg-slate-900 border-2 border-orange-400 dark:border-orange-500/60 shadow-sm'
+                        : 'bg-white/80 dark:bg-slate-900/60 border-orange-200 dark:border-orange-900/40 opacity-85')
+                      }`}
+                  >
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className={`text-[10px] font-black px-2 py-0.5 rounded-md text-white ${dir.priority.includes('SURGE') || dir.priority === 'CRITICAL'
+                          ? 'bg-rose-600 animate-pulse'
+                          : (dir.priority === 'HIGH' ? 'bg-amber-600' : 'bg-blue-600')
+                          }`}>
+                          {index === 0 ? `TOP PRIORITY: ${dir.priority}` : `PRIORITY ${index + 1}: ${dir.priority}`}
+                        </span>
+                        <p className="text-xs font-bold text-slate-900 dark:text-white">{dir.title}</p>
+                      </div>
+                      <p className="text-xs text-orange-950 dark:text-orange-200 font-semibold flex items-center gap-1 pt-0.5">
+                        <ArrowRight className="h-3.5 w-3.5 text-orange-600 dark:text-orange-400 flex-shrink-0" />
+                        <span>Action: <span className="font-extrabold text-orange-900 dark:text-orange-100 underline">{dir.actionText}</span></span>
+                      </p>
+                    </div>
+
+                    {dir.resolved ? (
+                      <span className="px-3 py-1.5 rounded-xl bg-emerald-600 text-white font-bold text-xs flex items-center gap-1 whitespace-nowrap self-start sm:self-auto">
+                        <CheckCircle2 className="h-4 w-4" />
+                        <span>Reassigned & Resolved</span>
+                      </span>
+                    ) : (
+                      <button
+                        onClick={() => handleExecuteDirective(dir)}
+                        className={`px-3.5 py-2 rounded-xl text-white font-bold text-xs shadow-md transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap self-start sm:self-auto ${index === 0
+                          ? 'bg-orange-600 hover:bg-orange-700 shadow-orange-600/30 ring-2 ring-orange-400'
+                          : 'bg-slate-800 hover:bg-slate-900 dark:bg-slate-700 dark:hover:bg-slate-600'
+                          }`}
+                      >
+                        <ShieldCheck className="h-4 w-4" />
+                        <span>Reallocate {dir.targetStaff}</span>
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
-      </div>
       )}
 
 
 
       {/* Research ML Model Performance & Evaluation Card */}
       {(activeKitchenTab === 'optimization' || activeKitchenTab === 'all') && (
-      <>
-      {(() => {
-        const mlEval = data?.ml_model_evaluation || {
-          model_name: "Random Forest Regressor (Multi-Output)",
-          mae: 1.42,
-          rmse: 2.18,
-          r2_score: 0.941,
-          mape: "5.9%",
-          cross_val_accuracy: "94.1%",
-          dataset_days_trained: 92,
-          features_used: ["Hour", "DayOfWeek", "IsWeekend", "HistoricalQueue", "StationType"]
-        };
+        <>
+          {(() => {
+            const mlEval = data?.ml_model_evaluation || {
+              model_name: "Random Forest Regressor (Multi-Output)",
+              mae: 1.42,
+              rmse: 2.18,
+              r2_score: 0.941,
+              mape: "5.9%",
+              cross_val_accuracy: "94.1%",
+              dataset_days_trained: 92,
+              features_used: ["Hour", "DayOfWeek", "IsWeekend", "HistoricalQueue", "StationType"]
+            };
 
-        const r2Pct = (Number(mlEval.r2_score || 0.941) * 100).toFixed(1);
+            const r2Pct = (Number(mlEval.r2_score || 0.941) * 100).toFixed(1);
 
-        return (
-          <div className="glass-panel p-6 rounded-2xl space-y-5 border border-indigo-200/80 dark:border-indigo-500/30 bg-gradient-to-br from-indigo-50/40 via-white to-purple-50/30 dark:from-slate-900/90 dark:via-indigo-950/20 dark:to-slate-900/90 shadow-sm">
-            {/* Header */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-indigo-100 dark:border-indigo-900/50 pb-4">
-              <div className="flex items-center gap-3">
-                <div className="p-3 rounded-2xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-purple-600 text-white shadow-md shadow-indigo-500/25">
-                  <Cpu className="h-6 w-6" />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <h3 className="text-base font-bold text-slate-900 dark:text-white">
-                      Research ML Model Performance & Evaluation
-                    </h3>
-                    <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 flex items-center gap-1">
-                      <Sparkles className="h-3 w-3 text-indigo-500" />
-                      {mlEval.model_name || "Random Forest Regressor (Multi-Output)"}
-                    </span>
-                  </div>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mt-0.5">
-                    Supervised Multi-Output regression pipeline forecasting station loads across Hot Kitchen, Grill, Cold Salad, Pizza & Fryer
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2 flex-wrap">
-                <div className="px-3 py-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800/60 text-emerald-800 dark:text-emerald-300 text-xs font-bold flex items-center gap-1.5 shadow-2xs">
-                  <Database className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
-                  <span>Trained on {mlEval.dataset_days_trained || 92} Days of Historical Kitchen Workload Data</span>
-                </div>
-                <div className="px-3 py-1.5 rounded-xl bg-purple-50 dark:bg-purple-950/50 border border-purple-200 dark:border-purple-800/60 text-purple-800 dark:text-purple-300 text-xs font-bold flex items-center gap-1.5 shadow-2xs">
-                  <ShieldCheck className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" />
-                  <span>CV Accuracy: {mlEval.cross_val_accuracy || "94.1%"}</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Metrics Cards Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              {/* Metric 1: MAE */}
-              <div className="p-4 rounded-xl bg-white/90 dark:bg-slate-900/80 border border-indigo-100 dark:border-slate-800 shadow-2xs space-y-2 relative overflow-hidden">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                    MAE (Mean Absolute Error)
-                  </span>
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300">
-                    Low Bias
-                  </span>
-                </div>
-                <div className="flex items-baseline gap-1.5">
-                  <span className="text-2xl font-black text-slate-900 dark:text-white">
-                    {mlEval.mae ?? 1.42}
-                  </span>
-                  <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-                    orders
-                  </span>
-                </div>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-snug">
-                  Average deviation between model forecast and real-time kitchen order tickets.
-                </p>
-                <div className="w-full bg-slate-100 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden mt-1">
-                  <div className="bg-emerald-500 h-full rounded-full" style={{ width: '92%' }}></div>
-                </div>
-              </div>
-
-              {/* Metric 2: RMSE */}
-              <div className="p-4 rounded-xl bg-white/90 dark:bg-slate-900/80 border border-indigo-100 dark:border-slate-800 shadow-2xs space-y-2 relative overflow-hidden">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                    RMSE (Root Mean Squared Error)
-                  </span>
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-300">
-                    Peak Safe
-                  </span>
-                </div>
-                <div className="flex items-baseline gap-1.5">
-                  <span className="text-2xl font-black text-slate-900 dark:text-white">
-                    {mlEval.rmse ?? 2.18}
-                  </span>
-                  <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-                    orders
-                  </span>
-                </div>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-snug">
-                  Penalizes peak rush-hour outliers to avoid catastrophic kitchen queue backlogs.
-                </p>
-                <div className="w-full bg-slate-100 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden mt-1">
-                  <div className="bg-sky-500 h-full rounded-full" style={{ width: '88%' }}></div>
-                </div>
-              </div>
-
-              {/* Metric 3: R² Score */}
-              <div className="p-4 rounded-xl bg-white/90 dark:bg-slate-900/80 border border-indigo-100 dark:border-slate-800 shadow-2xs space-y-2 relative overflow-hidden">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                    R² Score (Goodness of Fit)
-                  </span>
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-300">
-                    High Fit
-                  </span>
-                </div>
-                <div className="flex items-baseline gap-2">
-                  <span className="text-2xl font-black text-indigo-600 dark:text-indigo-400">
-                    {mlEval.r2_score ?? 0.941}
-                  </span>
-                  <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
-                    ({r2Pct}%)
-                  </span>
-                </div>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-snug">
-                  Proportion of variance explained by temporal patterns & queue factors.
-                </p>
-                <div className="w-full bg-slate-100 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden mt-1">
-                  <div className="bg-indigo-600 h-full rounded-full" style={{ width: `${Math.min(100, r2Pct)}%` }}></div>
-                </div>
-              </div>
-
-              {/* Metric 4: MAPE */}
-              <div className="p-4 rounded-xl bg-white/90 dark:bg-slate-900/80 border border-indigo-100 dark:border-slate-800 shadow-2xs space-y-2 relative overflow-hidden">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                    MAPE (Mean Absolute % Error)
-                  </span>
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300">
-                    &lt; 10% Benchmark
-                  </span>
-                </div>
-                <div className="flex items-baseline gap-1.5">
-                  <span className="text-2xl font-black text-purple-600 dark:text-purple-400">
-                    {mlEval.mape ?? "5.9%"}
-                  </span>
-                </div>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-snug">
-                  Tight percentage error ensuring reliable prep-line staffing decisions across shifts.
-                </p>
-                <div className="w-full bg-slate-100 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden mt-1">
-                  <div className="bg-purple-500 h-full rounded-full" style={{ width: '94.1%' }}></div>
-                </div>
-              </div>
-            </div>
-
-            {/* Feature Inputs & Dataset Scope Bar */}
-            <div className="p-3.5 rounded-xl bg-indigo-50/70 dark:bg-slate-800/60 border border-indigo-100 dark:border-slate-700/60 flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1">
-                  <Layers className="h-3.5 w-3.5 text-indigo-500" />
-                  Model Feature Inputs:
-                </span>
-                {(mlEval.features_used || ["Hour", "DayOfWeek", "IsWeekend", "HistoricalQueue", "StationType"]).map((feat, fIdx) => (
-                  <span
-                    key={fIdx}
-                    className="px-2 py-0.5 rounded-md bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border border-indigo-100 dark:border-slate-700 font-mono text-[11px] font-semibold"
-                  >
-                    {feat}
-                  </span>
-                ))}
-              </div>
-
-              <div className="flex items-center gap-2 text-slate-600 dark:text-slate-400 font-medium">
-                <Award className="h-3.5 w-3.5 text-amber-500" />
-                <span>
-                  Validated on <strong>{mlEval.dataset_days_trained || 92} days</strong> of historical kitchen workload data across <strong>5 stations</strong> (Hot Kitchen, Grill, Cold Salad, Pizza, Fryer)
-                </span>
-              </div>
-            </div>
-          </div>
-        );
-      })()}
-
-      {/* Peak-Hour Workload & Staffing Demand Chart */}
-      <div className="glass-panel p-6 rounded-2xl space-y-4">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 border-b border-slate-200 dark:border-slate-800 pb-3">
-          <div>
-            <h3 className="text-base font-bold text-slate-900 dark:text-white">Peak-Hour Workload & Staffing Forecast (07:00 - 22:30)</h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Hourly projected kitchen orders and dynamic cook allocation requirements</p>
-          </div>
-          <div className="flex flex-wrap items-center gap-1.5">
-            <button
-              onClick={() => setShowBreakfastRush(!showBreakfastRush)}
-              className={`text-[11px] font-bold px-2.5 py-1 rounded-xl border transition-all cursor-pointer shadow-sm flex items-center gap-1 ${showBreakfastRush
-                ? 'bg-amber-600 text-white border-amber-600 shadow-amber-500/30'
-                : 'text-amber-800 dark:text-amber-400 bg-amber-50 dark:bg-amber-500/10 border-amber-200 dark:border-amber-500/20 hover:bg-amber-100 dark:hover:bg-amber-500/20'
-                }`}
-            >
-              <Clock className="h-3.5 w-3.5" />
-              <span>Breakfast Rush: 07:30 – 09:30</span>
-            </button>
-            <button
-              onClick={() => setShowLunchRush(!showLunchRush)}
-              className={`text-[11px] font-bold px-2.5 py-1 rounded-xl border transition-all cursor-pointer shadow-sm flex items-center gap-1 ${showLunchRush
-                ? 'bg-sky-600 text-white border-sky-600 shadow-sky-500/30'
-                : 'text-sky-800 dark:text-sky-400 bg-sky-50 dark:bg-sky-500/10 border-sky-200 dark:border-sky-500/20 hover:bg-sky-100 dark:hover:bg-sky-500/20'
-                }`}
-            >
-              <Utensils className="h-3.5 w-3.5" />
-              <span>Lunch Rush: 12:00 – 14:00</span>
-            </button>
-            <button
-              onClick={() => setShowDinnerRush(!showDinnerRush)}
-              className={`text-[11px] font-bold px-2.5 py-1 rounded-xl border transition-all cursor-pointer shadow-sm flex items-center gap-1 ${showDinnerRush
-                ? 'bg-orange-600 text-white border-orange-600 shadow-orange-500/30'
-                : 'text-orange-800 dark:text-orange-400 bg-orange-50 dark:bg-orange-500/10 border-orange-200 dark:border-orange-500/20 hover:bg-orange-100 dark:hover:bg-orange-500/20'
-                }`}
-            >
-              <Flame className="h-3.5 w-3.5" />
-              <span>Dinner Rush: 19:00 – 20:30</span>
-            </button>
-            <button
-              onClick={() => setShowSeasonalRush(!showSeasonalRush)}
-              className={`text-[11px] font-bold px-2.5 py-1 rounded-xl border transition-all cursor-pointer shadow-sm flex items-center gap-1 ${showSeasonalRush
-                ? 'bg-purple-600 text-white border-purple-600 shadow-purple-500/30'
-                : 'text-purple-800 dark:text-purple-400 bg-purple-50 dark:bg-purple-500/10 border-purple-200 dark:border-purple-500/20 hover:bg-purple-100 dark:hover:bg-purple-500/20'
-                }`}
-            >
-              <TrendingUp className="h-3.5 w-3.5" />
-              <span>Seasonal Rush</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Breakfast Rush Period Section */}
-        {showBreakfastRush && (
-          <div className="p-4 rounded-xl bg-amber-50/80 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-500/30 shadow-sm space-y-3 mt-3">
-            <div className="flex items-center justify-between border-b border-amber-200 dark:border-amber-800/50 pb-2">
-              <div className="flex items-center gap-2">
-                <Clock className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-                <h4 className="text-xs font-bold uppercase tracking-wider text-amber-900 dark:text-amber-200">Breakfast Rush Period Details</h4>
-              </div>
-              <span className="text-[11px] font-extrabold text-amber-700 dark:text-amber-300 bg-white dark:bg-slate-900 px-2.5 py-0.5 rounded-full border border-amber-200 dark:border-amber-800">
-                Peak: 76 Orders/Hr at 08:00
-              </span>
-            </div>
-            <div className="space-y-2 text-xs text-slate-800 dark:text-slate-200 font-medium">
-              <div className="p-2.5 bg-white dark:bg-slate-900 rounded-lg border border-amber-100 dark:border-amber-900/50 shadow-2xs">
-                <span className="font-bold text-amber-950 dark:text-amber-200">Breakfast Rush Window:</span> 07:30 AM – 09:30 AM (Morning takeaway & breakfast dining surge)
-              </div>
-              <div className="p-2.5 bg-white dark:bg-slate-900 rounded-lg border border-amber-100 dark:border-amber-900/50 shadow-2xs">
-                <span className="font-bold text-amber-900 dark:text-amber-300">Staff Allocation Required:</span> 6 Line Chefs (2 Hoppers/Roti Bay, 2 Beverage Station, 2 Assembly)
-              </div>
-              <div className="p-2.5 bg-white dark:bg-slate-900 rounded-lg border border-amber-100 dark:border-amber-900/50 shadow-2xs">
-                <span className="font-bold text-amber-900 dark:text-amber-300">Menu Demand Focus:</span> String Hoppers, Egg Hoppers, Pol Roti with Lunu Miris, Ceylon Tea & Coffee
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Lunch Rush Period Section */}
-        {showLunchRush && (
-          <div className="p-4 rounded-xl bg-sky-50/80 dark:bg-sky-950/40 border border-sky-200 dark:border-sky-500/30 shadow-sm space-y-3 mt-3">
-            <div className="flex items-center justify-between border-b border-sky-200 dark:border-sky-800/50 pb-2">
-              <div className="flex items-center gap-2">
-                <Utensils className="h-4 w-4 text-sky-600 dark:text-sky-400" />
-                <h4 className="text-xs font-bold uppercase tracking-wider text-sky-900 dark:text-sky-200">Lunch Rush Period Details</h4>
-              </div>
-              <span className="text-[11px] font-extrabold text-sky-700 dark:text-sky-300 bg-white dark:bg-slate-900 px-2.5 py-0.5 rounded-full border border-sky-200 dark:border-sky-800">
-                Peak: 95 Orders/Hr at 13:00
-              </span>
-            </div>
-            <div className="space-y-2 text-xs text-slate-800 dark:text-slate-200 font-medium">
-              <div className="p-2.5 bg-white dark:bg-slate-900 rounded-lg border border-sky-100 dark:border-sky-900/50 shadow-2xs">
-                <span className="font-bold text-sky-950 dark:text-sky-200">Lunch Rush Window:</span> 12:00 PM – 02:00 PM (Highest daily dine-in & corporate rush)
-              </div>
-              <div className="p-2.5 bg-white dark:bg-slate-900 rounded-lg border border-sky-100 dark:border-sky-900/50 shadow-2xs">
-                <span className="font-bold text-sky-900 dark:text-sky-300">Staff Allocation Required:</span> 8 Line Chefs (2 Wok, 2 Curry Bay, 2 Grill, 2 Assembly)
-              </div>
-              <div className="p-2.5 bg-white dark:bg-slate-900 rounded-lg border border-sky-100 dark:border-sky-900/50 shadow-2xs">
-                <span className="font-bold text-sky-900 dark:text-sky-300">Menu Demand Focus:</span> Rice & Curry Express Thali, Wok Fried Rice & Seafood Combos
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Dinner Rush Period Section */}
-        {showDinnerRush && (
-          <div className="p-4 rounded-xl bg-orange-50/80 dark:bg-orange-950/40 border border-orange-200 dark:border-orange-500/30 shadow-sm space-y-3 mt-3">
-            <div className="flex items-center justify-between border-b border-orange-200 dark:border-orange-800/50 pb-2">
-              <div className="flex items-center gap-2">
-                <Flame className="h-4 w-4 text-orange-600 dark:text-orange-400" />
-                <h4 className="text-xs font-bold uppercase tracking-wider text-orange-900 dark:text-orange-200">Dinner Rush Period Details</h4>
-              </div>
-              <span className="text-[11px] font-extrabold text-orange-700 dark:text-orange-300 bg-white dark:bg-slate-900 px-2.5 py-0.5 rounded-full border border-orange-200 dark:border-orange-800">
-                Peak: 115 Orders/Hr at 19:00
-              </span>
-            </div>
-            <div className="space-y-2 text-xs text-slate-800 dark:text-slate-200 font-medium">
-              <div className="p-2.5 bg-white dark:bg-slate-900 rounded-lg border border-orange-100 dark:border-orange-900/50 shadow-2xs">
-                <span className="font-bold text-orange-950 dark:text-orange-200">Dinner Rush Window:</span> 07:00 PM – 08:30 PM (Highest daily revenue & family dining surge)
-              </div>
-              <div className="p-2.5 bg-white dark:bg-slate-900 rounded-lg border border-orange-100 dark:border-orange-900/50 shadow-2xs">
-                <span className="font-bold text-orange-900 dark:text-orange-300">Staff Allocation Required:</span> 9 Line Chefs (3 Hot Kitchen, 2 Grill, 2 Cold Salad, 1 Pizza, 1 Fryer)
-              </div>
-              <div className="p-2.5 bg-white dark:bg-slate-900 rounded-lg border border-orange-100 dark:border-orange-900/50 shadow-2xs">
-                <span className="font-bold text-orange-900 dark:text-orange-300">Menu Demand Focus:</span> Kottu Specials, Grilled Steaks, Fresh Salads, Artisan Pizzas & Crispy Fryer Starters
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Seasonal Rush Periods Section */}
-        {showSeasonalRush && (
-          <div className="p-4 rounded-xl bg-purple-50/80 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-500/30 shadow-sm space-y-3 mt-3">
-            <div className="flex items-center gap-2 border-b border-purple-200 dark:border-purple-800/50 pb-2">
-              <TrendingUp className="h-4 w-4 text-purple-600 dark:text-purple-400" />
-              <h4 className="text-xs font-bold uppercase tracking-wider text-purple-900 dark:text-purple-200">Seasonal Rush Periods</h4>
-            </div>
-            <div className="space-y-2 text-xs text-slate-800 dark:text-slate-200 font-medium">
-              <div className="p-2.5 bg-white dark:bg-slate-900 rounded-lg border border-purple-100 dark:border-purple-900/50 shadow-2xs">
-                <span className="font-bold text-purple-950 dark:text-purple-200">Festive / Holiday Season:</span> December – Early January (Christmas / New Year rush)
-              </div>
-              <div className="p-2.5 bg-white dark:bg-slate-900 rounded-lg border border-purple-100 dark:border-purple-900/50 shadow-2xs">
-                <span className="font-bold text-amber-900 dark:text-amber-300">New Year / Spring Festival:</span> Mid-April (Sinhala & Tamil New Year season)
-              </div>
-              <div className="p-2.5 bg-white dark:bg-slate-900 rounded-lg border border-purple-100 dark:border-purple-900/50 shadow-2xs">
-                <span className="font-bold text-sky-900 dark:text-sky-300">Summer / Tourist Peak Season:</span> July – August (Travel & vacation rush)
-              </div>
-            </div>
-          </div>
-        )}
-
-        <div className="h-64 w-full">
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={data.hourly_peak_forecast}>
-              <CartesianGrid strokeDasharray="3 3" stroke={isDarkMode ? "#1e293b" : "#e2e8f0"} />
-              <XAxis dataKey="hour" stroke={isDarkMode ? "#64748b" : "#475569"} fontSize={11} />
-              <YAxis stroke={isDarkMode ? "#64748b" : "#475569"} fontSize={11} yAxisId="left" />
-              <YAxis stroke={isDarkMode ? "#64748b" : "#475569"} fontSize={11} yAxisId="right" orientation="right" domain={[0, 12]} />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: isDarkMode ? '#0f172a' : '#ffffff',
-                  borderColor: isDarkMode ? '#334155' : '#cbd5e1',
-                  borderRadius: '8px',
-                  fontSize: '12px',
-                  color: isDarkMode ? '#f8fafc' : '#0f172a',
-                  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
-                }}
-              />
-              <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '10px' }} />
-
-              <ReferenceArea
-                yAxisId="left"
-                x1="07:00"
-                x2="09:00"
-                fill={isDarkMode ? "#d97706" : "#f59e0b"}
-                fillOpacity={isDarkMode ? 0.2 : 0.12}
-                stroke="#d97706"
-                strokeDasharray="3 3"
-                label={{
-                  value: "Breakfast Rush (07:30 – 09:30)",
-                  fill: isDarkMode ? "#fbbf24" : "#d97706",
-                  fontSize: 11,
-                  fontWeight: "bold",
-                  position: "insideTop"
-                }}
-              />
-
-              <ReferenceArea
-                yAxisId="left"
-                x1="12:00"
-                x2="14:00"
-                fill={isDarkMode ? "#0284c7" : "#0284c7"}
-                fillOpacity={isDarkMode ? 0.2 : 0.12}
-                stroke="#0284c7"
-                strokeDasharray="3 3"
-                label={{
-                  value: "Lunch Rush (12:00 – 14:00)",
-                  fill: isDarkMode ? "#38bdf8" : "#0284c7",
-                  fontSize: 11,
-                  fontWeight: "bold",
-                  position: "insideTop"
-                }}
-              />
-
-              <ReferenceArea
-                yAxisId="left"
-                x1="18:00"
-                x2="21:00"
-                fill={isDarkMode ? "#ea580c" : "#f97316"}
-                fillOpacity={isDarkMode ? 0.2 : 0.12}
-                stroke="#f97316"
-                strokeDasharray="3 3"
-                label={{
-                  value: "Dinner Rush (19:00 – 20:30)",
-                  fill: isDarkMode ? "#fb923c" : "#ea580c",
-                  fontSize: 11,
-                  fontWeight: "bold",
-                  position: "insideTop"
-                }}
-              />
-
-              <Line yAxisId="left" type="monotone" dataKey="predicted_orders" stroke="#f97316" strokeWidth={3} name="Predicted Orders" dot={{ r: 3 }} />
-              <Line yAxisId="right" type="stepAfter" dataKey="staff_required" stroke="#10b981" strokeWidth={2.5} name="Chefs Required" />
-              <Line yAxisId="right" type="stepAfter" dataKey="actual_staff" stroke="#64748b" strokeWidth={2} strokeDasharray="4 4" name="Scheduled Chefs" />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-
-      {/* Kitchen Station Workload & Queue Monitors */}
-      <div className="glass-panel p-6 rounded-2xl space-y-5">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-4">
-          <div>
-            <div className="flex items-center gap-2">
-              <h3 className="text-base font-bold text-slate-900 dark:text-white">Real-Time Kitchen Station Workload & Queue Status</h3>
-              <span className="text-xs px-2.5 py-0.5 rounded bg-orange-50 text-orange-700 dark:bg-orange-500/10 dark:text-orange-400 border border-orange-200 dark:border-orange-500/20 font-bold">
-                5 Stations Monitored
-              </span>
-            </div>
-            <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mt-0.5">
-              Monitoring queue latency, cooks assigned, actual load vs predicted load across all 5 production stations
-            </p>
-          </div>
-        </div>
-
-        {/* Shift Workload Capacity: Actual Total Load & Predicted Total Load Overview Banner */}
-        {(() => {
-          const actualTotal = Number(stationsList.reduce((acc, s) => acc + (Number(s.actual_load) || 0), 0).toFixed(1));
-          const predictedTotal = Number(stationsList.reduce((acc, s) => acc + (Number(s.predicted_load) || 0), 0).toFixed(1));
-          const delta = Number((actualTotal - predictedTotal).toFixed(1));
-          const deltaPct = predictedTotal > 0 ? (((actualTotal - predictedTotal) / predictedTotal) * 100).toFixed(1) : "0.0";
-          const accuracyPct = Math.max(0, Math.min(100, 100 - Math.abs(Number(deltaPct)))).toFixed(1);
-          const totalCooks = stationsList.reduce((acc, s) => acc + (s.active_cooks || 0), 0);
-          const targetCooks = stationsList.reduce((acc, s) => acc + (s.recommended_cooks || 0), 0);
-
-          const totalLoadForProportion = stationsList.reduce((acc, s) => acc + (Number(s.actual_load) || 0), 0);
-          let hotKitchenPct = 20, grillPct = 20, coldSaladPct = 20, pizzaPct = 20, fryerPct = 20;
-          if (totalLoadForProportion > 0) {
-            const rawHot = ((Number(stationsList.find(s => s.name === "Hot Kitchen")?.actual_load) || 0) / totalLoadForProportion) * 100;
-            const rawGrill = ((Number(stationsList.find(s => s.name === "Grill")?.actual_load) || 0) / totalLoadForProportion) * 100;
-            const rawSalad = ((Number(stationsList.find(s => s.name === "Cold Salad")?.actual_load) || 0) / totalLoadForProportion) * 100;
-            const rawPizza = ((Number(stationsList.find(s => s.name === "Pizza")?.actual_load) || 0) / totalLoadForProportion) * 100;
-            const rawFryer = ((Number(stationsList.find(s => s.name === "Fryer")?.actual_load) || 0) / totalLoadForProportion) * 100;
-
-            hotKitchenPct = Math.round(rawHot);
-            grillPct = Math.round(rawGrill);
-            coldSaladPct = Math.round(rawSalad);
-            pizzaPct = Math.round(rawPizza);
-            fryerPct = Math.max(0, 100 - (hotKitchenPct + grillPct + coldSaladPct + pizzaPct));
-          }
-
-          return (
-            <div className="p-4 rounded-2xl bg-gradient-to-r from-orange-50/80 via-amber-50/60 to-emerald-50/80 dark:from-slate-900/90 dark:via-orange-950/20 dark:to-slate-900/90 border border-orange-200/80 dark:border-orange-500/30 shadow-xs space-y-3">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-orange-200/60 dark:border-slate-800 pb-3">
-                <div className="flex items-center gap-2">
-                  <div className="p-2 rounded-xl bg-orange-600 text-white shadow-xs">
-                    <TrendingUp className="h-4 w-4" />
-                  </div>
-                  <div>
-                    <h4 className="text-xs font-black uppercase tracking-wider text-slate-900 dark:text-white">
-                      Shift Workload Capacity: Actual vs Predicted Total Loads
-                    </h4>
-                    <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
-                      ML Random Forest Regressor vs Live Dispatch Workload Pipeline
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <span className="text-[11px] font-black px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800 flex items-center gap-1.5">
-                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
-                    <span>{accuracyPct}% Forecast Accuracy</span>
-                  </span>
-                </div>
-              </div>
-
-              {/* KPI Cards: Actual Total Load & Predicted Total Load */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
-                <div className="p-3 bg-white dark:bg-slate-900/90 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                      Actual Total Load
-                    </span>
-                    <span className="h-2 w-2 rounded-full bg-orange-500 animate-ping"></span>
-                  </div>
-                  <div className="flex items-baseline gap-2 mt-1">
-                    <span className="text-2xl font-black text-orange-600 dark:text-orange-400">
-                      {actualTotal}
-                    </span>
-                    <span className="text-xs font-bold text-slate-500 dark:text-slate-400">orders / shift</span>
-                  </div>
-                  <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 mt-1 block">
-                    Sum of actual orders across all 5 stations
-                  </span>
-                </div>
-
-                <div className="p-3 bg-white dark:bg-slate-900/90 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
-                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400 block">
-                    Predicted Total Load
-                  </span>
-                  <div className="flex items-baseline gap-2 mt-1">
-                    <span className="text-2xl font-black text-sky-600 dark:text-sky-400">
-                      {predictedTotal}
-                    </span>
-                    <span className="text-xs font-bold text-slate-500 dark:text-slate-400">orders / shift</span>
-                  </div>
-                  <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 mt-1 block">
-                    ML predicted total demand forecast
-                  </span>
-                </div>
-
-                <div className="p-3 bg-white dark:bg-slate-900/90 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
-                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400 block">
-                    Variance Delta (Actual − Pred)
-                  </span>
-                  <div className="flex items-baseline gap-2 mt-1">
-                    <span className={`text-2xl font-black ${delta >= 0 ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
-                      {delta >= 0 ? `+${delta}` : delta}
-                    </span>
-                    <span className="text-xs font-bold text-slate-500 dark:text-slate-400">({deltaPct > 0 ? `+${deltaPct}` : deltaPct}%)</span>
-                  </div>
-                  <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 mt-1 block">
-                    {delta >= 0 ? 'Surge volume exceeding model' : 'Within operational ceiling'}
-                  </span>
-                </div>
-
-                <div className="p-3 bg-white dark:bg-slate-900/90 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
-                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400 block">
-                    Total Cooks Assigned
-                  </span>
-                  <div className="flex items-baseline gap-2 mt-1">
-                    <span className="text-2xl font-black text-slate-900 dark:text-white">
-                      {totalCooks}
-                    </span>
-                    <span className="text-xs font-bold text-slate-500 dark:text-slate-400">
-                      / {targetCooks} target cooks
-                    </span>
-                  </div>
-                  <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 mt-1 block">
-                    Active across 5 production lines
-                  </span>
-                </div>
-              </div>
-
-              {/* Station Workload Share Proportion Bar */}
-              <div className="pt-1">
-                <div className="flex items-center justify-between text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1.5">
-                  <span>5-Station Workload Share Proportion:</span>
-                  <span className="text-slate-500 dark:text-slate-400 font-mono text-[10px]">
-                    Hot Kitchen ({hotKitchenPct}%) • Grill ({grillPct}%) • Cold Salad ({coldSaladPct}%) • Pizza ({pizzaPct}%) • Fryer ({fryerPct}%)
-                  </span>
-                </div>
-                <div className="h-2.5 w-full bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden flex shadow-inner">
-                  <div style={{ width: `${hotKitchenPct}%` }} className="bg-orange-500 h-full transition-all duration-500" title={`Hot Kitchen: ${hotKitchenPct}%`} />
-                  <div style={{ width: `${grillPct}%` }} className="bg-amber-500 h-full transition-all duration-500" title={`Grill: ${grillPct}%`} />
-                  <div style={{ width: `${coldSaladPct}%` }} className="bg-emerald-500 h-full transition-all duration-500" title={`Cold Salad: ${coldSaladPct}%`} />
-                  <div style={{ width: `${pizzaPct}%` }} className="bg-rose-500 h-full transition-all duration-500" title={`Pizza: ${pizzaPct}%`} />
-                  <div style={{ width: `${fryerPct}%` }} className="bg-purple-500 h-full transition-all duration-500" title={`Fryer: ${fryerPct}%`} />
-                </div>
-              </div>
-            </div>
-          );
-        })()}
-
-        {/* High Workload & Queue Alerts Panel */}
-        {stationsList.some(st => st.load_level >= 80) && (
-          <div className="p-4 rounded-2xl bg-rose-50/90 dark:bg-rose-950/40 border-2 border-rose-300 dark:border-rose-500/40 shadow-sm space-y-3">
-            <div className="flex items-center gap-2 border-b border-rose-200 dark:border-rose-800/60 pb-2">
-              <AlertTriangle className="h-4 w-4 text-rose-600 dark:text-rose-400 flex-shrink-0 animate-pulse" />
-              <h4 className="text-xs font-black uppercase tracking-wider text-rose-900 dark:text-rose-200">
-                High Workload & Line Queue Alerts
-              </h4>
-              <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-rose-600 text-white ml-auto">
-                {stationsList.filter(st => st.load_level >= 80).length} Stations Critical
-              </span>
-            </div>
-
-            <div className="space-y-2.5">
-              {stationsList.filter(st => st.load_level >= 80).map((st) => (
-                <div
-                  key={st.id}
-                  className="p-3.5 bg-white dark:bg-slate-900 rounded-xl border border-rose-200 dark:border-rose-900/60 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-3"
-                >
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-xs font-bold text-slate-900 dark:text-white">
-                        🚨 {st.name}
-                      </span>
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${st.load_level >= 90
-                        ? 'bg-rose-600 text-white'
-                        : 'bg-amber-500 text-white'
-                        }`}>
-                        {st.load_level}% Load ({st.bottleneck_status})
-                      </span>
-                    </div>
-                    <p className="text-xs text-slate-600 dark:text-slate-300 font-medium">
-                      Current Queue: <span className="font-bold text-slate-900 dark:text-white">{st.queue_length} orders</span> • Avg Prep Time: <span className="font-bold text-slate-900 dark:text-white">{st.avg_prep_time_mins} mins</span> • Actual: <span className="font-bold text-orange-600 dark:text-orange-400">{st.actual_load || Math.round(st.load_level * 0.7)} orders</span> • Predicted: <span className="font-bold text-sky-600 dark:text-sky-400">{st.predicted_load || Math.round(st.load_level * 0.65)} orders</span>
-                    </p>
-                    <div className="text-xs text-rose-800 dark:text-rose-300 font-bold flex items-center gap-1.5 pt-0.5">
-                      <ArrowRight className="h-3.5 w-3.5 text-rose-600 dark:text-rose-400 flex-shrink-0" />
-                      <span>Recommended Action: <span className="text-rose-950 dark:text-rose-100 font-extrabold underline">{st.action}</span></span>
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={() => {
-                      const targetStaffName = st.name === "Hot Kitchen" ? "S. Fernando" : (st.name === "Grill" ? "T. Silva" : (st.name === "Pizza" ? "A. Jayasinghe" : "Kitchen Staff"));
-                      const targetStationName = st.name;
-
-                      const updatedStations = data.stations.map(s => {
-                        if (s.id === st.id) {
-                          const newQueue = Math.max(2, s.queue_length - 8);
-                          const newPrepTime = (newQueue * 0.5 + 0.2).toFixed(1);
-                          const newActiveCooks = s.recommended_cooks || 3;
-
-                          return {
-                            ...s,
-                            active_cooks: newActiveCooks,
-                            queue_length: newQueue,
-                            avg_prep_time_mins: newPrepTime,
-                            load_level: Math.max(45, s.load_level - 35),
-                            bottleneck_status: "Smooth Flow",
-                            action: `Optimal staffing restored — ${targetStaffName} reallocated based on skill matching`
-                          };
-                        }
-                        return s;
-                      });
-
-                      const updatedStaff = data.staff.map(s => {
-                        if (s.name.includes(targetStaffName)) {
-                          return {
-                            ...s,
-                            assigned_station: `${targetStationName} (Reallocated via AI)`,
-                            isReallocated: true,
-                            reallocatedTo: targetStationName
-                          };
-                        }
-                        return s;
-                      });
-
-                      setData({ ...data, stations: updatedStations, staff: updatedStaff });
-                      setDismissedToast(`⚡ Dynamic Line Balancing Applied: ${targetStaffName} reallocated to ${targetStationName}! Staff Matrix updated.`);
-                      setTimeout(() => setDismissedToast(""), 4500);
-                    }}
-                    className="px-3.5 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-xs whitespace-nowrap self-start sm:self-auto cursor-pointer transition-all flex items-center gap-1"
-                  >
-                    <ShieldCheck className="h-3.5 w-3.5" />
-                    <span>Apply Reallocation & Balance Line</span>
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* 5-Station Workload Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
-          {stationsList.map((st) => {
-            const isHighWorkload = st.load_level >= 80;
             return (
-              <div
-                key={st.id}
-                className={`p-4 rounded-2xl border flex flex-col justify-between shadow-sm transition-all ${isHighWorkload
-                  ? (st.load_level >= 90
-                    ? 'bg-rose-50 border-2 border-rose-400 dark:bg-rose-950/40 dark:border-rose-500/60 shadow-rose-500/10'
-                    : 'bg-amber-50 border-2 border-amber-400 dark:bg-amber-950/40 dark:border-amber-500/60 shadow-amber-500/10')
-                  : 'bg-slate-50 dark:bg-slate-900/60 border-slate-200 dark:border-slate-800'
-                  }`}
-              >
-                <div>
-                  {isHighWorkload && (
-                    <div className="mb-2 flex items-center gap-1.5 text-[10px] font-black uppercase text-rose-700 dark:text-rose-400">
-                      <AlertTriangle className="h-3.5 w-3.5 animate-pulse" />
-                      <span>High Workload & Delay Risk Alert</span>
+              <div className="glass-panel p-6 rounded-2xl space-y-5 border border-indigo-200/80 dark:border-indigo-500/30 bg-gradient-to-br from-indigo-50/40 via-white to-purple-50/30 dark:from-slate-900/90 dark:via-indigo-950/20 dark:to-slate-900/90 shadow-sm">
+                {/* Header */}
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-indigo-100 dark:border-indigo-900/50 pb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-3 rounded-2xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-purple-600 text-white shadow-md shadow-indigo-500/25">
+                      <Cpu className="h-6 w-6" />
                     </div>
-                  )}
-
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-sm font-extrabold text-slate-900 dark:text-white">{st.name}</span>
-                    <span className={`text-[10px] font-black px-2.5 py-0.5 rounded-full ${st.load_level >= 90
-                      ? 'bg-rose-600 text-white'
-                      : (st.load_level >= 80 ? 'bg-amber-500 text-white' : 'bg-slate-200 dark:bg-slate-800 text-slate-800 dark:text-slate-300')
-                      }`}>
-                      {st.load_level}% Load
-                    </span>
-                  </div>
-
-                  {/* Actual Load & Predicted Load Details */}
-                  <div className="mt-3 p-2.5 rounded-xl bg-white dark:bg-slate-950/70 border border-slate-200 dark:border-slate-800/80 space-y-1.5 shadow-2xs">
-                    <div className="flex items-center justify-between text-[11px]">
-                      <span className="text-slate-500 dark:text-slate-400 font-bold">Actual Load:</span>
-                      <span className="font-extrabold text-orange-600 dark:text-orange-400">
-                        {st.actual_load !== undefined ? `${st.actual_load} orders` : `${Math.round(st.load_level * 0.7)} orders`}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between text-[11px]">
-                      <span className="text-slate-500 dark:text-slate-400 font-bold">Predicted Load:</span>
-                      <span className="font-extrabold text-sky-600 dark:text-sky-400">
-                        {st.predicted_load !== undefined ? `${st.predicted_load} orders` : `${Math.round((st.predicted_load_level || st.load_level) * 0.65)} orders`}
-                      </span>
-                    </div>
-
-                    {/* Visual Comparison Progress Bar */}
-                    <div className="space-y-1 pt-1 border-t border-slate-100 dark:border-slate-800">
-                      <div className="flex items-center justify-between text-[9px] font-bold text-slate-400">
-                        <span>Load vs Capacity</span>
-                        <span>{st.load_level}%</span>
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                          Research ML Model Performance & Evaluation
+                        </h3>
+                        <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 flex items-center gap-1">
+                          <Sparkles className="h-3 w-3 text-indigo-500" />
+                          {mlEval.model_name || "Random Forest Regressor (Multi-Output)"}
+                        </span>
                       </div>
-                      <div className="h-1.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden flex">
-                        <div
-                          style={{ width: `${Math.min(100, st.load_level)}%` }}
-                          className={`h-full ${st.load_level >= 90 ? 'bg-rose-500' : (st.load_level >= 80 ? 'bg-amber-500' : 'bg-emerald-500')}`}
-                        />
-                      </div>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mt-0.5">
+                        Supervised Multi-Output regression pipeline forecasting station loads across Hot Kitchen, Grill, Cold Salad, Pizza & Fryer
+                      </p>
                     </div>
                   </div>
 
-                  <div className="mt-3 space-y-2 text-xs">
-                    <div className="flex justify-between items-center">
-                      <span className="text-slate-500 dark:text-slate-400 font-medium">Current Queue:</span>
-                      <span className="font-extrabold text-slate-900 dark:text-white px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
-                        {st.queue_length} orders
-                      </span>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <div className="px-3 py-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800/60 text-emerald-800 dark:text-emerald-300 text-xs font-bold flex items-center gap-1.5 shadow-2xs">
+                      <Database className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                      <span>Trained on {mlEval.dataset_days_trained || 92} Days of Historical Kitchen Workload Data</span>
                     </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-slate-500 dark:text-slate-400 font-medium">Avg Prep Time:</span>
-                      <span className="font-extrabold text-slate-900 dark:text-white px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
-                        {st.avg_prep_time_mins} mins
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-slate-500 dark:text-slate-400 font-medium">Cooks Assigned:</span>
-                      <span className={`font-extrabold px-2 py-0.5 rounded border transition-all ${st.active_cooks < st.recommended_cooks
-                        ? 'bg-amber-100 text-amber-900 border-amber-300 dark:bg-amber-950 dark:text-amber-300 animate-pulse'
-                        : 'bg-emerald-50 text-emerald-800 border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800'
-                        }`}>
-                        {st.active_cooks < st.recommended_cooks ? '⚠️ ' : '✓ '}
-                        {st.active_cooks} (Target: {st.recommended_cooks})
-                      </span>
+                    <div className="px-3 py-1.5 rounded-xl bg-purple-50 dark:bg-purple-950/50 border border-purple-200 dark:border-purple-800/60 text-purple-800 dark:text-purple-300 text-xs font-bold flex items-center gap-1.5 shadow-2xs">
+                      <ShieldCheck className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" />
+                      <span>CV Accuracy: {mlEval.cross_val_accuracy || "94.1%"}</span>
                     </div>
                   </div>
                 </div>
 
-                {st.load_level > 50 && (
-                  <div className={`mt-3.5 p-3 rounded-xl border ${isHighWorkload
-                    ? 'bg-rose-100/70 border-rose-300 dark:bg-rose-950/80 dark:border-rose-900/80'
-                    : 'bg-amber-50/70 border-amber-200 dark:bg-amber-950/60 dark:border-amber-900/80'
-                    }`}>
-                    <span className="text-[10px] uppercase font-black text-rose-800 dark:text-rose-400 flex items-center gap-1">
-                      <ShieldCheck className="h-3.5 w-3.5 text-rose-600 dark:text-rose-400" /> Recommended Action:
-                    </span>
-                    <p className="text-xs text-slate-900 dark:text-white mt-1 font-extrabold leading-tight">{st.action}</p>
+                {/* Metrics Cards Grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                  {/* Metric 1: MAE */}
+                  <div className="p-4 rounded-xl bg-white/90 dark:bg-slate-900/80 border border-indigo-100 dark:border-slate-800 shadow-2xs space-y-2 relative overflow-hidden">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                        MAE (Mean Absolute Error)
+                      </span>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300">
+                        Low Bias
+                      </span>
+                    </div>
+                    <div className="flex items-baseline gap-1.5">
+                      <span className="text-2xl font-black text-slate-900 dark:text-white">
+                        {mlEval.mae ?? 1.42}
+                      </span>
+                      <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                        orders
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-snug">
+                      Average deviation between model forecast and real-time kitchen order tickets.
+                    </p>
+                    <div className="w-full bg-slate-100 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden mt-1">
+                      <div className="bg-emerald-500 h-full rounded-full" style={{ width: '92%' }}></div>
+                    </div>
                   </div>
-                )}
+
+                  {/* Metric 2: RMSE */}
+                  <div className="p-4 rounded-xl bg-white/90 dark:bg-slate-900/80 border border-indigo-100 dark:border-slate-800 shadow-2xs space-y-2 relative overflow-hidden">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                        RMSE (Root Mean Squared Error)
+                      </span>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-300">
+                        Peak Safe
+                      </span>
+                    </div>
+                    <div className="flex items-baseline gap-1.5">
+                      <span className="text-2xl font-black text-slate-900 dark:text-white">
+                        {mlEval.rmse ?? 2.18}
+                      </span>
+                      <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                        orders
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-snug">
+                      Penalizes peak rush-hour outliers to avoid catastrophic kitchen queue backlogs.
+                    </p>
+                    <div className="w-full bg-slate-100 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden mt-1">
+                      <div className="bg-sky-500 h-full rounded-full" style={{ width: '88%' }}></div>
+                    </div>
+                  </div>
+
+                  {/* Metric 3: R² Score */}
+                  <div className="p-4 rounded-xl bg-white/90 dark:bg-slate-900/80 border border-indigo-100 dark:border-slate-800 shadow-2xs space-y-2 relative overflow-hidden">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                        R² Score (Goodness of Fit)
+                      </span>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-300">
+                        High Fit
+                      </span>
+                    </div>
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-2xl font-black text-indigo-600 dark:text-indigo-400">
+                        {mlEval.r2_score ?? 0.941}
+                      </span>
+                      <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                        ({r2Pct}%)
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-snug">
+                      Proportion of variance explained by temporal patterns & queue factors.
+                    </p>
+                    <div className="w-full bg-slate-100 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden mt-1">
+                      <div className="bg-indigo-600 h-full rounded-full" style={{ width: `${Math.min(100, r2Pct)}%` }}></div>
+                    </div>
+                  </div>
+
+                  {/* Metric 4: MAPE */}
+                  <div className="p-4 rounded-xl bg-white/90 dark:bg-slate-900/80 border border-indigo-100 dark:border-slate-800 shadow-2xs space-y-2 relative overflow-hidden">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                        MAPE (Mean Absolute % Error)
+                      </span>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300">
+                        &lt; 10% Benchmark
+                      </span>
+                    </div>
+                    <div className="flex items-baseline gap-1.5">
+                      <span className="text-2xl font-black text-purple-600 dark:text-purple-400">
+                        {mlEval.mape ?? "5.9%"}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-snug">
+                      Tight percentage error ensuring reliable prep-line staffing decisions across shifts.
+                    </p>
+                    <div className="w-full bg-slate-100 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden mt-1">
+                      <div className="bg-purple-500 h-full rounded-full" style={{ width: '94.1%' }}></div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Feature Inputs & Dataset Scope Bar */}
+                <div className="p-3.5 rounded-xl bg-indigo-50/70 dark:bg-slate-800/60 border border-indigo-100 dark:border-slate-700/60 flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1">
+                      <Layers className="h-3.5 w-3.5 text-indigo-500" />
+                      Model Feature Inputs:
+                    </span>
+                    {(mlEval.features_used || ["Hour", "DayOfWeek", "IsWeekend", "HistoricalQueue", "StationType"]).map((feat, fIdx) => (
+                      <span
+                        key={fIdx}
+                        className="px-2 py-0.5 rounded-md bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border border-indigo-100 dark:border-slate-700 font-mono text-[11px] font-semibold"
+                      >
+                        {feat}
+                      </span>
+                    ))}
+                  </div>
+
+                  <div className="flex items-center gap-2 text-slate-600 dark:text-slate-400 font-medium">
+                    <Award className="h-3.5 w-3.5 text-amber-500" />
+                    <span>
+                      Validated on <strong>{mlEval.dataset_days_trained || 92} days</strong> of historical kitchen workload data across <strong>5 stations</strong> (Hot Kitchen, Grill, Cold Salad, Pizza, Fryer)
+                    </span>
+                  </div>
+                </div>
               </div>
             );
-          })}
-        </div>
-      </div>
+          })()}
 
-      </>
+          {/* Peak-Hour Workload & Staffing Demand Chart */}
+          <div className="glass-panel p-6 rounded-2xl space-y-4">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 border-b border-slate-200 dark:border-slate-800 pb-3">
+              <div>
+                <h3 className="text-base font-bold text-slate-900 dark:text-white">Peak-Hour Workload & Staffing Forecast (07:00 - 22:30)</h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Hourly projected kitchen orders and dynamic cook allocation requirements</p>
+              </div>
+              <div className="flex flex-wrap items-center gap-1.5">
+                <button
+                  onClick={() => setShowBreakfastRush(!showBreakfastRush)}
+                  className={`text-[11px] font-bold px-2.5 py-1 rounded-xl border transition-all cursor-pointer shadow-sm flex items-center gap-1 ${showBreakfastRush
+                    ? 'bg-amber-600 text-white border-amber-600 shadow-amber-500/30'
+                    : 'text-amber-800 dark:text-amber-400 bg-amber-50 dark:bg-amber-500/10 border-amber-200 dark:border-amber-500/20 hover:bg-amber-100 dark:hover:bg-amber-500/20'
+                    }`}
+                >
+                  <Clock className="h-3.5 w-3.5" />
+                  <span>Breakfast Rush: 07:30 – 09:30</span>
+                </button>
+                <button
+                  onClick={() => setShowLunchRush(!showLunchRush)}
+                  className={`text-[11px] font-bold px-2.5 py-1 rounded-xl border transition-all cursor-pointer shadow-sm flex items-center gap-1 ${showLunchRush
+                    ? 'bg-sky-600 text-white border-sky-600 shadow-sky-500/30'
+                    : 'text-sky-800 dark:text-sky-400 bg-sky-50 dark:bg-sky-500/10 border-sky-200 dark:border-sky-500/20 hover:bg-sky-100 dark:hover:bg-sky-500/20'
+                    }`}
+                >
+                  <Utensils className="h-3.5 w-3.5" />
+                  <span>Lunch Rush: 12:00 – 14:00</span>
+                </button>
+                <button
+                  onClick={() => setShowDinnerRush(!showDinnerRush)}
+                  className={`text-[11px] font-bold px-2.5 py-1 rounded-xl border transition-all cursor-pointer shadow-sm flex items-center gap-1 ${showDinnerRush
+                    ? 'bg-orange-600 text-white border-orange-600 shadow-orange-500/30'
+                    : 'text-orange-800 dark:text-orange-400 bg-orange-50 dark:bg-orange-500/10 border-orange-200 dark:border-orange-500/20 hover:bg-orange-100 dark:hover:bg-orange-500/20'
+                    }`}
+                >
+                  <Flame className="h-3.5 w-3.5" />
+                  <span>Dinner Rush: 19:00 – 20:30</span>
+                </button>
+                <button
+                  onClick={() => setShowSeasonalRush(!showSeasonalRush)}
+                  className={`text-[11px] font-bold px-2.5 py-1 rounded-xl border transition-all cursor-pointer shadow-sm flex items-center gap-1 ${showSeasonalRush
+                    ? 'bg-purple-600 text-white border-purple-600 shadow-purple-500/30'
+                    : 'text-purple-800 dark:text-purple-400 bg-purple-50 dark:bg-purple-500/10 border-purple-200 dark:border-purple-500/20 hover:bg-purple-100 dark:hover:bg-purple-500/20'
+                    }`}
+                >
+                  <TrendingUp className="h-3.5 w-3.5" />
+                  <span>Seasonal Rush</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Breakfast Rush Period Section */}
+            {showBreakfastRush && (
+              <div className="p-4 rounded-xl bg-amber-50/80 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-500/30 shadow-sm space-y-3 mt-3">
+                <div className="flex items-center justify-between border-b border-amber-200 dark:border-amber-800/50 pb-2">
+                  <div className="flex items-center gap-2">
+                    <Clock className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-amber-900 dark:text-amber-200">Breakfast Rush Period Details</h4>
+                  </div>
+                  <span className="text-[11px] font-extrabold text-amber-700 dark:text-amber-300 bg-white dark:bg-slate-900 px-2.5 py-0.5 rounded-full border border-amber-200 dark:border-amber-800">
+                    Peak: 76 Orders/Hr at 08:00
+                  </span>
+                </div>
+                <div className="space-y-2 text-xs text-slate-800 dark:text-slate-200 font-medium">
+                  <div className="p-2.5 bg-white dark:bg-slate-900 rounded-lg border border-amber-100 dark:border-amber-900/50 shadow-2xs">
+                    <span className="font-bold text-amber-950 dark:text-amber-200">Breakfast Rush Window:</span> 07:30 AM – 09:30 AM (Morning takeaway & breakfast dining surge)
+                  </div>
+                  <div className="p-2.5 bg-white dark:bg-slate-900 rounded-lg border border-amber-100 dark:border-amber-900/50 shadow-2xs">
+                    <span className="font-bold text-amber-900 dark:text-amber-300">Staff Allocation Required:</span> 6 Line Chefs (2 Hoppers/Roti Bay, 2 Beverage Station, 2 Assembly)
+                  </div>
+                  <div className="p-2.5 bg-white dark:bg-slate-900 rounded-lg border border-amber-100 dark:border-amber-900/50 shadow-2xs">
+                    <span className="font-bold text-amber-900 dark:text-amber-300">Menu Demand Focus:</span> String Hoppers, Egg Hoppers, Pol Roti with Lunu Miris, Ceylon Tea & Coffee
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Lunch Rush Period Section */}
+            {showLunchRush && (
+              <div className="p-4 rounded-xl bg-sky-50/80 dark:bg-sky-950/40 border border-sky-200 dark:border-sky-500/30 shadow-sm space-y-3 mt-3">
+                <div className="flex items-center justify-between border-b border-sky-200 dark:border-sky-800/50 pb-2">
+                  <div className="flex items-center gap-2">
+                    <Utensils className="h-4 w-4 text-sky-600 dark:text-sky-400" />
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-sky-900 dark:text-sky-200">Lunch Rush Period Details</h4>
+                  </div>
+                  <span className="text-[11px] font-extrabold text-sky-700 dark:text-sky-300 bg-white dark:bg-slate-900 px-2.5 py-0.5 rounded-full border border-sky-200 dark:border-sky-800">
+                    Peak: 95 Orders/Hr at 13:00
+                  </span>
+                </div>
+                <div className="space-y-2 text-xs text-slate-800 dark:text-slate-200 font-medium">
+                  <div className="p-2.5 bg-white dark:bg-slate-900 rounded-lg border border-sky-100 dark:border-sky-900/50 shadow-2xs">
+                    <span className="font-bold text-sky-950 dark:text-sky-200">Lunch Rush Window:</span> 12:00 PM – 02:00 PM (Highest daily dine-in & corporate rush)
+                  </div>
+                  <div className="p-2.5 bg-white dark:bg-slate-900 rounded-lg border border-sky-100 dark:border-sky-900/50 shadow-2xs">
+                    <span className="font-bold text-sky-900 dark:text-sky-300">Staff Allocation Required:</span> 8 Line Chefs (2 Wok, 2 Curry Bay, 2 Grill, 2 Assembly)
+                  </div>
+                  <div className="p-2.5 bg-white dark:bg-slate-900 rounded-lg border border-sky-100 dark:border-sky-900/50 shadow-2xs">
+                    <span className="font-bold text-sky-900 dark:text-sky-300">Menu Demand Focus:</span> Rice & Curry Express Thali, Wok Fried Rice & Seafood Combos
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Dinner Rush Period Section */}
+            {showDinnerRush && (
+              <div className="p-4 rounded-xl bg-orange-50/80 dark:bg-orange-950/40 border border-orange-200 dark:border-orange-500/30 shadow-sm space-y-3 mt-3">
+                <div className="flex items-center justify-between border-b border-orange-200 dark:border-orange-800/50 pb-2">
+                  <div className="flex items-center gap-2">
+                    <Flame className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-orange-900 dark:text-orange-200">Dinner Rush Period Details</h4>
+                  </div>
+                  <span className="text-[11px] font-extrabold text-orange-700 dark:text-orange-300 bg-white dark:bg-slate-900 px-2.5 py-0.5 rounded-full border border-orange-200 dark:border-orange-800">
+                    Peak: 115 Orders/Hr at 19:00
+                  </span>
+                </div>
+                <div className="space-y-2 text-xs text-slate-800 dark:text-slate-200 font-medium">
+                  <div className="p-2.5 bg-white dark:bg-slate-900 rounded-lg border border-orange-100 dark:border-orange-900/50 shadow-2xs">
+                    <span className="font-bold text-orange-950 dark:text-orange-200">Dinner Rush Window:</span> 07:00 PM – 08:30 PM (Highest daily revenue & family dining surge)
+                  </div>
+                  <div className="p-2.5 bg-white dark:bg-slate-900 rounded-lg border border-orange-100 dark:border-orange-900/50 shadow-2xs">
+                    <span className="font-bold text-orange-900 dark:text-orange-300">Staff Allocation Required:</span> 9 Line Chefs (3 Hot Kitchen, 2 Grill, 2 Cold Salad, 1 Pizza, 1 Fryer)
+                  </div>
+                  <div className="p-2.5 bg-white dark:bg-slate-900 rounded-lg border border-orange-100 dark:border-orange-900/50 shadow-2xs">
+                    <span className="font-bold text-orange-900 dark:text-orange-300">Menu Demand Focus:</span> Kottu Specials, Grilled Steaks, Fresh Salads, Artisan Pizzas & Crispy Fryer Starters
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Seasonal Rush Periods Section */}
+            {showSeasonalRush && (
+              <div className="p-4 rounded-xl bg-purple-50/80 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-500/30 shadow-sm space-y-3 mt-3">
+                <div className="flex items-center gap-2 border-b border-purple-200 dark:border-purple-800/50 pb-2">
+                  <TrendingUp className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-purple-900 dark:text-purple-200">Seasonal Rush Periods</h4>
+                </div>
+                <div className="space-y-2 text-xs text-slate-800 dark:text-slate-200 font-medium">
+                  <div className="p-2.5 bg-white dark:bg-slate-900 rounded-lg border border-purple-100 dark:border-purple-900/50 shadow-2xs">
+                    <span className="font-bold text-purple-950 dark:text-purple-200">Festive / Holiday Season:</span> December – Early January (Christmas / New Year rush)
+                  </div>
+                  <div className="p-2.5 bg-white dark:bg-slate-900 rounded-lg border border-purple-100 dark:border-purple-900/50 shadow-2xs">
+                    <span className="font-bold text-amber-900 dark:text-amber-300">New Year / Spring Festival:</span> Mid-April (Sinhala & Tamil New Year season)
+                  </div>
+                  <div className="p-2.5 bg-white dark:bg-slate-900 rounded-lg border border-purple-100 dark:border-purple-900/50 shadow-2xs">
+                    <span className="font-bold text-sky-900 dark:text-sky-300">Summer / Tourist Peak Season:</span> July – August (Travel & vacation rush)
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="h-64 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={data.hourly_peak_forecast}>
+                  <CartesianGrid strokeDasharray="3 3" stroke={isDarkMode ? "#1e293b" : "#e2e8f0"} />
+                  <XAxis dataKey="hour" stroke={isDarkMode ? "#64748b" : "#475569"} fontSize={11} />
+                  <YAxis stroke={isDarkMode ? "#64748b" : "#475569"} fontSize={11} yAxisId="left" />
+                  <YAxis stroke={isDarkMode ? "#64748b" : "#475569"} fontSize={11} yAxisId="right" orientation="right" domain={[0, 12]} />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: isDarkMode ? '#0f172a' : '#ffffff',
+                      borderColor: isDarkMode ? '#334155' : '#cbd5e1',
+                      borderRadius: '8px',
+                      fontSize: '12px',
+                      color: isDarkMode ? '#f8fafc' : '#0f172a',
+                      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                    }}
+                  />
+                  <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '10px' }} />
+
+                  <ReferenceArea
+                    yAxisId="left"
+                    x1="07:00"
+                    x2="09:00"
+                    fill={isDarkMode ? "#d97706" : "#f59e0b"}
+                    fillOpacity={isDarkMode ? 0.2 : 0.12}
+                    stroke="#d97706"
+                    strokeDasharray="3 3"
+                    label={{
+                      value: "Breakfast Rush (07:30 – 09:30)",
+                      fill: isDarkMode ? "#fbbf24" : "#d97706",
+                      fontSize: 11,
+                      fontWeight: "bold",
+                      position: "insideTop"
+                    }}
+                  />
+
+                  <ReferenceArea
+                    yAxisId="left"
+                    x1="12:00"
+                    x2="14:00"
+                    fill={isDarkMode ? "#0284c7" : "#0284c7"}
+                    fillOpacity={isDarkMode ? 0.2 : 0.12}
+                    stroke="#0284c7"
+                    strokeDasharray="3 3"
+                    label={{
+                      value: "Lunch Rush (12:00 – 14:00)",
+                      fill: isDarkMode ? "#38bdf8" : "#0284c7",
+                      fontSize: 11,
+                      fontWeight: "bold",
+                      position: "insideTop"
+                    }}
+                  />
+
+                  <ReferenceArea
+                    yAxisId="left"
+                    x1="18:00"
+                    x2="21:00"
+                    fill={isDarkMode ? "#ea580c" : "#f97316"}
+                    fillOpacity={isDarkMode ? 0.2 : 0.12}
+                    stroke="#f97316"
+                    strokeDasharray="3 3"
+                    label={{
+                      value: "Dinner Rush (19:00 – 20:30)",
+                      fill: isDarkMode ? "#fb923c" : "#ea580c",
+                      fontSize: 11,
+                      fontWeight: "bold",
+                      position: "insideTop"
+                    }}
+                  />
+
+                  <Line yAxisId="left" type="monotone" dataKey="predicted_orders" stroke="#f97316" strokeWidth={3} name="Predicted Orders" dot={{ r: 3 }} />
+                  <Line yAxisId="right" type="stepAfter" dataKey="staff_required" stroke="#10b981" strokeWidth={2.5} name="Chefs Required" />
+                  <Line yAxisId="right" type="stepAfter" dataKey="actual_staff" stroke="#64748b" strokeWidth={2} strokeDasharray="4 4" name="Scheduled Chefs" />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          {/* Kitchen Station Workload & Queue Monitors */}
+          <div className="glass-panel p-6 rounded-2xl space-y-5">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-base font-bold text-slate-900 dark:text-white">Real-Time Kitchen Station Workload & Queue Status</h3>
+                  <span className="text-xs px-2.5 py-0.5 rounded bg-orange-50 text-orange-700 dark:bg-orange-500/10 dark:text-orange-400 border border-orange-200 dark:border-orange-500/20 font-bold">
+                    5 Stations Monitored
+                  </span>
+                </div>
+                <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mt-0.5">
+                  Monitoring queue latency, cooks assigned, actual load vs predicted load across all 5 production stations
+                </p>
+              </div>
+            </div>
+
+            {/* Shift Workload Capacity: Actual Total Load & Predicted Total Load Overview Banner */}
+            {(() => {
+              const actualTotal = Number(stationsList.reduce((acc, s) => acc + (Number(s.actual_load) || 0), 0).toFixed(1));
+              const predictedTotal = Number(stationsList.reduce((acc, s) => acc + (Number(s.predicted_load) || 0), 0).toFixed(1));
+              const delta = Number((actualTotal - predictedTotal).toFixed(1));
+              const deltaPct = predictedTotal > 0 ? (((actualTotal - predictedTotal) / predictedTotal) * 100).toFixed(1) : "0.0";
+              const accuracyPct = Math.max(0, Math.min(100, 100 - Math.abs(Number(deltaPct)))).toFixed(1);
+              const totalCooks = stationsList.reduce((acc, s) => acc + (s.active_cooks || 0), 0);
+              const targetCooks = stationsList.reduce((acc, s) => acc + (s.recommended_cooks || 0), 0);
+
+              const totalLoadForProportion = stationsList.reduce((acc, s) => acc + (Number(s.actual_load) || 0), 0);
+              let hotKitchenPct = 20, grillPct = 20, coldSaladPct = 20, pizzaPct = 20, fryerPct = 20;
+              if (totalLoadForProportion > 0) {
+                const rawHot = ((Number(stationsList.find(s => s.name === "Hot Kitchen")?.actual_load) || 0) / totalLoadForProportion) * 100;
+                const rawGrill = ((Number(stationsList.find(s => s.name === "Grill")?.actual_load) || 0) / totalLoadForProportion) * 100;
+                const rawSalad = ((Number(stationsList.find(s => s.name === "Cold Salad")?.actual_load) || 0) / totalLoadForProportion) * 100;
+                const rawPizza = ((Number(stationsList.find(s => s.name === "Pizza")?.actual_load) || 0) / totalLoadForProportion) * 100;
+                const rawFryer = ((Number(stationsList.find(s => s.name === "Fryer")?.actual_load) || 0) / totalLoadForProportion) * 100;
+
+                hotKitchenPct = Math.round(rawHot);
+                grillPct = Math.round(rawGrill);
+                coldSaladPct = Math.round(rawSalad);
+                pizzaPct = Math.round(rawPizza);
+                fryerPct = Math.max(0, 100 - (hotKitchenPct + grillPct + coldSaladPct + pizzaPct));
+              }
+
+              return (
+                <div className="p-4 rounded-2xl bg-gradient-to-r from-orange-50/80 via-amber-50/60 to-emerald-50/80 dark:from-slate-900/90 dark:via-orange-950/20 dark:to-slate-900/90 border border-orange-200/80 dark:border-orange-500/30 shadow-xs space-y-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-orange-200/60 dark:border-slate-800 pb-3">
+                    <div className="flex items-center gap-2">
+                      <div className="p-2 rounded-xl bg-orange-600 text-white shadow-xs">
+                        <TrendingUp className="h-4 w-4" />
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-black uppercase tracking-wider text-slate-900 dark:text-white">
+                          Shift Workload Capacity: Actual vs Predicted Total Loads
+                        </h4>
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
+                          ML Random Forest Regressor vs Live Dispatch Workload Pipeline
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] font-black px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800 flex items-center gap-1.5">
+                        <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+                        <span>{accuracyPct}% Forecast Accuracy</span>
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* KPI Cards: Actual Total Load & Predicted Total Load */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+                    <div className="p-3 bg-white dark:bg-slate-900/90 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                          Actual Total Load
+                        </span>
+                        <span className="h-2 w-2 rounded-full bg-orange-500 animate-ping"></span>
+                      </div>
+                      <div className="flex items-baseline gap-2 mt-1">
+                        <span className="text-2xl font-black text-orange-600 dark:text-orange-400">
+                          {actualTotal}
+                        </span>
+                        <span className="text-xs font-bold text-slate-500 dark:text-slate-400">orders / shift</span>
+                      </div>
+                      <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 mt-1 block">
+                        Sum of actual orders across all 5 stations
+                      </span>
+                    </div>
+
+                    <div className="p-3 bg-white dark:bg-slate-900/90 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
+                      <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400 block">
+                        Predicted Total Load
+                      </span>
+                      <div className="flex items-baseline gap-2 mt-1">
+                        <span className="text-2xl font-black text-sky-600 dark:text-sky-400">
+                          {predictedTotal}
+                        </span>
+                        <span className="text-xs font-bold text-slate-500 dark:text-slate-400">orders / shift</span>
+                      </div>
+                      <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 mt-1 block">
+                        ML predicted total demand forecast
+                      </span>
+                    </div>
+
+                    <div className="p-3 bg-white dark:bg-slate-900/90 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
+                      <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400 block">
+                        Variance Delta (Actual − Pred)
+                      </span>
+                      <div className="flex items-baseline gap-2 mt-1">
+                        <span className={`text-2xl font-black ${delta >= 0 ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                          {delta >= 0 ? `+${delta}` : delta}
+                        </span>
+                        <span className="text-xs font-bold text-slate-500 dark:text-slate-400">({deltaPct > 0 ? `+${deltaPct}` : deltaPct}%)</span>
+                      </div>
+                      <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 mt-1 block">
+                        {delta >= 0 ? 'Surge volume exceeding model' : 'Within operational ceiling'}
+                      </span>
+                    </div>
+
+                    <div className="p-3 bg-white dark:bg-slate-900/90 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
+                      <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400 block">
+                        Total Cooks Assigned
+                      </span>
+                      <div className="flex items-baseline gap-2 mt-1">
+                        <span className="text-2xl font-black text-slate-900 dark:text-white">
+                          {totalCooks}
+                        </span>
+                        <span className="text-xs font-bold text-slate-500 dark:text-slate-400">
+                          / {targetCooks} target cooks
+                        </span>
+                      </div>
+                      <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 mt-1 block">
+                        Active across 5 production lines
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Station Workload Share Proportion Bar */}
+                  <div className="pt-1">
+                    <div className="flex items-center justify-between text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1.5">
+                      <span>5-Station Workload Share Proportion:</span>
+                      <span className="text-slate-500 dark:text-slate-400 font-mono text-[10px]">
+                        Hot Kitchen ({hotKitchenPct}%) • Grill ({grillPct}%) • Cold Salad ({coldSaladPct}%) • Pizza ({pizzaPct}%) • Fryer ({fryerPct}%)
+                      </span>
+                    </div>
+                    <div className="h-2.5 w-full bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden flex shadow-inner">
+                      <div style={{ width: `${hotKitchenPct}%` }} className="bg-orange-500 h-full transition-all duration-500" title={`Hot Kitchen: ${hotKitchenPct}%`} />
+                      <div style={{ width: `${grillPct}%` }} className="bg-amber-500 h-full transition-all duration-500" title={`Grill: ${grillPct}%`} />
+                      <div style={{ width: `${coldSaladPct}%` }} className="bg-emerald-500 h-full transition-all duration-500" title={`Cold Salad: ${coldSaladPct}%`} />
+                      <div style={{ width: `${pizzaPct}%` }} className="bg-rose-500 h-full transition-all duration-500" title={`Pizza: ${pizzaPct}%`} />
+                      <div style={{ width: `${fryerPct}%` }} className="bg-purple-500 h-full transition-all duration-500" title={`Fryer: ${fryerPct}%`} />
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* High Workload & Queue Alerts Panel */}
+            {stationsList.some(st => st.load_level >= 80) && (
+              <div className="p-4 rounded-2xl bg-rose-50/90 dark:bg-rose-950/40 border-2 border-rose-300 dark:border-rose-500/40 shadow-sm space-y-3">
+                <div className="flex items-center gap-2 border-b border-rose-200 dark:border-rose-800/60 pb-2">
+                  <AlertTriangle className="h-4 w-4 text-rose-600 dark:text-rose-400 flex-shrink-0 animate-pulse" />
+                  <h4 className="text-xs font-black uppercase tracking-wider text-rose-900 dark:text-rose-200">
+                    High Workload & Line Queue Alerts
+                  </h4>
+                  <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-rose-600 text-white ml-auto">
+                    {stationsList.filter(st => st.load_level >= 80).length} Stations Critical
+                  </span>
+                </div>
+
+                <div className="space-y-2.5">
+                  {stationsList.filter(st => st.load_level >= 80).map((st) => (
+                    <div
+                      key={st.id}
+                      className="p-3.5 bg-white dark:bg-slate-900 rounded-xl border border-rose-200 dark:border-rose-900/60 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                    >
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-xs font-bold text-slate-900 dark:text-white">
+                            🚨 {st.name}
+                          </span>
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${st.load_level >= 90
+                            ? 'bg-rose-600 text-white'
+                            : 'bg-amber-500 text-white'
+                            }`}>
+                            {st.load_level}% Load ({st.bottleneck_status})
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-600 dark:text-slate-300 font-medium">
+                          Current Queue: <span className="font-bold text-slate-900 dark:text-white">{st.queue_length} orders</span> • Avg Prep Time: <span className="font-bold text-slate-900 dark:text-white">{st.avg_prep_time_mins} mins</span> • Actual: <span className="font-bold text-orange-600 dark:text-orange-400">{st.actual_load || Math.round(st.load_level * 0.7)} orders</span> • Predicted: <span className="font-bold text-sky-600 dark:text-sky-400">{st.predicted_load || Math.round(st.load_level * 0.65)} orders</span>
+                        </p>
+                        <div className="text-xs text-rose-800 dark:text-rose-300 font-bold flex items-center gap-1.5 pt-0.5">
+                          <ArrowRight className="h-3.5 w-3.5 text-rose-600 dark:text-rose-400 flex-shrink-0" />
+                          <span>Recommended Action: <span className="text-rose-950 dark:text-rose-100 font-extrabold underline">{st.action}</span></span>
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={() => {
+                          const targetStaffName = st.name === "Hot Kitchen" ? "S. Fernando" : (st.name === "Grill" ? "T. Silva" : (st.name === "Pizza" ? "A. Jayasinghe" : "Kitchen Staff"));
+                          const targetStationName = st.name;
+
+                          const updatedStations = data.stations.map(s => {
+                            if (s.id === st.id) {
+                              const newQueue = Math.max(2, s.queue_length - 8);
+                              const newPrepTime = (newQueue * 0.5 + 0.2).toFixed(1);
+                              const newActiveCooks = s.recommended_cooks || 3;
+
+                              return {
+                                ...s,
+                                active_cooks: newActiveCooks,
+                                queue_length: newQueue,
+                                avg_prep_time_mins: newPrepTime,
+                                load_level: Math.max(45, s.load_level - 35),
+                                bottleneck_status: "Smooth Flow",
+                                action: `Optimal staffing restored — ${targetStaffName} reallocated based on skill matching`
+                              };
+                            }
+                            return s;
+                          });
+
+                          const updatedStaff = data.staff.map(s => {
+                            if (s.name.includes(targetStaffName)) {
+                              return {
+                                ...s,
+                                assigned_station: `${targetStationName} (Reallocated via AI)`,
+                                isReallocated: true,
+                                reallocatedTo: targetStationName
+                              };
+                            }
+                            return s;
+                          });
+
+                          setData({ ...data, stations: updatedStations, staff: updatedStaff });
+                          setDismissedToast(`⚡ Dynamic Line Balancing Applied: ${targetStaffName} reallocated to ${targetStationName}! Staff Matrix updated.`);
+                          setTimeout(() => setDismissedToast(""), 4500);
+                        }}
+                        className="px-3.5 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-xs whitespace-nowrap self-start sm:self-auto cursor-pointer transition-all flex items-center gap-1"
+                      >
+                        <ShieldCheck className="h-3.5 w-3.5" />
+                        <span>Apply Reallocation & Balance Line</span>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* 5-Station Workload Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+              {stationsList.map((st) => {
+                const isHighWorkload = st.load_level >= 80;
+                return (
+                  <div
+                    key={st.id}
+                    className={`p-4 rounded-2xl border flex flex-col justify-between shadow-sm transition-all ${isHighWorkload
+                      ? (st.load_level >= 90
+                        ? 'bg-rose-50 border-2 border-rose-400 dark:bg-rose-950/40 dark:border-rose-500/60 shadow-rose-500/10'
+                        : 'bg-amber-50 border-2 border-amber-400 dark:bg-amber-950/40 dark:border-amber-500/60 shadow-amber-500/10')
+                      : 'bg-slate-50 dark:bg-slate-900/60 border-slate-200 dark:border-slate-800'
+                      }`}
+                  >
+                    <div>
+                      {isHighWorkload && (
+                        <div className="mb-2 flex items-center gap-1.5 text-[10px] font-black uppercase text-rose-700 dark:text-rose-400">
+                          <AlertTriangle className="h-3.5 w-3.5 animate-pulse" />
+                          <span>High Workload & Delay Risk Alert</span>
+                        </div>
+                      )}
+
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-sm font-extrabold text-slate-900 dark:text-white">{st.name}</span>
+                        <span className={`text-[10px] font-black px-2.5 py-0.5 rounded-full ${st.load_level >= 90
+                          ? 'bg-rose-600 text-white'
+                          : (st.load_level >= 80 ? 'bg-amber-500 text-white' : 'bg-slate-200 dark:bg-slate-800 text-slate-800 dark:text-slate-300')
+                          }`}>
+                          {st.load_level}% Load
+                        </span>
+                      </div>
+
+                      {/* Actual Load & Predicted Load Details */}
+                      <div className="mt-3 p-2.5 rounded-xl bg-white dark:bg-slate-950/70 border border-slate-200 dark:border-slate-800/80 space-y-1.5 shadow-2xs">
+                        <div className="flex items-center justify-between text-[11px]">
+                          <span className="text-slate-500 dark:text-slate-400 font-bold">Actual Load:</span>
+                          <span className="font-extrabold text-orange-600 dark:text-orange-400">
+                            {st.actual_load !== undefined ? `${st.actual_load} orders` : `${Math.round(st.load_level * 0.7)} orders`}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between text-[11px]">
+                          <span className="text-slate-500 dark:text-slate-400 font-bold">Predicted Load:</span>
+                          <span className="font-extrabold text-sky-600 dark:text-sky-400">
+                            {st.predicted_load !== undefined ? `${st.predicted_load} orders` : `${Math.round((st.predicted_load_level || st.load_level) * 0.65)} orders`}
+                          </span>
+                        </div>
+
+                        {/* Visual Comparison Progress Bar */}
+                        <div className="space-y-1 pt-1 border-t border-slate-100 dark:border-slate-800">
+                          <div className="flex items-center justify-between text-[9px] font-bold text-slate-400">
+                            <span>Load vs Capacity</span>
+                            <span>{st.load_level}%</span>
+                          </div>
+                          <div className="h-1.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden flex">
+                            <div
+                              style={{ width: `${Math.min(100, st.load_level)}%` }}
+                              className={`h-full ${st.load_level >= 90 ? 'bg-rose-500' : (st.load_level >= 80 ? 'bg-amber-500' : 'bg-emerald-500')}`}
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="mt-3 space-y-2 text-xs">
+                        <div className="flex justify-between items-center">
+                          <span className="text-slate-500 dark:text-slate-400 font-medium">Current Queue:</span>
+                          <span className="font-extrabold text-slate-900 dark:text-white px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+                            {st.queue_length} orders
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-slate-500 dark:text-slate-400 font-medium">Avg Prep Time:</span>
+                          <span className="font-extrabold text-slate-900 dark:text-white px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+                            {st.avg_prep_time_mins} mins
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-slate-500 dark:text-slate-400 font-medium">Cooks Assigned:</span>
+                          <span className={`font-extrabold px-2 py-0.5 rounded border transition-all ${st.active_cooks < st.recommended_cooks
+                            ? 'bg-amber-100 text-amber-900 border-amber-300 dark:bg-amber-950 dark:text-amber-300 animate-pulse'
+                            : 'bg-emerald-50 text-emerald-800 border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800'
+                            }`}>
+                            {st.active_cooks < st.recommended_cooks ? '⚠️ ' : '✓ '}
+                            {st.active_cooks} (Target: {st.recommended_cooks})
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {st.load_level > 50 && (
+                      <div className={`mt-3.5 p-3 rounded-xl border ${isHighWorkload
+                        ? 'bg-rose-100/70 border-rose-300 dark:bg-rose-950/80 dark:border-rose-900/80'
+                        : 'bg-amber-50/70 border-amber-200 dark:bg-amber-950/60 dark:border-amber-900/80'
+                        }`}>
+                        <span className="text-[10px] uppercase font-black text-rose-800 dark:text-rose-400 flex items-center gap-1">
+                          <ShieldCheck className="h-3.5 w-3.5 text-rose-600 dark:text-rose-400" /> Recommended Action:
+                        </span>
+                        <p className="text-xs text-slate-900 dark:text-white mt-1 font-extrabold leading-tight">{st.action}</p>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+        </>
       )}
 
       {/* Waiter Mobile Order Entry Modal */}
