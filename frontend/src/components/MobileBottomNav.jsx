@@ -11,7 +11,6 @@ export default function MobileBottomNav({
   activeModule, 
   onSelectModule,
   currentRole = 'admin',
-  onSelectRole,
   onRefresh,
   activeAlertCount = 0,
   onOpenAlerts,
@@ -49,17 +48,6 @@ export default function MobileBottomNav({
 
   const handleSelect = (moduleId) => {
     onSelectModule(moduleId);
-    setMoreSheetOpen(false);
-  };
-
-  const handleRoleChange = (roleId) => {
-    if (onSelectRole) {
-      onSelectRole(roleId);
-      const targetRole = ROLES.find(r => r.id === roleId);
-      if (targetRole && targetRole.defaultModule) {
-        onSelectModule(targetRole.defaultModule);
-      }
-    }
     setMoreSheetOpen(false);
   };
 
@@ -293,32 +281,8 @@ export default function MobileBottomNav({
               </div>
 
               <span className="text-[10px] uppercase font-black text-slate-400 tracking-wider block">
-                Workspace Persona & Tools
+                Quick Actions & Controls
               </span>
-
-              {/* Persona Switcher Pills */}
-              <div className="grid grid-cols-3 gap-2">
-                {ROLES.map((role) => {
-                  const isCurrentRole = role.id === currentRole;
-                  return (
-                    <button
-                      key={role.id}
-                      type="button"
-                      onClick={() => handleRoleChange(role.id)}
-                      className={`p-2.5 rounded-xl border text-center transition-all cursor-pointer ${
-                        isCurrentRole
-                          ? 'border-emerald-600 bg-emerald-100 dark:bg-emerald-950/70 text-emerald-950 dark:text-emerald-200 font-black shadow-xs'
-                          : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-850 text-slate-700 dark:text-slate-300 font-bold'
-                      }`}
-                    >
-                      <div className="flex justify-center mb-1">
-                        {role.icon}
-                      </div>
-                      <div className="text-[11px] leading-tight truncate">{role.shortTitle}</div>
-                    </button>
-                  );
-                })}
-              </div>
 
               {/* Quick Actions Row: Alerts, Sync, Theme */}
               <div className="grid grid-cols-3 gap-2 pt-1">

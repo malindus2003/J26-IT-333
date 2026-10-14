@@ -185,7 +185,6 @@ export default function Header({
   activeModule,
   onSelectModule,
   currentRole = 'admin',
-  onSelectRole,
   stats,
   onRefresh,
   activeAlertCount,
@@ -218,14 +217,6 @@ export default function Header({
     currentRole === 'staff' ? 'kitchen@gmail.com' : 'cashier@gmail.com'
   );
   const userName = currentUser?.name || activeRoleObj.title;
-
-  const handleRoleSwitch = (role) => {
-    if (onSelectRole) {
-      onSelectRole(role.id);
-    }
-    setRoleDropdownOpen(false);
-    onSelectModule(role.defaultModule);
-  };
 
   return (
     <header className="sticky top-0 z-40 backdrop-blur-xl bg-white/95 dark:bg-slate-950/95 border-b border-[#cbdad0]/80 dark:border-slate-800/80 transition-colors shadow-sm pt-[max(env(safe-area-inset-top),12px)]">
@@ -292,10 +283,10 @@ export default function Header({
 
               {/* Dropdown Menu Modal */}
               {roleDropdownOpen && (
-                <div className="absolute right-0 mt-2 w-80 rounded-2xl bg-white/95 dark:bg-slate-900/95 backdrop-blur-2xl border border-slate-200 dark:border-slate-800 shadow-2xl p-2.5 z-50 space-y-2.5 animate-fade-in">
+                <div className="absolute right-0 mt-2 w-72 rounded-2xl bg-white/95 dark:bg-slate-900/95 backdrop-blur-2xl border border-slate-200 dark:border-slate-800 shadow-2xl p-3 z-50 space-y-3 animate-fade-in">
                   
                   {/* User Profile Summary */}
-                  <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700 space-y-2">
+                  <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700 space-y-2.5">
                     <div className="flex items-center justify-between">
                       <span className="text-[10px] uppercase font-black tracking-wider text-slate-400">
                         Signed In User
@@ -306,7 +297,7 @@ export default function Header({
                     </div>
 
                     <div className="flex items-center gap-2.5">
-                      <div className="p-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 shadow-xs flex-shrink-0">
+                      <div className="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 shadow-xs flex-shrink-0">
                         {activeRoleObj.icon}
                       </div>
                       <div className="min-w-0 flex-1">
@@ -318,65 +309,28 @@ export default function Header({
                         </p>
                       </div>
                     </div>
-                  </div>
 
-                  {/* Switch Persona View */}
-                  <div className="space-y-1">
-                    <div className="px-1 flex items-center justify-between">
-                      <span className="text-[10px] uppercase font-black tracking-wider text-slate-400">
-                        Switch Persona View
+                    <div className="pt-2 border-t border-slate-200/60 dark:border-slate-700/60 flex items-center justify-between text-[10px]">
+                      <span className="text-slate-400 font-medium">Workspace Role:</span>
+                      <span className="font-extrabold text-emerald-700 dark:text-emerald-400 truncate max-w-[140px] text-right">
+                        {activeRoleObj.title}
                       </span>
-                      <span className="text-[9px] text-slate-400 font-medium">Evaluation Demo</span>
                     </div>
-
-                    {ROLES.map((role) => {
-                      const isSelected = role.id === currentRole;
-                      return (
-                        <button
-                          key={role.id}
-                          type="button"
-                          onClick={() => handleRoleSwitch(role)}
-                          className={`w-full p-2 rounded-xl text-left transition-all flex items-center gap-2.5 cursor-pointer ${
-                            isSelected
-                              ? 'bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-700/60'
-                              : 'hover:bg-slate-100 dark:hover:bg-slate-800/80 border border-transparent'
-                          }`}
-                        >
-                          <div className="p-1 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-xs flex-shrink-0">
-                            {role.icon}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center justify-between">
-                              <span className="text-xs font-black text-slate-900 dark:text-white">{role.shortTitle}</span>
-                              {isSelected ? (
-                                <span className="text-[10px] font-black text-emerald-700 dark:text-emerald-400">Active</span>
-                              ) : (
-                                <span className="text-[10px] font-mono text-slate-400">
-                                  {role.id === 'admin' ? 'admin@gmail.com' : role.id === 'cashier' ? 'cashier@gmail.com' : 'kitchen@gmail.com'}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        </button>
-                      );
-                    })}
                   </div>
 
                   {/* Sign Out Action */}
                   {onLogout && (
-                    <div className="pt-1 border-t border-slate-100 dark:border-slate-800">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setRoleDropdownOpen(false);
-                          onLogout();
-                        }}
-                        className="w-full py-2 px-3 rounded-xl bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-950/70 border border-rose-200 dark:border-rose-900/60 text-rose-800 dark:text-rose-300 font-extrabold text-xs transition-all flex items-center justify-center gap-2 cursor-pointer shadow-2xs"
-                      >
-                        <LogOut className="h-3.5 w-3.5 text-rose-600 dark:text-rose-400" />
-                        <span>Sign Out / Switch Account</span>
-                      </button>
-                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setRoleDropdownOpen(false);
+                        onLogout();
+                      }}
+                      className="w-full py-2.5 px-3 rounded-xl bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-950/70 border border-rose-200 dark:border-rose-900/60 text-rose-800 dark:text-rose-300 font-extrabold text-xs transition-all flex items-center justify-center gap-2 cursor-pointer shadow-2xs"
+                    >
+                      <LogOut className="h-4 w-4 text-rose-600 dark:text-rose-400" />
+                      <span>Sign Out / Switch Account</span>
+                    </button>
                   )}
 
                 </div>

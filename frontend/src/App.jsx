@@ -246,7 +246,6 @@ export default function App() {
         activeModule={activeModule}
         onSelectModule={setActiveModule}
         currentRole={currentRole}
-        onSelectRole={setCurrentRole}
         stats={stats}
         onRefresh={fetchAllData}
         activeAlertCount={totalActiveAlertCount}
@@ -563,7 +562,6 @@ export default function App() {
         activeModule={activeModule}
         onSelectModule={setActiveModule}
         currentRole={currentRole}
-        onSelectRole={setCurrentRole}
         onRefresh={fetchAllData}
         activeAlertCount={totalActiveAlertCount}
         onOpenAlerts={() => setShowAlertsCenter(true)}
