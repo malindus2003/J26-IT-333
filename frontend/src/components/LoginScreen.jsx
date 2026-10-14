@@ -108,31 +108,10 @@ export default function LoginScreen({ onLoginSuccess, isDarkMode, onToggleTheme 
 
       setError(
         err.response?.data?.detail || 
-        'Invalid email or password. Please verify your credentials or choose a quick demo account below.'
+        'Invalid email or password. Please verify your credentials and try again.'
       );
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleQuickDemoSelect = (demoAccount, autoSubmit = false) => {
-    setEmail(demoAccount.email);
-    setPassword(demoAccount.password);
-    setError('');
-
-    if (autoSubmit) {
-      setLoading(true);
-      setTimeout(() => {
-        onLoginSuccess({
-          email: demoAccount.email,
-          name: demoAccount.name,
-          title: demoAccount.title,
-          role: demoAccount.role,
-          defaultModule: demoAccount.defaultModule,
-          authenticated_at: new Date().toISOString()
-        });
-        setLoading(false);
-      }, 250);
     }
   };
 
@@ -255,57 +234,6 @@ export default function LoginScreen({ onLoginSuccess, isDarkMode, onToggleTheme 
               )}
             </button>
           </form>
-
-          {/* Quick Demo Logins Section */}
-          <div className="pt-4 border-t border-slate-100 dark:border-slate-800 space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] uppercase font-black tracking-wider text-slate-400">
-                1-Tap Quick Demo Logins
-              </span>
-              <span className="text-[10px] text-emerald-700 dark:text-emerald-400 font-bold">
-                Tap card to sign in instantly
-              </span>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-              {DEMO_CREDENTIALS.map((demo) => {
-                const isCurrentForm = email === demo.email;
-                return (
-                  <button
-                    key={demo.role}
-                    type="button"
-                    onClick={() => handleQuickDemoSelect(demo, true)}
-                    className={`p-3 rounded-2xl text-left border transition-all flex flex-col justify-between gap-2 group cursor-pointer ${
-                      isCurrentForm
-                        ? 'border-emerald-500 bg-emerald-50/70 dark:bg-emerald-950/40 shadow-xs'
-                        : 'border-slate-200/90 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-850 hover:border-emerald-400 hover:bg-slate-100 dark:hover:bg-slate-800'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="p-1.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-xs">
-                        {demo.icon}
-                      </div>
-                      <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider border ${demo.badgeColor}`}>
-                        {demo.role}
-                      </span>
-                    </div>
-
-                    <div>
-                      <div className="text-xs font-black text-slate-900 dark:text-white group-hover:text-emerald-700 dark:group-hover:text-emerald-400 transition-colors">
-                        {demo.name}
-                      </div>
-                      <div className="text-[11px] font-mono text-slate-600 dark:text-slate-300 mt-0.5 truncate">
-                        {demo.email}
-                      </div>
-                      <div className="text-[10px] font-mono text-slate-500 dark:text-slate-400 mt-0.5">
-                        pwd: <span className="text-emerald-700 dark:text-emerald-400 font-bold">{demo.password}</span>
-                      </div>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
 
         </div>
 
