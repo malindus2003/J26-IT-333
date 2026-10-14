@@ -1,21 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  ShoppingBag, 
-  Plus, 
-  Clock, 
-  ChefHat, 
-  CheckCircle2, 
-  AlertTriangle, 
-  ArrowRight, 
-  Layers, 
-  Sparkles, 
-  Flame, 
-  Utensils, 
-  RefreshCw, 
-  X, 
-  Check, 
-  DollarSign, 
-  TrendingUp, 
+import {
+  ShoppingBag,
+  Plus,
+  Clock,
+  ChefHat,
+  CheckCircle2,
+  AlertTriangle,
+  ArrowRight,
+  Layers,
+  Sparkles,
+  Flame,
+  Utensils,
+  RefreshCw,
+  X,
+  Check,
+  DollarSign,
+  TrendingUp,
   AlertCircle,
   ShieldCheck,
   PackageCheck,
@@ -35,7 +35,10 @@ import {
   Download,
   BarChart3,
   ArrowUpRight,
-  TrendingDown
+  TrendingDown,
+  Minus,
+  Trash2,
+  ShoppingCart
 } from 'lucide-react';
 import axios from 'axios';
 
@@ -165,7 +168,7 @@ const FALLBACK_MENU_ITEMS = [
   {
     id: "menu-07",
     name: "Woodfired Margherita Pizza",
-    category: "Main Course",
+    category: "Pizza",
     price_lkr: 2100.0,
     prep_time_mins: 11,
     station_id: "station-4",
@@ -183,7 +186,7 @@ const FALLBACK_MENU_ITEMS = [
   {
     id: "menu-08",
     name: "Crispy Golden Calamari & Fries",
-    category: "Sides & Starters",
+    category: "Seafood",
     price_lkr: 1650.0,
     prep_time_mins: 7,
     station_id: "station-5",
@@ -296,7 +299,7 @@ const FALLBACK_ORDER_STATS = {
   on_time_fulfillment_rate: "94.2%"
 };
 
-export default function OrderManagementDashboard({ onRefresh, isDarkMode, currentRole = 'admin', viewMode = 'all', refreshTrigger }) {
+export default function OrderManagementDashboard({ onRefresh, isDarkMode, currentRole = 'admin', viewMode = 'all', refreshTrigger, onNavigateModule }) {
   const isStaff = currentRole === 'staff';
   const isCashier = currentRole === 'cashier';
 
@@ -308,7 +311,12 @@ export default function OrderManagementDashboard({ onRefresh, isDarkMode, curren
   const [backendOffline, setBackendOffline] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [showNewOrderModal, setShowNewOrderModal] = useState(false);
-  
+
+  // Search & Pagination States for POS Menu Catalog
+  const [dishSearch, setDishSearch] = useState("");
+  const [currentDishPage, setCurrentDishPage] = useState(1);
+  const dishesPerPage = 6;
+
   // Single-Page Sub-View State (when in Admin mode): 'pos_menu' | 'tables_map' | 'kds' | 'orders_ledger'
   const [adminActiveTab, setAdminActiveTab] = useState(
     viewMode !== 'all' ? viewMode : (isCashier ? 'pos_menu' : isStaff ? 'kds' : 'pos_menu')
@@ -360,16 +368,66 @@ export default function OrderManagementDashboard({ onRefresh, isDarkMode, curren
     document.body.removeChild(link);
   };
 
-  // New Order State
+  // Multi-Item Order State
   const [selectedDish, setSelectedDish] = useState(null);
-  const [additionalItems, setAdditionalItems] = useState([]);
-  const [showAddItemSelector, setShowAddItemSelector] = useState(false);
+  const [orderCart, setOrderCart] = useState([]); // Array of { dish, quantity }
+  const [modalCategory, setModalCategory] = useState("all");
+  const [modalSearch, setModalSearch] = useState("");
   const [tableNumber, setTableNumber] = useState("Table 01");
   const [orderType, setOrderType] = useState("Dine-In");
   const [portionCount, setPortionCount] = useState(1);
   const [customerNote, setCustomerNote] = useState("");
   const [submittingOrder, setSubmittingOrder] = useState(false);
   const [orderSuccessMessage, setOrderSuccessMessage] = useState(null);
+
+  const MODAL_CATEGORIES = [
+    { id: "all", label: "All Items" },
+    { id: "main", label: "Main Course" },
+    { id: "seafood", label: "Seafood" },
+    { id: "pizza", label: "Pizza" },
+    { id: "salad", label: "Cold Salads" },
+    { id: "dessert", label: "Dessert & Pastry" },
+    { id: "beverage", label: "Beverages" }
+  ];
+
+  const handleOpenNewOrder = (dish = null) => {
+    if (dish) {
+      setOrderCart([{ dish, quantity: 1 }]);
+      setSelectedDish(dish);
+    } else {
+      setOrderCart([]);
+      setSelectedDish(null);
+    }
+    setModalCategory("all");
+    setModalSearch("");
+    setShowNewOrderModal(true);
+  };
+
+  const handleAddToCart = (dish) => {
+    setOrderCart(prev => {
+      const idx = prev.findIndex(item => item.dish.id === dish.id);
+      if (idx > -1) {
+        const copy = [...prev];
+        copy[idx] = { ...copy[idx], quantity: copy[idx].quantity + 1 };
+        return copy;
+      }
+      return [...prev, { dish, quantity: 1 }];
+    });
+  };
+
+  const handleUpdateCartQuantity = (dishId, newQty) => {
+    if (newQty <= 0) {
+      handleRemoveFromCart(dishId);
+      return;
+    }
+    setOrderCart(prev =>
+      prev.map(item => item.dish.id === dishId ? { ...item, quantity: newQty } : item)
+    );
+  };
+
+  const handleRemoveFromCart = (dishId) => {
+    setOrderCart(prev => prev.filter(item => item.dish.id !== dishId));
+  };
 
   useEffect(() => {
     fetchOrderData();
@@ -414,16 +472,16 @@ export default function OrderManagementDashboard({ onRefresh, isDarkMode, curren
   };
 
   const handleCreateOrder = async (e) => {
-    e.preventDefault();
-    if (!selectedDish) return;
+    if (e) e.preventDefault();
+    if (orderCart.length === 0) return;
 
     try {
       setSubmittingOrder(true);
-      
-      const allItemsPayload = [
-        { menu_id: selectedDish.id, quantity: Number(portionCount) },
-        ...additionalItems.map(it => ({ menu_id: it.menu_id, quantity: Number(it.quantity) }))
-      ];
+
+      const allItemsPayload = orderCart.map(it => ({
+        menu_id: it.dish.id,
+        quantity: Number(it.quantity)
+      }));
 
       const payload = {
         table_no: orderType === 'Dine-In' ? tableNumber : `${orderType} #${Math.floor(10 + Math.random() * 90)}`,
@@ -433,13 +491,15 @@ export default function OrderManagementDashboard({ onRefresh, isDarkMode, curren
       };
 
       const res = await axios.post("http://localhost:8000/api/orders", payload);
-      setOrderSuccessMessage(`Order #${res.data.order.order_number} placed for ${res.data.order.table_no}! Smart FIFO ingredients deducted.`);
+      const placedOrder = res.data?.order;
+      setOrderSuccessMessage(
+        `Order #${placedOrder?.order_number || 'OK'} placed with ${allItemsPayload.length} dish(es) for ${payload.table_no}! Smart FIFO ingredients deducted.`
+      );
       setShowNewOrderModal(false);
+      setOrderCart([]);
       setSelectedDish(null);
-      setAdditionalItems([]);
       setCustomerNote("");
-      setPortionCount(1);
-      
+
       await fetchOrderData();
       if (onRefresh) onRefresh();
 
@@ -473,9 +533,48 @@ export default function OrderManagementDashboard({ onRefresh, isDarkMode, curren
     }
   };
 
-  const filteredMenu = selectedCategory === "all"
-    ? menu
-    : menu.filter(m => m.category.toLowerCase().includes(selectedCategory.toLowerCase()));
+  // Filter Menu Items by Category and Search Term
+  const filteredMenu = menu.filter(dish => {
+    const matchesCategory = selectedCategory === "all"
+      ? true
+      : dish.category.toLowerCase().includes(selectedCategory.toLowerCase());
+    const matchesSearch = dish.name.toLowerCase().includes(dishSearch.toLowerCase()) ||
+      (dish.description && dish.description.toLowerCase().includes(dishSearch.toLowerCase()));
+    return matchesCategory && matchesSearch;
+  });
+
+  // Calculate Pagination values
+  const totalDishPages = Math.ceil(filteredMenu.length / dishesPerPage);
+  const paginatedMenu = filteredMenu.slice((currentDishPage - 1) * dishesPerPage, currentDishPage * dishesPerPage);
+
+  // Derived Multi-Item Cart & In-Modal Menu Filter Values
+  const cartTotalAmount = orderCart.reduce((sum, item) => sum + (item.dish.price_lkr * item.quantity), 0);
+  const cartTotalCount = orderCart.reduce((sum, item) => sum + item.quantity, 0);
+
+  const modalFilteredMenu = menu.filter(dish => {
+    const matchesCategory = modalCategory === "all"
+      ? true
+      : dish.category?.toLowerCase().includes(modalCategory.toLowerCase());
+    const matchesSearch = modalSearch.trim() === ""
+      ? true
+      : (dish.name?.toLowerCase().includes(modalSearch.toLowerCase()) ||
+         dish.description?.toLowerCase().includes(modalSearch.toLowerCase()) ||
+         dish.category?.toLowerCase().includes(modalSearch.toLowerCase()));
+    return matchesCategory && matchesSearch;
+  });
+
+  const combinedFifoDeductions = orderCart.reduce((acc, item) => {
+    const bomList = item.dish?.recipe_bom || [];
+    bomList.forEach(bom => {
+      const ingName = bom.ingredient_name.split('(')[0].trim();
+      const kg = (bom.required_kg || 0) * item.quantity;
+      if (!acc[ingName]) {
+        acc[ingName] = 0;
+      }
+      acc[ingName] += kg;
+    });
+    return acc;
+  }, {});
 
   const pendingOrders = orders.filter(o => o.status === 'pending');
   const inPrepOrders = orders.filter(o => o.status === 'in_prep');
@@ -486,16 +585,16 @@ export default function OrderManagementDashboard({ onRefresh, isDarkMode, curren
 
   // Filtered recent orders for History Ledger
   const filteredHistoryOrders = orders.filter(ord => {
-    const matchesSearch = 
+    const matchesSearch =
       ord.id?.toLowerCase().includes(historySearch.toLowerCase()) ||
       ord.table_no?.toLowerCase().includes(historySearch.toLowerCase()) ||
       ord.items?.some(i => i.name.toLowerCase().includes(historySearch.toLowerCase()));
-    
-    const matchesStatus = historyStatusFilter === 'all' 
-      ? true 
-      : historyStatusFilter === 'active' 
-      ? (ord.status === 'pending' || ord.status === 'in_prep' || ord.status === 'ready')
-      : ord.status === historyStatusFilter;
+
+    const matchesStatus = historyStatusFilter === 'all'
+      ? true
+      : historyStatusFilter === 'active'
+        ? (ord.status === 'pending' || ord.status === 'in_prep' || ord.status === 'ready')
+        : ord.status === historyStatusFilter;
 
     return matchesSearch && matchesStatus;
   });
@@ -519,7 +618,7 @@ export default function OrderManagementDashboard({ onRefresh, isDarkMode, curren
 
   return (
     <div className="space-y-6">
-      
+
       {/* Backend Offline / Fallback Notice */}
       {backendOffline && (
         <div className="p-3.5 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-700/80 flex items-center justify-between gap-3 text-xs text-amber-900 dark:text-amber-200 animate-fade-in shadow-sm">
@@ -537,7 +636,7 @@ export default function OrderManagementDashboard({ onRefresh, isDarkMode, curren
           </button>
         </div>
       )}
-      
+
       {/* Header Banner with Real-time Operational Stats (Exclusively in Orders & Sales Ledger) */}
       {currentView === 'orders_ledger' && (
         <div className="glass-panel p-6 rounded-2xl relative overflow-hidden bg-white dark:bg-slate-900 border border-[#d1ded5] dark:border-slate-800 shadow-sm space-y-4">
@@ -562,11 +661,10 @@ export default function OrderManagementDashboard({ onRefresh, isDarkMode, curren
             <div className="flex items-center gap-2.5">
               <button
                 onClick={() => setShowHistoryAnalytics(!showHistoryAnalytics)}
-                className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 border transition-all ${
-                  showHistoryAnalytics
-                    ? 'bg-emerald-700 text-white border-emerald-800 shadow-md'
-                    : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-300 dark:border-slate-700 hover:bg-slate-100'
-                }`}
+                className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 border transition-all ${showHistoryAnalytics
+                  ? 'bg-emerald-700 text-white border-emerald-800 shadow-md'
+                  : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-300 dark:border-slate-700 hover:bg-slate-100'
+                  }`}
                 title="Toggle Past Days Sales Analytics"
               >
                 <BarChart3 className="h-4 w-4" />
@@ -646,11 +744,10 @@ export default function OrderManagementDashboard({ onRefresh, isDarkMode, curren
           <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
             <button
               onClick={() => setAdminActiveTab('pos_menu')}
-              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap ${
-                adminActiveTab === 'pos_menu'
-                  ? 'bg-emerald-700 text-white shadow-md shadow-emerald-700/20'
-                  : 'bg-[#f0f5f2] dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
-              }`}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap ${adminActiveTab === 'pos_menu'
+                ? 'bg-emerald-700 text-white shadow-md shadow-emerald-700/20'
+                : 'bg-[#f0f5f2] dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                }`}
             >
               <Utensils className="h-4 w-4" />
               <span>POS Menu Ordering</span>
@@ -658,11 +755,10 @@ export default function OrderManagementDashboard({ onRefresh, isDarkMode, curren
 
             <button
               onClick={() => setAdminActiveTab('tables_map')}
-              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap ${
-                adminActiveTab === 'tables_map'
-                  ? 'bg-emerald-700 text-white shadow-md shadow-emerald-700/20'
-                  : 'bg-[#f0f5f2] dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
-              }`}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap ${adminActiveTab === 'tables_map'
+                ? 'bg-emerald-700 text-white shadow-md shadow-emerald-700/20'
+                : 'bg-[#f0f5f2] dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                }`}
             >
               <Armchair className="h-4 w-4" />
               <span>Table Floor Map</span>
@@ -670,11 +766,10 @@ export default function OrderManagementDashboard({ onRefresh, isDarkMode, curren
 
             <button
               onClick={() => setAdminActiveTab('kds')}
-              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap ${
-                adminActiveTab === 'kds'
-                  ? 'bg-emerald-700 text-white shadow-md shadow-emerald-700/20'
-                  : 'bg-[#f0f5f2] dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
-              }`}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap ${adminActiveTab === 'kds'
+                ? 'bg-emerald-700 text-white shadow-md shadow-emerald-700/20'
+                : 'bg-[#f0f5f2] dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                }`}
             >
               <ChefHat className="h-4 w-4" />
               <span>Kitchen Display (KDS)</span>
@@ -682,11 +777,10 @@ export default function OrderManagementDashboard({ onRefresh, isDarkMode, curren
 
             <button
               onClick={() => setAdminActiveTab('orders_ledger')}
-              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap ${
-                adminActiveTab === 'orders_ledger'
-                  ? 'bg-emerald-700 text-white shadow-md shadow-emerald-700/20'
-                  : 'bg-[#f0f5f2] dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
-              }`}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap ${adminActiveTab === 'orders_ledger'
+                ? 'bg-emerald-700 text-white shadow-md shadow-emerald-700/20'
+                : 'bg-[#f0f5f2] dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                }`}
             >
               <Receipt className="h-4 w-4" />
               <span>Sales Ledger</span>
@@ -720,20 +814,49 @@ export default function OrderManagementDashboard({ onRefresh, isDarkMode, curren
 
             {/* Category Filter Pills */}
             <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
-              {["all", "main", "seafood", "salad", "dessert", "beverage"].map(cat => (
-                <button
-                  key={cat}
-                  onClick={() => setSelectedCategory(cat)}
-                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold capitalize transition-all ${
-                    selectedCategory === cat
+                {["all", "main", "seafood", "pizza", "salad", "dessert", "beverage"].map(cat => (
+                  <button
+                    key={cat}
+                    onClick={() => {
+                      setSelectedCategory(cat);
+                      setCurrentDishPage(1);
+                    }}
+                    className={`px-3.5 py-1.5 rounded-xl text-xs font-bold capitalize transition-all ${selectedCategory === cat
                       ? 'bg-emerald-700 text-white shadow-sm'
                       : 'bg-[#f0f5f2] dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-emerald-50 dark:hover:bg-slate-700 border border-[#d1ded5] dark:border-slate-700'
-                  }`}
-                >
-                  {cat}
-                </button>
-              ))}
-            </div>
+                      }`}
+                  >
+                    {cat}
+                  </button>
+                ))}
+              </div>
+          </div>
+
+          {/* Dish Search Bar */}
+          <div className="relative">
+            <Search className="absolute left-3.5 top-3 h-4 w-4 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Search dishes by name (e.g. Margherita, Prawns, Salmon, Cuttlefish)..."
+              value={dishSearch}
+              onChange={(e) => {
+                setDishSearch(e.target.value);
+                setCurrentDishPage(1);
+              }}
+              className="w-full bg-[#f8faf9] dark:bg-slate-800/90 border border-[#d1ded5] dark:border-slate-700 rounded-xl pl-10 pr-10 py-2.5 text-xs text-slate-900 dark:text-white font-medium focus:outline-none focus:border-emerald-600 shadow-sm"
+            />
+            {dishSearch && (
+              <button
+                type="button"
+                onClick={() => {
+                  setDishSearch("");
+                  setCurrentDishPage(1);
+                }}
+                className="absolute right-3 top-2.5 p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-white cursor-pointer"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
           </div>
 
           {/* Menu Cards Grid / Loading / Empty State */}
@@ -752,85 +875,117 @@ export default function OrderManagementDashboard({ onRefresh, isDarkMode, curren
             <div className="p-10 rounded-2xl bg-[#f8faf9] dark:bg-slate-800/40 border border-[#d1ded5] dark:border-slate-700 text-center space-y-3">
               <Utensils className="h-10 w-10 text-slate-400 mx-auto" />
               <h4 className="text-sm font-bold text-slate-700 dark:text-slate-200">
-                No dishes found matching category "{selectedCategory}"
+                No dishes found matching your search "{dishSearch || selectedCategory}"
               </h4>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                Try selecting a different filter or reset to view all dishes.
+                Try selecting a different filter or reset search to view all dishes.
               </p>
               <button
-                onClick={() => setSelectedCategory("all")}
+                onClick={() => {
+                  setSelectedCategory("all");
+                  setDishSearch("");
+                  setCurrentDishPage(1);
+                }}
                 className="px-4 py-2 rounded-xl bg-emerald-700 text-white text-xs font-bold hover:bg-emerald-800 transition-all shadow-sm"
               >
                 Show All Dishes
               </button>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {filteredMenu.map(dish => (
-                <div
-                  key={dish.id}
-                  className="p-4 rounded-2xl bg-[#f8faf9] dark:bg-slate-800/80 border border-[#d1ded5] dark:border-slate-700 flex flex-col justify-between transition-all hover:shadow-md group space-y-3"
-                >
-                  <div>
-                    <div className="w-full h-40 rounded-xl overflow-hidden relative bg-slate-100 dark:bg-slate-950 border border-[#d1ded5] dark:border-slate-700 mb-2.5">
-                      <img
-                        src={dish.image_url}
-                        alt={dish.name}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                        onError={(e) => {
-                          if (dish.image_url && !e.currentTarget.src.includes(':8000') && dish.image_url.startsWith('/dishes/')) {
-                            e.currentTarget.src = `http://localhost:8000${dish.image_url}`;
-                          }
-                        }}
-                      />
-                      <span className={`absolute top-2 right-2 text-[10px] font-black px-2.5 py-0.5 rounded-full shadow ${
-                        dish.in_stock ? 'bg-emerald-700 text-white' : 'bg-rose-600 text-white'
-                      }`}>
-                        {dish.in_stock ? "✓ In Stock" : "⚠️ Low Stock"}
-                      </span>
-                      <span className="absolute bottom-2 left-2 text-[10px] font-bold px-2 py-0.5 rounded bg-black/70 text-white backdrop-blur-sm">
-                        {(dish.station_name || 'Kitchen').split('&')[0]}
-                      </span>
+            <>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {paginatedMenu.map(dish => (
+                  <div
+                    key={dish.id}
+                    className="p-4 rounded-2xl bg-[#f8faf9] dark:bg-slate-800/80 border border-[#d1ded5] dark:border-slate-700 flex flex-col justify-between transition-all hover:shadow-md group space-y-3"
+                  >
+                    <div>
+                      <div className="w-full h-40 rounded-xl overflow-hidden relative bg-slate-100 dark:bg-slate-950 border border-[#d1ded5] dark:border-slate-700 mb-2.5">
+                        <img
+                          src={dish.image_url}
+                          alt={dish.name}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                          onError={(e) => {
+                            if (dish.image_url && !e.currentTarget.src.includes(':8000') && dish.image_url.startsWith('/dishes/')) {
+                              e.currentTarget.src = `http://localhost:8000${dish.image_url}`;
+                            }
+                          }}
+                        />
+                        <span className={`absolute top-2 right-2 text-[10px] font-black px-2.5 py-0.5 rounded-full shadow ${dish.in_stock ? 'bg-emerald-700 text-white' : 'bg-rose-600 text-white'
+                          }`}>
+                          {dish.in_stock ? "✓ In Stock" : "⚠️ Low Stock"}
+                        </span>
+                        <span className="absolute bottom-2 left-2 text-[10px] font-bold px-2 py-0.5 rounded bg-black/70 text-white backdrop-blur-sm">
+                          {(dish.station_name || 'Kitchen').split('&')[0]}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center justify-between">
+                        <h4 className="font-black text-sm text-slate-900 dark:text-white line-clamp-1">{dish.name}</h4>
+                        <span className="text-sm font-black text-emerald-800 dark:text-emerald-400 font-mono">
+                          Rs. {dish.price_lkr}
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 line-clamp-2 font-medium leading-relaxed">
+                        {dish.description}
+                      </p>
+
+                      {/* Recipe Ingredient Breakdown */}
+                      <div className="mt-3 pt-2.5 border-t border-[#e1eae4] dark:border-slate-700 space-y-1">
+                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Recipe Ingredients (BOM):</span>
+                        {dish.stock_details?.map((st, i) => (
+                          <div key={i} className="flex items-center justify-between text-[11px] font-medium">
+                            <span className="text-slate-700 dark:text-slate-300">• {st.ingredient.split('(')[0]}</span>
+                            <span className={`font-mono text-[10px] font-bold ${st.is_spoilage_risk ? 'text-amber-700 dark:text-amber-400' : 'text-slate-500'}`}>
+                              {st.required_kg}kg {st.is_spoilage_risk ? '(Low RSL Target)' : ''}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
                     </div>
 
-                    <div className="flex items-center justify-between">
-                      <h4 className="font-black text-sm text-slate-900 dark:text-white line-clamp-1">{dish.name}</h4>
-                      <span className="text-sm font-black text-emerald-800 dark:text-emerald-400 font-mono">
-                        Rs. {dish.price_lkr}
-                      </span>
-                    </div>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 line-clamp-2 font-medium leading-relaxed">
-                      {dish.description}
-                    </p>
-
-                    {/* Recipe Ingredient Breakdown */}
-                    <div className="mt-3 pt-2.5 border-t border-[#e1eae4] dark:border-slate-700 space-y-1">
-                      <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Recipe Ingredients (BOM):</span>
-                      {dish.stock_details?.map((st, i) => (
-                        <div key={i} className="flex items-center justify-between text-[11px] font-medium">
-                          <span className="text-slate-700 dark:text-slate-300">• {st.ingredient.split('(')[0]}</span>
-                          <span className={`font-mono text-[10px] font-bold ${st.is_spoilage_risk ? 'text-amber-700 dark:text-amber-400' : 'text-slate-500'}`}>
-                            {st.required_kg}kg {st.is_spoilage_risk ? '(Low RSL Target)' : ''}
-                          </span>
-                        </div>
-                      ))}
+                    <div className="pt-2">
+                      <button
+                        onClick={() => handleOpenNewOrder(dish)}
+                        className="w-full py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm transition-all hover:scale-102"
+                      >
+                        <Plus className="h-4 w-4" /> Order This Dish
+                      </button>
                     </div>
                   </div>
+                ))}
+              </div>
 
-                  <div className="pt-2">
+              {/* Pagination Controls */}
+              {totalDishPages > 1 && (
+                <div className="flex items-center justify-between pt-4 border-t border-[#e1eae4] dark:border-slate-800">
+                  <span className="text-xs text-slate-500 font-semibold">
+                    Showing {(currentDishPage - 1) * dishesPerPage + 1} - {Math.min(currentDishPage * dishesPerPage, filteredMenu.length)} of {filteredMenu.length} dishes
+                  </span>
+                  <div className="flex items-center gap-2">
                     <button
-                      onClick={() => {
-                        setSelectedDish(dish);
-                        setShowNewOrderModal(true);
-                      }}
-                      className="w-full py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm transition-all hover:scale-102"
+                      type="button"
+                      disabled={currentDishPage === 1}
+                      onClick={() => setCurrentDishPage(prev => Math.max(1, prev - 1))}
+                      className="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 disabled:opacity-40 cursor-pointer shadow-2xs"
                     >
-                      <Plus className="h-4 w-4" /> Order This Dish
+                      Previous
+                    </button>
+                    <span className="px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300">
+                      Page {currentDishPage} of {totalDishPages}
+                    </span>
+                    <button
+                      type="button"
+                      disabled={currentDishPage >= totalDishPages}
+                      onClick={() => setCurrentDishPage(prev => Math.min(totalDishPages, prev + 1))}
+                      className="px-3 py-1.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold disabled:opacity-40 cursor-pointer shadow-2xs"
+                    >
+                      Next
                     </button>
                   </div>
                 </div>
-              ))}
-            </div>
+              )}
+            </>
           )}
         </div>
       )}
@@ -875,13 +1030,12 @@ export default function OrderManagementDashboard({ onRefresh, isDarkMode, curren
               return (
                 <div
                   key={tbl.table_no}
-                  className={`p-4 rounded-2xl border transition-all flex flex-col justify-between min-h-[140px] shadow-sm ${
-                    isAvailable
-                      ? 'bg-emerald-50/80 dark:bg-emerald-950/30 border-emerald-300 dark:border-emerald-800 text-emerald-950 dark:text-emerald-200'
-                      : isCooking
+                  className={`p-4 rounded-2xl border transition-all flex flex-col justify-between min-h-[140px] shadow-sm ${isAvailable
+                    ? 'bg-emerald-50/80 dark:bg-emerald-950/30 border-emerald-300 dark:border-emerald-800 text-emerald-950 dark:text-emerald-200'
+                    : isCooking
                       ? 'bg-amber-50 dark:bg-amber-950/30 border-amber-300 dark:border-amber-800 text-amber-950 dark:text-amber-200'
                       : 'bg-rose-50 dark:bg-rose-950/30 border-rose-300 dark:border-rose-800 text-rose-950 dark:text-rose-200'
-                  }`}
+                    }`}
                 >
                   <div className="space-y-1">
                     <div className="flex items-center justify-between">
@@ -936,19 +1090,32 @@ export default function OrderManagementDashboard({ onRefresh, isDarkMode, curren
                 Kitchen Display System (KDS) Live Tickets
               </h3>
               <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
-                {isStaff 
-                  ? 'Incoming New Orders & Ongoing In-Prep Cooking Tickets (High-Focus View)' 
+                {isStaff
+                  ? 'Incoming New Orders & Ongoing In-Prep Cooking Tickets (High-Focus View)'
                   : 'Real-time kitchen ticket flow from intake to pass'}
               </p>
             </div>
-            <span className="text-xs px-2.5 py-1 rounded bg-[#f0f5f2] dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold border border-[#d1ded5] dark:border-slate-700">
-              {pendingOrders.length + inPrepOrders.length} Cooking / Incoming
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="text-xs px-2.5 py-1 rounded bg-[#f0f5f2] dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold border border-[#d1ded5] dark:border-slate-700">
+                {pendingOrders.length + inPrepOrders.length} Cooking / Incoming
+              </span>
+
+              {onNavigateModule && (
+                <button
+                  onClick={() => onNavigateModule('kitchen')}
+                  className="hidden sm:flex items-center gap-1.5 px-3 py-1 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-bold text-xs shadow-xs transition-colors cursor-pointer"
+                >
+                  <Users className="h-3.5 w-3.5" />
+                  <span>Open in Kitchen & Staff</span>
+                  <ArrowUpRight className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Ticket Flow Grid (3-Column for Staff: Incoming -> Cooking -> Ready / 4-Column for Admin) */}
           <div className={`grid grid-cols-1 ${isStaff ? 'md:grid-cols-3 gap-5' : 'md:grid-cols-2 lg:grid-cols-4 gap-4'}`}>
-            
+
             {/* Column 1: Pending (New Incoming Orders) */}
             <div className="space-y-3">
               <div className="flex items-center justify-between px-1">
@@ -1143,7 +1310,7 @@ export default function OrderManagementDashboard({ onRefresh, isDarkMode, curren
 
                         <div className="flex items-center justify-between pt-2 border-t border-[#e1eae4] dark:border-slate-700 text-[10px]">
                           <span className="text-slate-500 font-mono font-bold">Rs. {ord.total_amount_lkr}</span>
-                          
+
                           {isDineIn && (
                             isTableOccupied ? (
                               <button
@@ -1176,7 +1343,7 @@ export default function OrderManagementDashboard({ onRefresh, isDarkMode, curren
       {/* ========================================================================= */}
       {currentView === 'orders_ledger' && (
         <div className="glass-panel p-6 rounded-2xl bg-white dark:bg-slate-900 border border-[#d1ded5] dark:border-slate-800 space-y-6 shadow-sm animate-fade-in">
-          
+
           {/* Section 4.1: Historical Daily Sales & Revenue Performance Hub */}
           {showHistoryAnalytics && dailySalesData && (
             <div className="p-5 rounded-2xl bg-[#f4f8f5] dark:bg-slate-950 border border-[#d2e2d7] dark:border-slate-800 space-y-4">
@@ -1205,11 +1372,10 @@ export default function OrderManagementDashboard({ onRefresh, isDarkMode, curren
                     <button
                       key={p.days}
                       onClick={() => setSelectedDaysRange(p.days)}
-                      className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
-                        selectedDaysRange === p.days
-                          ? 'bg-emerald-700 text-white shadow-sm'
-                          : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-                      }`}
+                      className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${selectedDaysRange === p.days
+                        ? 'bg-emerald-700 text-white shadow-sm'
+                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                        }`}
                     >
                       {p.label}
                     </button>
@@ -1257,7 +1423,7 @@ export default function OrderManagementDashboard({ onRefresh, isDarkMode, curren
                 <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300 block">
                   Daily Revenue Performance & Order Breakdown ({selectedDaysRange} Days):
                 </span>
-                
+
                 <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-2.5">
                   {dailySalesData.history.slice(0, selectedDaysRange).map((day, idx) => {
                     const maxRev = Math.max(...dailySalesData.history.map(d => d.revenue_lkr));
@@ -1323,158 +1489,157 @@ export default function OrderManagementDashboard({ onRefresh, isDarkMode, curren
               </div>
             </div>
 
-          {/* Search & Status Filters */}
-          <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 bg-[#f4f8f5] dark:bg-slate-800/80 p-3 rounded-xl border border-[#d7e5dc] dark:border-slate-700">
-            {/* Search */}
-            <div className="sm:col-span-6 relative">
-              <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-500 dark:text-slate-400" />
-              <input
-                type="text"
-                placeholder="Search by Order # (e.g. ORD-1081), Table, or Dish..."
-                value={historySearch}
-                onChange={(e) => setHistorySearch(e.target.value)}
-                className="w-full bg-white dark:bg-slate-900 border border-[#c6d7cd] dark:border-slate-700 rounded-xl pl-9 pr-3 py-2 text-xs text-slate-900 dark:text-white font-medium focus:outline-none focus:border-emerald-600 shadow-sm"
-              />
-            </div>
+            {/* Search & Status Filters */}
+            <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 bg-[#f4f8f5] dark:bg-slate-800/80 p-3 rounded-xl border border-[#d7e5dc] dark:border-slate-700">
+              {/* Search */}
+              <div className="sm:col-span-6 relative">
+                <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-500 dark:text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Search by Order # (e.g. ORD-1081), Table, or Dish..."
+                  value={historySearch}
+                  onChange={(e) => setHistorySearch(e.target.value)}
+                  className="w-full bg-white dark:bg-slate-900 border border-[#c6d7cd] dark:border-slate-700 rounded-xl pl-9 pr-3 py-2 text-xs text-slate-900 dark:text-white font-medium focus:outline-none focus:border-emerald-600 shadow-sm"
+                />
+              </div>
 
-            {/* Status Filter */}
-            <div className="sm:col-span-6 flex items-center gap-1.5 overflow-x-auto no-scrollbar">
-              {[
-                { id: 'all', label: 'All Orders' },
-                { id: 'active', label: 'In Kitchen' },
-                { id: 'ready', label: 'Ready' },
-                { id: 'completed', label: 'Completed' }
-              ].map(st => (
-                <button
-                  key={st.id}
-                  onClick={() => setHistoryStatusFilter(st.id)}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold capitalize transition-all whitespace-nowrap ${
-                    historyStatusFilter === st.id
+              {/* Status Filter */}
+              <div className="sm:col-span-6 flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+                {[
+                  { id: 'all', label: 'All Orders' },
+                  { id: 'active', label: 'In Kitchen' },
+                  { id: 'ready', label: 'Ready' },
+                  { id: 'completed', label: 'Completed' }
+                ].map(st => (
+                  <button
+                    key={st.id}
+                    onClick={() => setHistoryStatusFilter(st.id)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold capitalize transition-all whitespace-nowrap ${historyStatusFilter === st.id
                       ? 'bg-emerald-700 text-white shadow-sm'
                       : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:bg-emerald-50 dark:hover:bg-slate-800 border border-[#d1ded5] dark:border-slate-700'
-                  }`}
-                >
-                  {st.label}
-                </button>
-              ))}
+                      }`}
+                  >
+                    {st.label}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
 
-          {/* Orders History Table */}
-          <div className="overflow-x-auto rounded-xl border border-[#d1ded5] dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm">
-            <table className="w-full text-left text-xs text-slate-900 dark:text-slate-100">
-              <thead className="bg-[#f0f5f2] dark:bg-slate-800 text-slate-800 dark:text-slate-200 uppercase font-bold border-b border-[#d1ded5] dark:border-slate-800">
-                <tr>
-                  <th className="py-3.5 px-4">Order Ref & Time</th>
-                  <th className="py-3.5 px-4">Table / Channel</th>
-                  <th className="py-3.5 px-4">Items Ordered</th>
-                  <th className="py-3.5 px-4">Total Amount</th>
-                  <th className="py-3.5 px-4">Order Status</th>
-                  <th className="py-3.5 px-4">Smart FIFO Batches Deducted</th>
-                  <th className="py-3.5 px-4 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#e6ede8] dark:divide-slate-800">
-                {filteredHistoryOrders.length === 0 ? (
+            {/* Orders History Table */}
+            <div className="overflow-x-auto rounded-xl border border-[#d1ded5] dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm">
+              <table className="w-full text-left text-xs text-slate-900 dark:text-slate-100">
+                <thead className="bg-[#f0f5f2] dark:bg-slate-800 text-slate-800 dark:text-slate-200 uppercase font-bold border-b border-[#d1ded5] dark:border-slate-800">
                   <tr>
-                    <td colSpan="7" className="py-8 text-center text-slate-500 dark:text-slate-400 font-medium">
-                      No matching orders found in ledger.
-                    </td>
+                    <th className="py-3.5 px-4">Order Ref & Time</th>
+                    <th className="py-3.5 px-4">Table / Channel</th>
+                    <th className="py-3.5 px-4">Items Ordered</th>
+                    <th className="py-3.5 px-4">Total Amount</th>
+                    <th className="py-3.5 px-4">Order Status</th>
+                    <th className="py-3.5 px-4">Smart FIFO Batches Deducted</th>
+                    <th className="py-3.5 px-4 text-right">Actions</th>
                   </tr>
-                ) : (
-                  filteredHistoryOrders.map((ord) => {
-                    const isDineIn = ord.order_type === 'Dine-In';
-                    const isTableOccupied = ord.table_status === 'dining' || ord.table_status === 'occupied';
+                </thead>
+                <tbody className="divide-y divide-[#e6ede8] dark:divide-slate-800">
+                  {filteredHistoryOrders.length === 0 ? (
+                    <tr>
+                      <td colSpan="7" className="py-8 text-center text-slate-500 dark:text-slate-400 font-medium">
+                        No matching orders found in ledger.
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredHistoryOrders.map((ord) => {
+                      const isDineIn = ord.order_type === 'Dine-In';
+                      const isTableOccupied = ord.table_status === 'dining' || ord.table_status === 'occupied';
 
-                    return (
-                      <tr key={ord.id} className="hover:bg-[#f9fbf9] dark:hover:bg-slate-800/60 transition-colors">
-                        
-                        {/* Order Number & Timestamp */}
-                        <td className="py-3.5 px-4">
-                          <div className="font-extrabold text-slate-900 dark:text-white flex items-center gap-1.5">
-                            <span>#{ord.order_number}</span>
-                            <span className="text-[10px] font-mono text-slate-400">({ord.id})</span>
-                          </div>
-                          <div className="text-[11px] text-slate-500 dark:text-slate-400 font-medium mt-0.5 flex items-center gap-1">
-                            <Clock className="h-3 w-3" /> Placed at {ord.created_at}
-                          </div>
-                        </td>
+                      return (
+                        <tr key={ord.id} className="hover:bg-[#f9fbf9] dark:hover:bg-slate-800/60 transition-colors">
 
-                        {/* Table / Order Channel */}
-                        <td className="py-3.5 px-4">
-                          <div className="font-bold text-slate-900 dark:text-white">{ord.table_no}</div>
-                          <div className="text-[11px] text-slate-500 dark:text-slate-400 font-medium mt-0.5">
-                            {ord.order_type} • <span className="text-emerald-700 dark:text-emerald-400 font-semibold">{ord.station_name.split('&')[0]}</span>
-                          </div>
-                        </td>
+                          {/* Order Number & Timestamp */}
+                          <td className="py-3.5 px-4">
+                            <div className="font-extrabold text-slate-900 dark:text-white flex items-center gap-1.5">
+                              <span>#{ord.order_number}</span>
+                              <span className="text-[10px] font-mono text-slate-400">({ord.id})</span>
+                            </div>
+                            <div className="text-[11px] text-slate-500 dark:text-slate-400 font-medium mt-0.5 flex items-center gap-1">
+                              <Clock className="h-3 w-3" /> Placed at {ord.created_at}
+                            </div>
+                          </td>
 
-                        {/* Items Summary */}
-                        <td className="py-3.5 px-4 max-w-xs">
-                          <div className="space-y-0.5">
-                            {ord.items.map((it, i) => (
-                              <div key={i} className="text-xs font-bold text-slate-800 dark:text-slate-200">
-                                {it.quantity}x {it.name}
-                              </div>
-                            ))}
-                          </div>
-                        </td>
+                          {/* Table / Order Channel */}
+                          <td className="py-3.5 px-4">
+                            <div className="font-bold text-slate-900 dark:text-white">{ord.table_no}</div>
+                            <div className="text-[11px] text-slate-500 dark:text-slate-400 font-medium mt-0.5">
+                              {ord.order_type} • <span className="text-emerald-700 dark:text-emerald-400 font-semibold">{ord.station_name.split('&')[0]}</span>
+                            </div>
+                          </td>
 
-                        {/* Total Amount in LKR */}
-                        <td className="py-3.5 px-4 font-mono font-black text-sm text-emerald-800 dark:text-emerald-400">
-                          Rs. {ord.total_amount_lkr.toLocaleString()}
-                        </td>
-
-                        {/* Order Status */}
-                        <td className="py-3.5 px-4">
-                          {renderOrderStatusBadge(ord.status)}
-                        </td>
-
-                        {/* Smart FIFO Deductions */}
-                        <td className="py-3.5 px-4 max-w-xs">
-                          {ord.ingredients_deducted?.length > 0 ? (
-                            <div className="space-y-0.5 text-[11px]">
-                              {ord.ingredients_deducted.map((ing, i) => (
-                                <div key={i} className="text-slate-600 dark:text-slate-300 font-medium">
-                                  • {ing.amount_kg}kg {ing.item.split('(')[0]} <span className="text-slate-400 font-mono text-[10px]">({ing.batch.split(' ')[0]})</span>
+                          {/* Items Summary */}
+                          <td className="py-3.5 px-4 max-w-xs">
+                            <div className="space-y-0.5">
+                              {ord.items.map((it, i) => (
+                                <div key={i} className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                                  {it.quantity}x {it.name}
                                 </div>
                               ))}
                             </div>
-                          ) : (
-                            <span className="text-slate-400 text-xs">Standard Stock</span>
-                          )}
-                        </td>
+                          </td>
 
-                        {/* Actions */}
-                        <td className="py-3.5 px-4 text-right">
-                          <div className="flex items-center justify-end gap-2">
-                            <button
-                              onClick={() => setSelectedReceiptOrder(ord)}
-                              className="px-3 py-1.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all hover:scale-105"
-                              title="Generate Customer Bill & Print Receipt"
-                            >
-                              <Printer className="h-3.5 w-3.5" />
-                              <span>Bill & Print</span>
-                            </button>
+                          {/* Total Amount in LKR */}
+                          <td className="py-3.5 px-4 font-mono font-black text-sm text-emerald-800 dark:text-emerald-400">
+                            Rs. {ord.total_amount_lkr.toLocaleString()}
+                          </td>
 
-                            {isDineIn && isTableOccupied && (
-                              <button
-                                onClick={() => handleFreeTable(ord.table_no)}
-                                className="px-2.5 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-[11px] font-bold shadow-sm transition-colors"
-                                title="Free Table"
-                              >
-                                Free Table
-                              </button>
+                          {/* Order Status */}
+                          <td className="py-3.5 px-4">
+                            {renderOrderStatusBadge(ord.status)}
+                          </td>
+
+                          {/* Smart FIFO Deductions */}
+                          <td className="py-3.5 px-4 max-w-xs">
+                            {ord.ingredients_deducted?.length > 0 ? (
+                              <div className="space-y-0.5 text-[11px]">
+                                {ord.ingredients_deducted.map((ing, i) => (
+                                  <div key={i} className="text-slate-600 dark:text-slate-300 font-medium">
+                                    • {ing.amount_kg}kg {ing.item.split('(')[0]} <span className="text-slate-400 font-mono text-[10px]">({ing.batch.split(' ')[0]})</span>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <span className="text-slate-400 text-xs">Standard Stock</span>
                             )}
-                          </div>
-                        </td>
+                          </td>
 
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
+                          {/* Actions */}
+                          <td className="py-3.5 px-4 text-right">
+                            <div className="flex items-center justify-end gap-2">
+                              <button
+                                onClick={() => setSelectedReceiptOrder(ord)}
+                                className="px-3 py-1.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all hover:scale-105"
+                                title="Generate Customer Bill & Print Receipt"
+                              >
+                                <Printer className="h-3.5 w-3.5" />
+                                <span>Bill & Print</span>
+                              </button>
+
+                              {isDineIn && isTableOccupied && (
+                                <button
+                                  onClick={() => handleFreeTable(ord.table_no)}
+                                  className="px-2.5 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-[11px] font-bold shadow-sm transition-colors"
+                                  title="Free Table"
+                                >
+                                  Free Table
+                                </button>
+                              )}
+                            </div>
+                          </td>
+
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
 
           </div>
         </div>
@@ -1486,7 +1651,7 @@ export default function OrderManagementDashboard({ onRefresh, isDarkMode, curren
       {selectedReceiptOrder && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white dark:bg-slate-900 border border-[#d1ded5] dark:border-slate-800 rounded-3xl p-6 w-full max-w-lg shadow-2xl space-y-5 animate-fade-in max-h-[95vh] overflow-y-auto">
-            
+
             {/* Modal Actions Header */}
             <div className="flex items-center justify-between pb-3 border-b border-[#e1eae4] dark:border-slate-800">
               <div className="flex items-center gap-2">
@@ -1498,7 +1663,7 @@ export default function OrderManagementDashboard({ onRefresh, isDarkMode, curren
                   <span className="text-[11px] text-slate-500 font-medium">Order #{selectedReceiptOrder.order_number} • POS Terminal</span>
                 </div>
               </div>
-              
+
               <div className="flex items-center gap-2">
                 <button
                   onClick={handlePrintReceipt}
@@ -1517,7 +1682,7 @@ export default function OrderManagementDashboard({ onRefresh, isDarkMode, curren
             </div>
 
             {/* PRINTABLE THERMAL RECEIPT SLIP CONTAINER */}
-            <div 
+            <div
               id="printable-bill-slip"
               className="p-5 rounded-2xl bg-white dark:bg-slate-950 border border-dashed border-slate-300 dark:border-slate-800 shadow-inner space-y-4 font-mono text-slate-900 dark:text-slate-100"
             >
@@ -1606,11 +1771,10 @@ export default function OrderManagementDashboard({ onRefresh, isDarkMode, curren
                       key={pm.id}
                       type="button"
                       onClick={() => setPaymentMethod(pm.id)}
-                      className={`p-2 rounded-xl text-xs font-bold border transition-all flex items-center justify-center gap-1.5 ${
-                        paymentMethod === pm.id
-                          ? 'bg-emerald-700 text-white border-emerald-800 shadow-sm'
-                          : 'bg-slate-50 dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-800 hover:bg-slate-100'
-                      }`}
+                      className={`p-2 rounded-xl text-xs font-bold border transition-all flex items-center justify-center gap-1.5 ${paymentMethod === pm.id
+                        ? 'bg-emerald-700 text-white border-emerald-800 shadow-sm'
+                        : 'bg-slate-50 dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-800 hover:bg-slate-100'
+                        }`}
                     >
                       {pm.icon}
                       <span>{pm.label}</span>
@@ -1677,160 +1841,435 @@ export default function OrderManagementDashboard({ onRefresh, isDarkMode, curren
       {/* ========================================================================= */}
       {/* PLACE NEW CUSTOMER ORDER MODAL                                            */}
       {/* ========================================================================= */}
-      {showNewOrderModal && selectedDish && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-slate-900 border border-[#d1ded5] dark:border-slate-800 rounded-2xl p-6 w-full max-w-lg shadow-2xl space-y-4 animate-fade-in max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between pb-3 border-b border-[#e1eae4] dark:border-slate-800">
-              <div className="flex items-center gap-2">
-                <ShoppingBag className="h-5 w-5 text-emerald-700 dark:text-emerald-400" />
-                <h3 className="text-base font-extrabold text-slate-900 dark:text-white">Place New Customer Order</h3>
-              </div>
-              <button
-                onClick={() => setShowNewOrderModal(false)}
-                className="p-1 rounded-lg text-slate-400 hover:text-slate-900 dark:hover:text-white"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
+      {showNewOrderModal && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-5 overflow-y-auto">
+          <div className="bg-white dark:bg-slate-900 border border-[#d1ded5] dark:border-slate-800 rounded-3xl w-full max-w-5xl shadow-2xl overflow-hidden flex flex-col my-auto h-[90vh] max-h-[860px] animate-fade-in">
 
-            <form onSubmit={handleCreateOrder} className="space-y-4 text-xs">
-              
-              {/* Selected Dish Card Summary */}
-              <div className="p-3.5 rounded-xl bg-[#f8faf9] dark:bg-slate-800 border border-[#d1ded5] dark:border-slate-700 flex items-center gap-3">
-                <img
-                  src={selectedDish.image_url}
-                  alt={selectedDish.name}
-                  className="h-14 w-14 rounded-lg object-cover flex-shrink-0"
-                  onError={(e) => {
-                    if (selectedDish.image_url && !e.currentTarget.src.includes(':8000') && selectedDish.image_url.startsWith('/dishes/')) {
-                      e.currentTarget.src = `http://localhost:8000${selectedDish.image_url}`;
-                    }
-                  }}
-                />
-                <div>
-                  <h4 className="font-extrabold text-sm text-slate-900 dark:text-white">{selectedDish.name}</h4>
-                  <span className="text-xs font-bold text-emerald-800 dark:text-emerald-400 font-mono">
-                    Rs. {selectedDish.price_lkr} • {selectedDish.station_name}
-                  </span>
+            {/* Modal Header */}
+            <div className="px-6 py-4 border-b border-[#e1eae4] dark:border-slate-800 flex items-center justify-between bg-[#f8faf9] dark:bg-slate-900/90 flex-shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-2xl bg-emerald-100 dark:bg-emerald-950/70 border border-emerald-300 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300">
+                  <ShoppingBag className="h-5 w-5" />
                 </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-slate-800 dark:text-slate-200 font-bold block mb-1">Order Channel</label>
-                  <select
-                    value={orderType}
-                    onChange={(e) => setOrderType(e.target.value)}
-                    className="w-full bg-[#f8faf9] dark:bg-slate-800 border border-[#c6d7cd] dark:border-slate-700 rounded-xl px-3 py-2 text-slate-900 dark:text-white font-bold focus:outline-none focus:border-emerald-600"
-                  >
-                    <option value="Dine-In">Dine-In (Select Table Below)</option>
-                    <option value="Takeout">Takeaway / Takeout</option>
-                    <option value="Delivery">Delivery Platform</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="text-slate-800 dark:text-slate-200 font-bold block mb-1">Selected Table</label>
-                  <select
-                    disabled={orderType !== 'Dine-In'}
-                    value={tableNumber}
-                    onChange={(e) => setTableNumber(e.target.value)}
-                    className="w-full bg-[#f8faf9] dark:bg-slate-800 border border-[#c6d7cd] dark:border-slate-700 rounded-xl px-3 py-2 text-slate-900 dark:text-white font-bold focus:outline-none focus:border-emerald-600 disabled:opacity-50"
-                  >
-                    {tables.map(t => (
-                      <option key={t.table_no} value={t.table_no}>
-                        {t.table_no} ({t.status === 'available' ? '✓ Free' : 'Occupied'})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              {/* Free Tables Quick Chips */}
-              {orderType === 'Dine-In' && availableTables.length > 0 && (
-                <div>
-                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Quick Select Available Free Tables:</span>
-                  <div className="flex flex-wrap gap-1.5">
-                    {availableTables.map(tbl => (
-                      <button
-                        key={tbl.table_no}
-                        type="button"
-                        onClick={() => setTableNumber(tbl.table_no)}
-                        className={`px-2.5 py-1 rounded-lg font-bold text-xs border transition-all ${
-                          tableNumber === tbl.table_no
-                            ? 'bg-emerald-700 text-white border-emerald-800 shadow-sm'
-                            : 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-900 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100'
-                        }`}
-                      >
-                        {tbl.table_no}
-                      </button>
-                    ))}
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-base font-extrabold text-slate-900 dark:text-white">Place New Customer Order</h3>
+                    <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                      Multi-Item POS Builder
+                    </span>
                   </div>
-                </div>
-              )}
-
-              <div>
-                <div className="flex justify-between font-bold mb-1">
-                  <span className="text-slate-800 dark:text-slate-200">Portion Quantity:</span>
-                  <span className="text-emerald-800 dark:text-emerald-400 text-sm">{portionCount} portions (Total: Rs. {selectedDish.price_lkr * portionCount})</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  {[1, 2, 3, 4, 5].map(n => (
-                    <button
-                      key={n}
-                      type="button"
-                      onClick={() => setPortionCount(n)}
-                      className={`flex-1 py-1.5 rounded-lg font-bold border transition-all ${
-                        portionCount === n
-                          ? 'bg-emerald-700 text-white border-emerald-800 shadow-sm'
-                          : 'bg-[#f8faf9] dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-[#d1ded5] dark:border-slate-700 hover:bg-slate-100'
-                      }`}
-                    >
-                      {n}
-                    </button>
-                  ))}
+                  <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
+                    Browse menu categories, add multiple dishes, assign tables & trigger automated Smart FIFO kitchen dispatch
+                  </p>
                 </div>
               </div>
 
-              <div>
-                <label className="text-slate-800 dark:text-slate-200 font-bold block mb-1">Kitchen / Chef Notes</label>
-                <textarea
-                  rows="2"
-                  value={customerNote}
-                  onChange={(e) => setCustomerNote(e.target.value)}
-                  placeholder="e.g. Less oil, extra chili on the side, allergies..."
-                  className="w-full bg-[#f8faf9] dark:bg-slate-800 border border-[#c6d7cd] dark:border-slate-700 rounded-xl px-3 py-2 text-slate-900 dark:text-white font-medium focus:outline-none focus:border-emerald-600"
-                />
-              </div>
-
-              {/* Smart FIFO Ingredient Deduction Preview */}
-              <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800/60 space-y-1">
-                <span className="font-bold text-emerald-950 dark:text-emerald-300 flex items-center gap-1.5 text-[11px]">
-                  <Sparkles className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
-                  Smart FIFO Auto-Deduction preview:
-                </span>
-                <p className="text-[10px] text-slate-600 dark:text-slate-300 leading-relaxed font-medium">
-                  {selectedDish.recipe_bom.map(b => `${(b.required_kg * portionCount).toFixed(2)}kg ${b.ingredient_name.split('(')[0]}`).join(' + ')} will be automatically deducted from cold storage batches with lowest remaining shelf-life.
-                </p>
-              </div>
-
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-[#e1eae4] dark:border-slate-800">
+              <div className="flex items-center gap-3">
+                {orderCart.length > 0 && (
+                  <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 text-xs font-bold text-emerald-900 dark:text-emerald-300">
+                    <ShoppingCart className="h-4 w-4 text-emerald-700 dark:text-emerald-400" />
+                    <span>{cartTotalCount} item{cartTotalCount > 1 ? 's' : ''} • Rs. {cartTotalAmount.toLocaleString()}</span>
+                  </div>
+                )}
                 <button
                   type="button"
                   onClick={() => setShowNewOrderModal(false)}
-                  className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold"
+                  className="p-2 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Two-Column Body */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 divide-y lg:divide-y-0 lg:divide-x divide-[#e1eae4] dark:divide-slate-800 flex-1 min-h-0 overflow-hidden">
+
+              {/* Column 1: Menu Catalog & In-Modal Category Browser (7 Cols) */}
+              <div className="col-span-12 lg:col-span-7 flex flex-col min-h-0 overflow-hidden bg-[#fafcfb] dark:bg-slate-950/40 p-4 sm:p-5 space-y-3">
+                <div className="flex-shrink-0 flex items-center justify-between">
+                  <span className="text-xs font-black uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                    <Utensils className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                    Browse & Add Items ({modalFilteredMenu.length})
+                  </span>
+                  <span className="text-[11px] font-medium text-slate-400">
+                    Click + to add dishes into cart
+                  </span>
+                </div>
+
+                {/* In-Modal Category Tabs */}
+                <div className="flex-shrink-0 w-full overflow-x-auto no-scrollbar py-1">
+                  <div className="flex items-center gap-2 min-w-max">
+                    {MODAL_CATEGORIES.map(cat => {
+                      const count = cat.id === 'all'
+                        ? menu.length
+                        : menu.filter(d => d.category?.toLowerCase().includes(cat.id.toLowerCase())).length;
+                      return (
+                        <button
+                          key={cat.id}
+                          type="button"
+                          onClick={() => setModalCategory(cat.id)}
+                          className={`px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-2 flex-shrink-0 ${modalCategory === cat.id
+                            ? 'bg-emerald-700 text-white shadow-sm'
+                            : 'bg-[#f0f5f2] dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-emerald-50 dark:hover:bg-slate-700 border border-[#d1ded5] dark:border-slate-700'
+                            }`}
+                        >
+                          <span>{cat.label}</span>
+                          <span className={`text-[10px] px-2 py-0.5 rounded-full font-extrabold ${modalCategory === cat.id ? 'bg-emerald-800 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
+                            }`}>
+                            {count}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* In-Modal Quick Search */}
+                <div className="flex-shrink-0 relative">
+                  <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-slate-400" />
+                  <input
+                    type="text"
+                    placeholder="Quick search dishes to add (e.g. Salmon, Pizza, Kottu, Salad)..."
+                    value={modalSearch}
+                    onChange={(e) => setModalSearch(e.target.value)}
+                    className="w-full bg-white dark:bg-slate-800 border border-[#d1ded5] dark:border-slate-700 rounded-xl pl-9 pr-8 py-2 text-xs text-slate-900 dark:text-white font-medium focus:outline-none focus:border-emerald-600 shadow-sm"
+                  />
+                  {modalSearch && (
+                    <button
+                      type="button"
+                      onClick={() => setModalSearch("")}
+                      className="absolute right-2.5 top-2 p-1 text-slate-400 hover:text-slate-600 dark:hover:text-white"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                </div>
+
+                {/* Dish Catalog Scrollable List */}
+                <div className="flex-1 min-h-0 overflow-y-auto space-y-2 pr-1">
+                  {modalFilteredMenu.length === 0 ? (
+                    <div className="p-8 text-center text-slate-400 space-y-2">
+                      <Utensils className="h-8 w-8 mx-auto text-slate-300 dark:text-slate-600" />
+                      <p className="text-xs font-bold">No dishes found in category "{modalCategory}"</p>
+                      <button
+                        type="button"
+                        onClick={() => { setModalCategory('all'); setModalSearch(''); }}
+                        className="text-xs text-emerald-700 font-bold hover:underline"
+                      >
+                        Reset filters
+                      </button>
+                    </div>
+                  ) : (
+                    modalFilteredMenu.map(dish => {
+                      const inCart = orderCart.find(it => it.dish.id === dish.id);
+                      return (
+                        <div
+                          key={dish.id}
+                          className={`p-3 rounded-2xl border transition-all flex items-center justify-between gap-3 ${inCart
+                            ? 'bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-300 dark:border-emerald-800/80 shadow-xs'
+                            : 'bg-white dark:bg-slate-900 border-[#d1ded5] dark:border-slate-800 hover:border-emerald-400 dark:hover:border-slate-700'
+                            }`}
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            <img
+                              src={dish.image_url}
+                              alt={dish.name}
+                              className="h-14 w-14 rounded-xl object-cover flex-shrink-0 border border-[#e1eae4] dark:border-slate-800"
+                              onError={(e) => {
+                                if (dish.image_url && !e.currentTarget.src.includes(':8000') && dish.image_url.startsWith('/dishes/')) {
+                                  e.currentTarget.src = `http://localhost:8000${dish.image_url}`;
+                                }
+                              }}
+                            />
+                            <div className="min-w-0">
+                              <h5 className="font-extrabold text-xs text-slate-900 dark:text-white truncate">
+                                {dish.name}
+                              </h5>
+                              <div className="flex items-center gap-2 mt-0.5">
+                                <span className="font-mono font-black text-xs text-emerald-800 dark:text-emerald-400">
+                                  Rs. {dish.price_lkr.toLocaleString()}
+                                </span>
+                                <span className="text-[10px] text-slate-400 font-semibold">•</span>
+                                <span className="text-[10px] font-bold text-slate-500 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.2 rounded">
+                                  {dish.station_name || dish.category}
+                                </span>
+                              </div>
+                              <p className="text-[11px] text-slate-500 line-clamp-1 mt-0.5 font-medium">
+                                {dish.description}
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            {inCart ? (
+                              <div className="flex items-center gap-1.5">
+                                <span className="px-2 py-1 rounded-lg bg-emerald-100 dark:bg-emerald-950 text-emerald-900 dark:text-emerald-300 text-[11px] font-bold border border-emerald-300 dark:border-emerald-800">
+                                  {inCart.quantity} in order
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleAddToCart(dish)}
+                                  className="p-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white shadow-sm transition-all hover:scale-105"
+                                  title="Add another portion"
+                                >
+                                  <Plus className="h-3.5 w-3.5" />
+                                </button>
+                              </div>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => handleAddToCart(dish)}
+                                className="px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-700 text-emerald-900 hover:text-white dark:bg-emerald-950/60 dark:hover:bg-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700 text-xs font-bold flex items-center gap-1 transition-all hover:scale-102"
+                              >
+                                <Plus className="h-3.5 w-3.5" /> Add
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+
+              {/* Column 2: Order Cart & Submission Panel (5 Cols) */}
+              <div className="col-span-12 lg:col-span-5 flex flex-col min-h-0 overflow-y-auto p-4 sm:p-5 space-y-4 bg-white dark:bg-slate-900">
+
+                {/* Section Header */}
+                <div className="flex items-center justify-between pb-2 border-b border-[#e1eae4] dark:border-slate-800">
+                  <div className="flex items-center gap-2">
+                    <ShoppingCart className="h-4 w-4 text-emerald-700 dark:text-emerald-400" />
+                    <h4 className="font-extrabold text-xs text-slate-900 dark:text-white uppercase tracking-wider">
+                      Selected Order Dishes ({orderCart.length})
+                    </h4>
+                  </div>
+                  {orderCart.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setOrderCart([])}
+                      className="text-[11px] text-red-600 dark:text-red-400 font-bold hover:underline"
+                    >
+                      Clear All
+                    </button>
+                  )}
+                </div>
+
+                {/* Cart Items List */}
+                <div className="space-y-2 max-h-[24vh] overflow-y-auto pr-1">
+                  {orderCart.length === 0 ? (
+                    <div className="p-6 rounded-2xl bg-[#f8faf9] dark:bg-slate-800/40 border border-dashed border-[#c6d7cd] dark:border-slate-700 text-center space-y-2">
+                      <Utensils className="h-7 w-7 text-slate-400 mx-auto" />
+                      <p className="text-xs font-bold text-slate-700 dark:text-slate-300">Your order cart is empty</p>
+                      <p className="text-[11px] text-slate-500 leading-relaxed">
+                        Select any dish from the left category menu (e.g. Pizza, Seafood, Beverage) to add multiple items to this order.
+                      </p>
+                    </div>
+                  ) : (
+                    orderCart.map(item => (
+                      <div
+                        key={item.dish.id}
+                        className="p-2.5 rounded-xl bg-[#f8faf9] dark:bg-slate-800/90 border border-[#d1ded5] dark:border-slate-700 flex items-center justify-between gap-2.5"
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <img
+                            src={item.dish.image_url}
+                            alt={item.dish.name}
+                            className="h-10 w-10 rounded-lg object-cover flex-shrink-0"
+                            onError={(e) => {
+                              if (item.dish.image_url && !e.currentTarget.src.includes(':8000') && item.dish.image_url.startsWith('/dishes/')) {
+                                e.currentTarget.src = `http://localhost:8000${item.dish.image_url}`;
+                              }
+                            }}
+                          />
+                          <div className="min-w-0">
+                            <h5 className="font-extrabold text-xs text-slate-900 dark:text-white truncate">
+                              {item.dish.name}
+                            </h5>
+                            <span className="text-[10px] font-bold text-slate-500 block">
+                              Rs. {item.dish.price_lkr.toLocaleString()} ea
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          {/* Stepper */}
+                          <div className="flex items-center border border-[#c6d7cd] dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 overflow-hidden shadow-xs">
+                            <button
+                              type="button"
+                              onClick={() => handleUpdateCartQuantity(item.dish.id, item.quantity - 1)}
+                              className="px-2 py-1 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                              title="Decrease"
+                            >
+                              <Minus className="h-3 w-3" />
+                            </button>
+                            <span className="px-2 font-mono font-bold text-xs text-slate-900 dark:text-white min-w-[18px] text-center">
+                              {item.quantity}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => handleUpdateCartQuantity(item.dish.id, item.quantity + 1)}
+                              className="px-2 py-1 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                              title="Increase"
+                            >
+                              <Plus className="h-3 w-3" />
+                            </button>
+                          </div>
+
+                          <div className="text-right min-w-[62px]">
+                            <span className="text-xs font-mono font-black text-slate-900 dark:text-white block">
+                              Rs. {(item.dish.price_lkr * item.quantity).toLocaleString()}
+                            </span>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveFromCart(item.dish.id)}
+                            className="p-1 rounded text-slate-400 hover:text-red-600 dark:hover:text-red-400 transition-colors"
+                            title="Remove item"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                {/* Channel & Table Selection */}
+                <div className="grid grid-cols-2 gap-2.5 pt-1">
+                  <div>
+                    <label className="text-slate-800 dark:text-slate-200 font-bold block mb-1 text-[11px]">Order Channel</label>
+                    <select
+                      value={orderType}
+                      onChange={(e) => setOrderType(e.target.value)}
+                      className="w-full bg-[#f8faf9] dark:bg-slate-800 border border-[#c6d7cd] dark:border-slate-700 rounded-xl px-2.5 py-1.5 text-xs text-slate-900 dark:text-white font-bold focus:outline-none focus:border-emerald-600"
+                    >
+                      <option value="Dine-In">Dine-In (Table)</option>
+                      <option value="Takeout">Takeaway / Takeout</option>
+                      <option value="Delivery">Delivery Platform</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="text-slate-800 dark:text-slate-200 font-bold block mb-1 text-[11px]">Assigned Table</label>
+                    <select
+                      disabled={orderType !== 'Dine-In'}
+                      value={tableNumber}
+                      onChange={(e) => setTableNumber(e.target.value)}
+                      className="w-full bg-[#f8faf9] dark:bg-slate-800 border border-[#c6d7cd] dark:border-slate-700 rounded-xl px-2.5 py-1.5 text-xs text-slate-900 dark:text-white font-bold focus:outline-none focus:border-emerald-600 disabled:opacity-50"
+                    >
+                      {tables.map(t => (
+                        <option key={t.table_no} value={t.table_no}>
+                          {t.table_no} ({t.status === 'available' ? '✓ Free' : 'Occupied'})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Free Tables Quick Chips */}
+                {orderType === 'Dine-In' && availableTables.length > 0 && (
+                  <div>
+                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                      Quick Free Table Select:
+                    </span>
+                    <div className="flex flex-wrap gap-1">
+                      {availableTables.slice(0, 8).map(tbl => (
+                        <button
+                          key={tbl.table_no}
+                          type="button"
+                          onClick={() => setTableNumber(tbl.table_no)}
+                          className={`px-2 py-0.5 rounded-lg font-bold text-[11px] border transition-all ${tableNumber === tbl.table_no
+                            ? 'bg-emerald-700 text-white border-emerald-800 shadow-sm'
+                            : 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-900 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100'
+                            }`}
+                        >
+                          {tbl.table_no}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Kitchen / Chef Notes */}
+                <div>
+                  <label className="text-slate-800 dark:text-slate-200 font-bold block mb-1 text-[11px]">
+                    Kitchen / Chef Notes
+                  </label>
+                  <textarea
+                    rows="2"
+                    value={customerNote}
+                    onChange={(e) => setCustomerNote(e.target.value)}
+                    placeholder="e.g. Less oil, extra chili on the side, allergic to nuts..."
+                    className="w-full bg-[#f8faf9] dark:bg-slate-800 border border-[#c6d7cd] dark:border-slate-700 rounded-xl px-2.5 py-1.5 text-xs text-slate-900 dark:text-white font-medium focus:outline-none focus:border-emerald-600"
+                  />
+                </div>
+
+                {/* Dynamic Combined Smart FIFO Deduction Preview */}
+                <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800/60 space-y-1">
+                  <span className="font-bold text-emerald-950 dark:text-emerald-300 flex items-center gap-1.5 text-[11px]">
+                    <Sparkles className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                    Smart FIFO Auto-Deductions ({orderCart.length} dishes):
+                  </span>
+                  <p className="text-[10px] text-slate-600 dark:text-slate-300 leading-relaxed font-medium">
+                    {Object.keys(combinedFifoDeductions).length > 0 ? (
+                      <>
+                        {Object.entries(combinedFifoDeductions).map(([name, kg]) => `${kg.toFixed(2)}kg ${name}`).join(' + ')} will be automatically deducted from cold storage batches with lowest remaining shelf-life.
+                      </>
+                    ) : (
+                      "Select dishes above to calculate automated Smart FIFO cold storage deductions."
+                    )}
+                  </p>
+                </div>
+
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="px-6 py-4 border-t border-[#e1eae4] dark:border-slate-800 bg-[#f8faf9] dark:bg-slate-900/90 flex flex-col sm:flex-row items-center justify-between gap-3 flex-shrink-0">
+              <div className="flex items-center gap-3">
+                <div>
+                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
+                    Order Total ({cartTotalCount} portions):
+                  </span>
+                  <span className="text-xl font-black text-slate-900 dark:text-white font-mono">
+                    Rs. {cartTotalAmount.toLocaleString()}
+                  </span>
+                </div>
+                {orderCart.length > 0 && (
+                  <span className="text-xs text-emerald-700 dark:text-emerald-400 font-bold bg-emerald-50 dark:bg-emerald-950/60 px-2.5 py-1 rounded-lg border border-emerald-200 dark:border-emerald-800">
+                    {orderCart.length} distinct item{orderCart.length > 1 ? 's' : ''}
+                  </span>
+                )}
+              </div>
+
+              <div className="flex items-center gap-2.5 w-full sm:w-auto">
+                <button
+                  type="button"
+                  onClick={() => setShowNewOrderModal(false)}
+                  className="flex-1 sm:flex-initial px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold text-xs transition-colors"
                 >
                   Cancel
                 </button>
                 <button
-                  type="submit"
-                  disabled={submittingOrder}
-                  className="px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold shadow-md shadow-emerald-700/20 flex items-center gap-1.5"
+                  type="button"
+                  onClick={handleCreateOrder}
+                  disabled={submittingOrder || orderCart.length === 0}
+                  className="flex-1 sm:flex-initial px-5 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-white font-bold text-xs shadow-md shadow-emerald-700/20 flex items-center justify-center gap-2 transition-all hover:scale-102"
                 >
-                  <Check className="h-4 w-4" /> Confirm & Send to Kitchen
+                  {submittingOrder ? (
+                    <>
+                      <RefreshCw className="h-4 w-4 animate-spin" /> Placing Order...
+                    </>
+                  ) : (
+                    <>
+                      <Check className="h-4 w-4" /> Confirm & Send to Kitchen ({orderCart.length})
+                    </>
+                  )}
                 </button>
               </div>
-            </form>
+            </div>
+
           </div>
         </div>
       )}

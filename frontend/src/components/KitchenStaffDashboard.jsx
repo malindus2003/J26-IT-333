@@ -1,9 +1,20 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Clock, Flame, Award, AlertTriangle, ArrowRight, ShieldCheck, CheckCircle2, TrendingUp, Utensils, X, Lock, LogIn, Key, Smartphone, Coffee, ChefHat, Send, CheckSquare, Pizza, Plus, Minus, Hash, Search, Cpu, Sparkles, Database, Layers } from 'lucide-react';
+import { 
+  Users, Clock, Flame, Award, AlertTriangle, ArrowRight, ShieldCheck, CheckCircle2, 
+  TrendingUp, Utensils, X, Lock, LogIn, Key, Smartphone, Coffee, ChefHat, Send, 
+  CheckSquare, Pizza, Plus, Minus, Hash, Search, Cpu, Sparkles, Database, Layers,
+  CheckCheck, Armchair, PackageCheck, RefreshCw, Filter, ArrowUpRight, ShoppingBag, Check
+} from 'lucide-react';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, Legend, ReferenceArea } from 'recharts';
 import axios from 'axios';
 
-export default function KitchenStaffDashboard({ isDarkMode, currentRole = 'admin' }) {
+export default function KitchenStaffDashboard({ 
+  isDarkMode, 
+  currentRole = 'admin', 
+  refreshTrigger, 
+  onRefresh, 
+  onNavigateModule 
+}) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -41,6 +52,183 @@ export default function KitchenStaffDashboard({ isDarkMode, currentRole = 'admin
   const isCriticalEfficiency = efficiencyNum < 50;
 
   const [directives, setDirectives] = useState([]);
+
+  // --- Real-Time Orders & KDS Live Sync State (Linked with Orders & POS) ---
+  const [liveOrders, setLiveOrders] = useState([]);
+  const [ordersLoading, setOrdersLoading] = useState(false);
+  const [lastOrderSyncTime, setLastOrderSyncTime] = useState("");
+  const [activeKitchenTab, setActiveKitchenTab] = useState('all'); // Default to Full Kitchen Ops (All Views)
+  const [kdsSearchQuery, setKdsSearchQuery] = useState("");
+  const [kdsStationFilter, setKdsStationFilter] = useState("all");
+  const [clearedCompletedIds, setClearedCompletedIds] = useState(() => {
+    try {
+      const saved = localStorage.getItem('kds_cleared_completed_orders');
+      return saved ? new Set(JSON.parse(saved)) : new Set();
+    } catch (e) {
+      return new Set();
+    }
+  });
+
+  const fetchLiveOrders = async () => {
+    try {
+      setOrdersLoading(true);
+      const res = await axios.get("http://localhost:8000/api/orders");
+      if (res?.data?.orders) {
+        setLiveOrders(res.data.orders);
+        setLastOrderSyncTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+      }
+    } catch (err) {
+      console.warn("Could not fetch live orders from /api/orders:", err);
+    } finally {
+      setOrdersLoading(false);
+    }
+  };
+
+  const handleRefreshTickets = async () => {
+    try {
+      setOrdersLoading(true);
+      // Dismiss completed orders on backend
+      try {
+        await axios.post("http://localhost:8000/api/orders/clear-completed");
+      } catch (postErr) {
+        console.warn("Could not post to /api/orders/clear-completed:", postErr);
+      }
+
+      // Collect all currently completed orders to clear them immediately from KDS view
+      const completedIds = liveOrders.filter(o => o.status === 'completed').map(o => o.id);
+      if (completedIds.length > 0) {
+        setClearedCompletedIds(prev => {
+          const updated = new Set([...prev, ...completedIds]);
+          try {
+            localStorage.setItem('kds_cleared_completed_orders', JSON.stringify(Array.from(updated)));
+          } catch (e) {}
+          return updated;
+        });
+      }
+
+      // Fetch fresh orders
+      const res = await axios.get("http://localhost:8000/api/orders");
+      if (res?.data?.orders) {
+        setLiveOrders(res.data.orders);
+        setLastOrderSyncTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+      }
+      setDismissedToast("✅ Tickets refreshed — Completed orders cleared from KDS.");
+      setTimeout(() => setDismissedToast(""), 3500);
+      if (onRefresh) onRefresh();
+    } catch (err) {
+      console.error("Error refreshing tickets:", err);
+    } finally {
+      setOrdersLoading(false);
+    }
+  };
+
+  const handleClearCompletedOrders = async () => {
+    try {
+      try {
+        await axios.post("http://localhost:8000/api/orders/clear-completed");
+      } catch (e) {}
+      const completedIds = liveOrders.filter(o => o.status === 'completed').map(o => o.id);
+      setClearedCompletedIds(prev => {
+        const updated = new Set([...prev, ...completedIds]);
+        try {
+          localStorage.setItem('kds_cleared_completed_orders', JSON.stringify(Array.from(updated)));
+        } catch (e) {}
+        return updated;
+      });
+      setDismissedToast("✅ Completed orders cleared from KDS.");
+      setTimeout(() => setDismissedToast(""), 3000);
+      await fetchLiveOrders();
+      if (onRefresh) onRefresh();
+    } catch (err) {
+      console.error("Failed to clear completed orders:", err);
+    }
+  };
+
+  // Auto-sync polling every 4 seconds + on refreshTrigger
+  useEffect(() => {
+    fetchLiveOrders();
+    const interval = setInterval(fetchLiveOrders, 4000);
+    return () => clearInterval(interval);
+  }, [refreshTrigger]);
+
+  const handleUpdateOrderStatus = async (orderId, newStatus) => {
+    try {
+      await axios.patch(`http://localhost:8000/api/orders/${orderId}/status`, { status: newStatus });
+      // If order had previously been cleared and was reopened or changed, ensure it's un-cleared
+      if (clearedCompletedIds.has(orderId)) {
+        setClearedCompletedIds(prev => {
+          const nextSet = new Set(prev);
+          nextSet.delete(orderId);
+          try {
+            localStorage.setItem('kds_cleared_completed_orders', JSON.stringify(Array.from(nextSet)));
+          } catch (e) {}
+          return nextSet;
+        });
+      }
+      const statusLabels = {
+        'in_prep': 'Cooking Started',
+        'ready': 'Marked Ready on Pass',
+        'completed': 'Served to Customer'
+      };
+      setDismissedToast(`✅ Order #${orderId} status: ${statusLabels[newStatus] || newStatus}! Synced with Orders & POS.`);
+      setTimeout(() => setDismissedToast(""), 4000);
+      await fetchLiveOrders();
+      if (onRefresh) onRefresh();
+    } catch (err) {
+      console.error("Failed to update order status:", err);
+    }
+  };
+
+  const handleFreeTable = async (tableNo) => {
+    try {
+      await axios.post(`http://localhost:8000/api/orders/tables/${encodeURIComponent(tableNo)}/free`);
+      setDismissedToast(`✅ ${tableNo} is now cleared, sanitized & ready for new guests!`);
+      setTimeout(() => setDismissedToast(""), 4000);
+      await fetchLiveOrders();
+      if (onRefresh) onRefresh();
+    } catch (err) {
+      console.error("Failed to free table:", err);
+    }
+  };
+
+  const getStationForDish = (dishName = "") => {
+    const nl = dishName.toLowerCase();
+    if (nl.includes("pizza") || nl.includes("margherita") || nl.includes("calzone")) return "Pizza";
+    if (nl.includes("salmon") || nl.includes("steak") || nl.includes("beef") || nl.includes("sirloin") || nl.includes("grill") || nl.includes("charbroil") || nl.includes("platter")) return "Grill";
+    if (nl.includes("salad") || nl.includes("smoothie") || nl.includes("avocado") || nl.includes("feta") || nl.includes("bowl")) return "Cold Salad";
+    if (nl.includes("cuttlefish") || nl.includes("calamari") || nl.includes("fry") || nl.includes("samosa") || nl.includes("fries") || nl.includes("crispy")) return "Fryer";
+    if (nl.includes("juice") || nl.includes("tea") || nl.includes("coke") || nl.includes("sprite") || nl.includes("beverage") || nl.includes("coffee") || nl.includes("cola")) return "Beverages";
+    return "Hot Kitchen";
+  };
+
+  const getStaffForStation = (station) => {
+    switch (station) {
+      case 'Hot Kitchen': return 'K. Perera (Senior Line Chef)';
+      case 'Grill': return 'T. Silva (Prep Cook)';
+      case 'Cold Salad': return 'S. Fernando (Junior Chef)';
+      case 'Pizza': return 'A. Jayasinghe (Station Lead)';
+      case 'Fryer': return 'M. Wickramasinghe (Kitchen Trainee)';
+      case 'Beverages':
+      default: return 'Beverage Counter';
+    }
+  };
+
+  const filteredOrders = liveOrders.filter(ord => {
+    const matchesSearch = !kdsSearchQuery ||
+      ord.order_number?.toString().includes(kdsSearchQuery) ||
+      ord.table_no?.toLowerCase().includes(kdsSearchQuery.toLowerCase()) ||
+      ord.items?.some(i => i.name.toLowerCase().includes(kdsSearchQuery.toLowerCase()));
+
+    const matchesStation = kdsStationFilter === 'all' ||
+      ord.station_name?.toLowerCase().includes(kdsStationFilter.toLowerCase());
+
+    return matchesSearch && matchesStation;
+  });
+
+  const pendingOrders = filteredOrders.filter(o => o.status === 'pending');
+  const inPrepOrders = filteredOrders.filter(o => o.status === 'in_prep');
+  const readyOrders = filteredOrders.filter(o => o.status === 'ready');
+  const completedOrders = filteredOrders.filter(o => o.status === 'completed' && !o.kds_dismissed && !clearedCompletedIds.has(o.id));
 
   // Fetch metrics data dynamically from FastAPI backend
   useEffect(() => {
@@ -303,7 +491,52 @@ export default function KitchenStaffDashboard({ isDarkMode, currentRole = 'admin
     }
   ]);
 
-  const handleCreateMobileOrder = (e) => {
+  const activeRoutedOrders = liveOrders
+    .filter(o => o.status === 'pending' || o.status === 'in_prep')
+    .map(ord => {
+      const cookingTasks = [];
+      const grillTasks = [];
+      const coldTasks = [];
+      const pizzaTasks = [];
+      const fryerTasks = [];
+      const beverageTasks = [];
+
+      (ord.items || []).forEach(it => {
+        const station = getStationForDish(it.name);
+        const taskObj = {
+          item: `${it.quantity} × ${it.name}`,
+          assignedStaff: getStaffForStation(station),
+          status: ord.status === 'in_prep' ? 'In Prep' : 'Queued'
+        };
+
+        if (station === 'Hot Kitchen') cookingTasks.push(taskObj);
+        else if (station === 'Grill') grillTasks.push(taskObj);
+        else if (station === 'Cold Salad') coldTasks.push(taskObj);
+        else if (station === 'Pizza') pizzaTasks.push(taskObj);
+        else if (station === 'Fryer') fryerTasks.push(taskObj);
+        else beverageTasks.push(taskObj);
+      });
+
+      return {
+        id: ord.id,
+        orderNo: `${ord.order_number}`,
+        table: ord.table_no,
+        timestamp: ord.created_at,
+        waiterApp: ord.order_type === 'Dine-In' ? 'Waiter Mobile Terminal' : `${ord.order_type} Channel`,
+        priority: ord.customer_note?.toLowerCase().includes('rush') || ord.customer_note?.toLowerCase().includes('urgent') ? 'Rush / High' : 'Normal',
+        status: ord.status,
+        cookingTasks,
+        grillTasks,
+        coldTasks,
+        pizzaTasks,
+        fryerTasks,
+        beverageTasks
+      };
+    });
+
+  const displayKitchenOrders = activeRoutedOrders.length > 0 ? activeRoutedOrders : kitchenOrders;
+
+  const handleCreateMobileOrder = async (e) => {
     e.preventDefault();
     const timestampNow = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     const currentOrderNo = nextOrderNumCounter;
@@ -313,6 +546,40 @@ export default function KitchenStaffDashboard({ isDarkMode, currentRole = 'admin
       setDismissedToast("⚠️ Please select at least one menu item to place the order.");
       setTimeout(() => setDismissedToast(""), 3500);
       return;
+    }
+
+    // Submit order to FastAPI backend so it reflects across POS & Kitchen
+    try {
+      const allItemsPayload = selectedItems.map(i => ({
+        menu_id: i.id.startsWith("menu-") ? i.id : (
+          i.name.includes("Kottu") ? "menu-01" :
+          i.name.includes("Salmon") ? "menu-02" :
+          i.name.includes("Waffle") ? "menu-03" :
+          i.name.includes("Salad") ? "menu-04" :
+          i.name.includes("Steak") ? "menu-05" :
+          i.name.includes("Smoothie") || i.name.includes("Tea") ? "menu-06" :
+          i.name.includes("Pizza") ? "menu-07" : "menu-08"
+        ),
+        quantity: i.qty
+      }));
+
+      const payload = {
+        table_no: selectedTableNo,
+        order_type: "Dine-In",
+        items: allItemsPayload,
+        customer_note: `Mobile Waiter Terminal Order (${selectedPriority} Priority)`
+      };
+
+      const res = await axios.post("http://localhost:8000/api/orders", payload);
+      const createdOrder = res.data?.order;
+      setDismissedToast(`📱 Order #${createdOrder?.order_number || currentOrderNo} received & synced across Orders & POS + KDS!`);
+      setTimeout(() => setDismissedToast(""), 4500);
+      await fetchLiveOrders();
+      if (onRefresh) onRefresh();
+    } catch (err) {
+      console.warn("Could not post to /api/orders, fallback:", err);
+      setDismissedToast(`📱 Order #${currentOrderNo} placed locally.`);
+      setTimeout(() => setDismissedToast(""), 4500);
     }
 
     const newCookingTasks = selectedItems
@@ -357,8 +624,6 @@ export default function KitchenStaffDashboard({ isDarkMode, currentRole = 'admin
     setKitchenOrders(prev => [newOrder, ...prev]);
     setNextOrderNumCounter(prev => prev + 1);
     setShowOrderSimulatorModal(false);
-    setDismissedToast(`📱 Order #${currentOrderNo} received! Real-Time Kitchen Station Workloads & Queue Status updated live.`);
-    setTimeout(() => setDismissedToast(""), 4500);
 
     if (data && data.stations) {
       const updatedStations = data.stations.map(st => {
@@ -452,9 +717,16 @@ export default function KitchenStaffDashboard({ isDarkMode, currentRole = 'admin
     }
   };
 
-  const handleCompleteEntireOrder = (orderId, orderNo) => {
+  const handleCompleteEntireOrder = async (orderId, orderNo) => {
+    try {
+      await axios.patch(`http://localhost:8000/api/orders/${orderId}/status`, { status: "ready" });
+      await fetchLiveOrders();
+      if (onRefresh) onRefresh();
+    } catch (e) {
+      // Local fallback
+    }
     setKitchenOrders(prev => prev.filter(ord => ord.id !== orderId));
-    setDismissedToast(`✨ Order #${orderNo} fully prepared! Automatically disappeared from kitchen dashboard.`);
+    setDismissedToast(`✨ Order #${orderNo} marked ready on pass! Dispatched to pickup pass.`);
     setTimeout(() => setDismissedToast(""), 4000);
 
     if (data && data.stations) {
@@ -580,7 +852,410 @@ export default function KitchenStaffDashboard({ isDarkMode, currentRole = 'admin
         </div>
       )}
 
-      {/* Top Banner */}
+      {/* ========================================================================= */}
+      {/* SUB-VIEW NAVIGATION & ORDERS SYNC BANNER                                 */}
+      {/* ========================================================================= */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white dark:bg-slate-900 p-2.5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+          <button
+            onClick={() => setActiveKitchenTab('optimization')}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
+              activeKitchenTab === 'optimization'
+                ? 'bg-emerald-700 text-white shadow-md shadow-emerald-700/20'
+                : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+            }`}
+          >
+            <Users className="h-4 w-4" />
+            <span>Staff Optimization & Workload AI</span>
+          </button>
+
+          <button
+            onClick={() => setActiveKitchenTab('all')}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
+              activeKitchenTab === 'all'
+                ? 'bg-emerald-700 text-white shadow-md shadow-emerald-700/20'
+                : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+            }`}
+          >
+            <Layers className="h-4 w-4" />
+            <span>Full Kitchen Ops (All Views)</span>
+          </button>
+        </div>
+
+        {/* Sync Status Badge & Cross-Module Shortcut */}
+        <div className="flex items-center gap-3 pr-2">
+          <div className="flex items-center gap-2 text-xs font-semibold text-slate-500 dark:text-slate-400">
+            <span className="flex h-2.5 w-2.5 relative">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+            </span>
+            <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300">
+              Orders & POS Live Sync Active
+            </span>
+          </div>
+
+          {onNavigateModule && (
+            <button
+              onClick={() => onNavigateModule('orders')}
+              className="hidden lg:flex items-center gap-1 text-[11px] font-bold text-emerald-700 dark:text-emerald-400 hover:underline cursor-pointer"
+            >
+              <span>Go to Orders & POS</span>
+              <ArrowUpRight className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* ========================================================================= */}
+      {/* KITCHEN DISPLAY SYSTEM (KDS) LIVE TICKETS VIEW                            */}
+      {/* ========================================================================= */}
+      {(activeKitchenTab === 'kds' || activeKitchenTab === 'all') && (
+        <div className="space-y-5 animate-fade-in">
+
+          {/* Kitchen Live KPI Summary Cards */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="p-3.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs">
+              <span className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400 block">Kitchen Overall Efficiency</span>
+              <div className={`text-2xl font-black mt-0.5 ${isCriticalEfficiency ? 'text-rose-600 dark:text-rose-400 animate-pulse' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                {shiftEfficiency}
+              </div>
+              <span className="text-[10px] text-emerald-700 dark:text-emerald-400 font-bold">Line pace balanced</span>
+            </div>
+
+            <div className="p-3.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs">
+              <span className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400 block">Avg Ticket Fulfillment</span>
+              <div className="text-2xl font-black text-slate-900 dark:text-white mt-0.5">{shiftPrepTime}</div>
+              <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">Target: ~6.0 mins</span>
+            </div>
+
+            <div className="p-3.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs">
+              <span className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400 block">Cooking / Intake Queue</span>
+              <div className="text-2xl font-black text-amber-600 dark:text-amber-400 mt-0.5">
+                {pendingOrders.length + inPrepOrders.length} <span className="text-xs font-medium text-slate-500 dark:text-slate-400">tickets</span>
+              </div>
+              <span className="text-[10px] text-amber-700 dark:text-amber-400 font-medium">{pendingOrders.length} new • {inPrepOrders.length} cooking</span>
+            </div>
+
+            <div className="p-3.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs">
+              <span className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400 block">Ready for Pickup / Pass</span>
+              <div className="text-2xl font-black text-emerald-700 dark:text-emerald-400 mt-0.5">
+                {readyOrders.length} <span className="text-xs font-medium text-slate-500 dark:text-slate-400">plates</span>
+              </div>
+              <span className="text-[10px] text-emerald-700 dark:text-emerald-400 font-bold">{completedOrders.length} served today</span>
+            </div>
+          </div>
+
+          {/* KDS Live Ticket Board Container */}
+          <div className="glass-panel p-6 rounded-2xl bg-white dark:bg-slate-900 border border-[#d1ded5] dark:border-slate-800 space-y-4 shadow-sm">
+            
+            {/* Top Toolbar */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-[#e1eae4] dark:border-slate-800 pb-4">
+              <div>
+                <h3 className="text-base font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
+                  <ChefHat className="h-5 w-5 text-emerald-700 dark:text-emerald-400" />
+                  Kitchen Display System (KDS) Live Tickets
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
+                  Real-time kitchen ticket flow from intake to pass • Synced with Orders & POS
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-xs px-2.5 py-1 rounded bg-[#f0f5f2] dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold border border-[#d1ded5] dark:border-slate-700">
+                  {pendingOrders.length + inPrepOrders.length} Cooking / Incoming
+                </span>
+
+                <button
+                  onClick={handleRefreshTickets}
+                  disabled={ordersLoading}
+                  className="px-3 py-1 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold text-xs flex items-center gap-1.5 border border-slate-200 dark:border-slate-700 cursor-pointer transition-colors"
+                  title="Force refresh live tickets & clear completed orders"
+                >
+                  <RefreshCw className={`h-3.5 w-3.5 ${ordersLoading ? 'animate-spin text-emerald-600' : ''}`} />
+                  <span>{ordersLoading ? 'Syncing...' : 'Refresh Tickets'}</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Filter & Search Bar */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
+              <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+                {['all', 'Hot Kitchen', 'Grill', 'Cold Salad', 'Pizza', 'Fryer'].map((st) => (
+                  <button
+                    key={st}
+                    onClick={() => setKdsStationFilter(st)}
+                    className={`px-3 py-1 rounded-lg text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
+                      kdsStationFilter === st
+                        ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 shadow-xs'
+                        : 'bg-[#f0f5f2] dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white border border-[#d1ded5] dark:border-slate-700'
+                    }`}
+                  >
+                    {st === 'all' ? 'All Stations' : st}
+                  </button>
+                ))}
+              </div>
+
+              <div className="relative min-w-[200px]">
+                <Search className="h-3.5 w-3.5 text-slate-400 absolute left-3 top-2.5" />
+                <input
+                  type="text"
+                  value={kdsSearchQuery}
+                  onChange={(e) => setKdsSearchQuery(e.target.value)}
+                  placeholder="Filter by Order # or Table..."
+                  className="w-full pl-8 pr-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white text-xs font-medium focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
+                />
+              </div>
+            </div>
+
+            {/* 4-Column Ticket Flow Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 pt-2">
+
+              {/* Column 1: Pending (New Incoming Orders) */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between px-1">
+                  <span className="text-xs font-black uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                    <span className="h-2.5 w-2.5 rounded-full bg-blue-500" /> NEW INCOMING ORDERS ({pendingOrders.length})
+                  </span>
+                </div>
+
+                <div className="space-y-3">
+                  {pendingOrders.length === 0 ? (
+                    <div className="p-8 rounded-xl border border-dashed border-[#d1ded5] dark:border-slate-800 text-center text-xs text-slate-400 font-medium space-y-1">
+                      <ChefHat className="h-8 w-8 text-slate-300 dark:text-slate-700 mx-auto" />
+                      <p>No new pending orders</p>
+                      <p className="text-[10px] text-slate-400">All incoming tickets have been started</p>
+                    </div>
+                  ) : (
+                    pendingOrders.map(ord => (
+                      <div key={ord.id} className="p-4 rounded-xl bg-[#f8faf9] dark:bg-slate-800/90 border border-[#d1ded5] dark:border-slate-700 shadow-sm space-y-2.5">
+                        <div className="flex items-center justify-between border-b border-[#e1eae4] dark:border-slate-700 pb-2">
+                          <span className="font-extrabold text-sm text-slate-900 dark:text-white">#{ord.order_number} ({ord.table_no})</span>
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-blue-100 dark:bg-blue-950/60 text-blue-900 dark:text-blue-300">
+                            {ord.created_at}
+                          </span>
+                        </div>
+
+                        <div className="space-y-1">
+                          {ord.items.map((it, idx) => (
+                            <div key={idx} className="flex items-center justify-between text-xs font-bold text-slate-800 dark:text-slate-200">
+                              <span>{it.quantity}x {it.name}</span>
+                              <span className="text-slate-500 font-mono">Rs. {it.unit_price * it.quantity}</span>
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* FIFO Ingredients Breakdown */}
+                        {ord.ingredients_deducted?.length > 0 && (
+                          <div className="p-2 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 text-[10px] space-y-1 text-emerald-950 dark:text-emerald-300">
+                            <span className="font-bold flex items-center gap-1">
+                              <PackageCheck className="h-3 w-3 text-emerald-600" /> Smart FIFO Batches Used:
+                            </span>
+                            {ord.ingredients_deducted.map((ing, i) => (
+                              <div key={i} className="text-slate-600 dark:text-slate-400 font-medium">
+                                • {ing.amount_kg}kg {ing.item.split('(')[0]} ({ing.batch})
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {ord.customer_note && (
+                          <p className="text-[10px] text-blue-900 dark:text-blue-300 italic bg-blue-50 dark:bg-blue-950/50 p-1.5 rounded">
+                            "{ord.customer_note}"
+                          </p>
+                        )}
+
+                        <div className="pt-2 border-t border-[#e1eae4] dark:border-slate-700 flex items-center justify-between">
+                          <span className="text-[10px] font-bold text-slate-500">{ord.station_name?.split('&')[0] || 'Hot Kitchen'}</span>
+                          <button
+                            onClick={() => handleUpdateOrderStatus(ord.id, 'in_prep')}
+                            className="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold flex items-center gap-1 shadow-sm transition-colors cursor-pointer"
+                          >
+                            <Flame className="h-3.5 w-3.5" /> Start Cooking
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              {/* Column 2: Ongoing / In Prep (Cooking) */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between px-1">
+                  <span className="text-xs font-black uppercase tracking-wider text-amber-700 dark:text-amber-400 flex items-center gap-1.5">
+                    <span className="h-2.5 w-2.5 rounded-full bg-amber-500 animate-pulse" /> ONGOING COOKING ({inPrepOrders.length})
+                  </span>
+                </div>
+
+                <div className="space-y-3">
+                  {inPrepOrders.length === 0 ? (
+                    <div className="p-8 rounded-xl border border-dashed border-[#d1ded5] dark:border-slate-800 text-center text-xs text-slate-400 font-medium space-y-1">
+                      <Flame className="h-8 w-8 text-slate-300 dark:text-slate-700 mx-auto" />
+                      <p>No tickets currently cooking</p>
+                      <p className="text-[10px] text-slate-400">Select a new order from left to start cooking</p>
+                    </div>
+                  ) : (
+                    inPrepOrders.map(ord => (
+                      <div key={ord.id} className="p-4 rounded-xl bg-amber-50/50 dark:bg-amber-950/20 border border-amber-300 dark:border-amber-700/60 shadow-sm space-y-2.5">
+                        <div className="flex items-center justify-between border-b border-amber-200 dark:border-amber-800 pb-2">
+                          <span className="font-extrabold text-sm text-amber-950 dark:text-amber-200">#{ord.order_number} ({ord.table_no})</span>
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-200 dark:bg-amber-900 text-amber-900 dark:text-amber-200 flex items-center gap-1">
+                            <Clock className="h-3 w-3" /> {ord.elapsed_mins || 0}m / {ord.target_prep_mins || 8}m
+                          </span>
+                        </div>
+
+                        <div className="space-y-1">
+                          {ord.items.map((it, idx) => (
+                            <div key={idx} className="text-xs font-bold text-slate-900 dark:text-white">
+                              {it.quantity}x {it.name}
+                            </div>
+                          ))}
+                        </div>
+
+                        {ord.customer_note && (
+                          <p className="text-[10px] text-amber-900 dark:text-amber-300 italic bg-amber-100/60 dark:bg-amber-950/60 p-1.5 rounded">
+                            "{ord.customer_note}"
+                          </p>
+                        )}
+
+                        <div className="pt-2 border-t border-amber-200 dark:border-amber-800 flex items-center justify-between">
+                          <span className="text-[10px] font-bold text-amber-800 dark:text-amber-400">{ord.station_name || 'Hot Kitchen'}</span>
+                          <button
+                            onClick={() => handleUpdateOrderStatus(ord.id, 'ready')}
+                            className="px-3.5 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold flex items-center gap-1 shadow-sm transition-colors cursor-pointer"
+                          >
+                            <Check className="h-3.5 w-3.5" /> Mark Ready on Pass
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              {/* Column 3: Ready for Pickup / Pass */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between px-1">
+                  <span className="text-xs font-black uppercase tracking-wider text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5">
+                    <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" /> READY FOR PICKUP ({readyOrders.length})
+                  </span>
+                </div>
+
+                <div className="space-y-3">
+                  {readyOrders.length === 0 ? (
+                    <div className="p-8 rounded-xl border border-dashed border-[#d1ded5] dark:border-slate-800 text-center text-xs text-slate-400 font-medium space-y-1">
+                      <CheckCircle2 className="h-8 w-8 text-slate-300 dark:text-slate-700 mx-auto" />
+                      <p>No plates waiting on pass</p>
+                      <p className="text-[10px] text-slate-400">Plates will appear here once marked ready</p>
+                    </div>
+                  ) : (
+                    readyOrders.map(ord => (
+                      <div key={ord.id} className="p-4 rounded-xl bg-emerald-50/70 dark:bg-emerald-950/30 border border-emerald-300 dark:border-emerald-700/60 shadow-sm space-y-2.5">
+                        <div className="flex items-center justify-between border-b border-emerald-200 dark:border-emerald-800 pb-2">
+                          <span className="font-extrabold text-sm text-emerald-950 dark:text-emerald-200">#{ord.order_number} ({ord.table_no})</span>
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-200 dark:bg-emerald-900 text-emerald-900 dark:text-emerald-200">
+                            {ord.order_type || 'Dine-In'}
+                          </span>
+                        </div>
+
+                        <div className="space-y-1">
+                          {ord.items.map((it, idx) => (
+                            <div key={idx} className="text-xs font-bold text-slate-900 dark:text-white">
+                              {it.quantity}x {it.name}
+                            </div>
+                          ))}
+                        </div>
+
+                        <div className="pt-2 border-t border-emerald-200 dark:border-emerald-800 flex items-center justify-between">
+                          <span className="text-xs font-mono font-bold text-emerald-800 dark:text-emerald-300">Rs. {ord.total_amount_lkr}</span>
+                          <button
+                            onClick={() => handleUpdateOrderStatus(ord.id, 'completed')}
+                            className="px-3.5 py-1.5 rounded-lg bg-slate-900 hover:bg-black dark:bg-slate-700 dark:hover:bg-slate-600 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer"
+                          >
+                            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" /> Served
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              {/* Column 4: Completed Orders */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between px-1">
+                  <span className="text-xs font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                    <span className="h-2.5 w-2.5 rounded-full bg-slate-400" /> COMPLETED ORDERS ({completedOrders.length})
+                  </span>
+                  {completedOrders.length > 0 && (
+                    <button
+                      onClick={handleClearCompletedOrders}
+                      className="text-[10px] text-slate-500 hover:text-rose-600 dark:text-slate-400 dark:hover:text-rose-400 font-bold underline cursor-pointer"
+                      title="Clear completed orders from screen"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+
+                <div className="space-y-3">
+                  {completedOrders.length === 0 ? (
+                    <div className="p-8 rounded-xl border border-dashed border-[#d1ded5] dark:border-slate-800 text-center text-xs text-slate-400 font-medium space-y-1">
+                      <CheckCheck className="h-8 w-8 text-slate-300 dark:text-slate-700 mx-auto" />
+                      <p>No completed orders</p>
+                      <p className="text-[10px] text-slate-400">Served orders will display here</p>
+                    </div>
+                  ) : (
+                    completedOrders.slice(0, 6).map(ord => {
+                      const isDineIn = ord.order_type === 'Dine-In';
+                      const isTableOccupied = ord.table_status === 'dining' || ord.table_status === 'occupied';
+
+                      return (
+                        <div key={ord.id} className="p-3.5 rounded-xl bg-white dark:bg-slate-800 border border-[#d1ded5] dark:border-slate-700 shadow-sm space-y-2">
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="font-bold text-slate-900 dark:text-white">#{ord.order_number} ({ord.table_no})</span>
+                            <span className="text-[10px] text-emerald-700 dark:text-emerald-400 font-bold flex items-center gap-0.5">
+                              <CheckCheck className="h-3 w-3" /> Served
+                            </span>
+                          </div>
+
+                          <div className="text-[11px] text-slate-600 dark:text-slate-300 font-medium">
+                            {ord.items.map(it => `${it.quantity}x ${it.name}`).join(', ')}
+                          </div>
+
+                          <div className="flex items-center justify-between pt-2 border-t border-[#e1eae4] dark:border-slate-700 text-[10px]">
+                            <span className="text-slate-500 font-mono font-bold">Rs. {ord.total_amount_lkr}</span>
+
+                            {isDineIn && (
+                              isTableOccupied ? (
+                                <button
+                                  onClick={() => handleFreeTable(ord.table_no)}
+                                  className="px-2.5 py-1 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white font-bold flex items-center gap-1 shadow-sm transition-all hover:scale-105 cursor-pointer"
+                                  title="Customers departed. Click to mark table free."
+                                >
+                                  <Armchair className="h-3 w-3" /> Clear & Free Table
+                                </button>
+                              ) : (
+                                <span className="text-emerald-700 dark:text-emerald-400 font-bold flex items-center gap-1">
+                                  ✓ Table Cleared
+                                </span>
+                              )
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Top Banner (Staff Optimization & Directives) */}
+      {(activeKitchenTab === 'optimization' || activeKitchenTab === 'all') && (
       <div className="glass-panel p-6 rounded-2xl space-y-5">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-5">
           <div>
@@ -735,137 +1410,13 @@ export default function KitchenStaffDashboard({ isDarkMode, currentRole = 'admin
           )}
         </div>
       </div>
+      )}
 
-      {/* Real-Time Mobile Order Dispatch & Station Task Routing Section */}
-      <div className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-md space-y-5">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-4">
-          <div>
-            <div className="flex items-center gap-2">
-              <div className="p-2 rounded-xl bg-orange-50 text-orange-600 dark:bg-orange-500/10 dark:text-orange-400 border border-orange-200 dark:border-orange-500/20">
-                <Smartphone className="h-5 w-5" />
-              </div>
-              <h3 className="text-base font-bold text-slate-900 dark:text-white">
-                Real-Time Mobile Order Routing & Station Task Dispatch
-              </h3>
-            </div>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 font-medium">
-              Waiter notes order on mobile app → Order enters system → Auto-split into Cooking, Beverage & Grill station tasks with timestamps & assigned staff
-            </p>
-          </div>
 
-          <div className="flex items-center gap-2 self-start md:self-auto">
-            <button
-              onClick={() => setShowOrderSimulatorModal(true)}
-              className="px-4 py-2 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-bold text-xs shadow-md shadow-orange-600/20 transition-all flex items-center gap-2 cursor-pointer whitespace-nowrap"
-            >
-              <Smartphone className="h-4 w-4" />
-              <span>📱 Simulate Waiter Mobile Order</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Active Routed Orders Stream */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-          {kitchenOrders.map((ord) => (
-            <div
-              key={ord.id}
-              className="p-5 rounded-2xl bg-slate-50 dark:bg-slate-950/70 border border-slate-200 dark:border-slate-800 space-y-4 shadow-xs"
-            >
-              <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-black text-slate-900 dark:text-white">
-                    Order #{ord.orderNo}
-                  </span>
-                  <span className="text-xs font-bold text-slate-500 dark:text-slate-400 bg-white dark:bg-slate-900 px-2.5 py-0.5 rounded-lg border border-slate-200 dark:border-slate-800">
-                    {ord.table}
-                  </span>
-                </div>
-
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className={`text-[10px] font-black px-2.5 py-0.5 rounded-full ${ord.priority.includes("Rush") || ord.priority.includes("VIP")
-                    ? "bg-rose-600 text-white animate-pulse"
-                    : "bg-emerald-600 text-white"
-                    }`}>
-                    🔴 Priority: {ord.priority}
-                  </span>
-                  <span className="text-xs font-extrabold text-slate-600 dark:text-slate-300 flex items-center gap-1">
-                    <Clock className="h-3.5 w-3.5 text-slate-400" />
-                    Received: {ord.timestamp}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => handleCompleteEntireOrder(ord.id, ord.orderNo)}
-                    className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] cursor-pointer shadow-xs transition-all flex items-center gap-1 ml-auto"
-                  >
-                    <CheckCircle2 className="h-3.5 w-3.5" />
-                    <span>Mark Prepared & Disappear</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Split Station Tasks */}
-              <div className="space-y-3">
-                {/* Split Tasks for 5 Stations & Beverages */}
-                {[
-                  { key: "cookingTasks", name: "Hot Kitchen Task", icon: "🍳", bg: "bg-orange-50/90 dark:bg-orange-950/40", border: "border-orange-200 dark:border-orange-500/30", text: "text-orange-900 dark:text-orange-200", dot: "bg-orange-500", btn: "bg-orange-600 hover:bg-orange-700" },
-                  { key: "grillTasks", name: "Grill Task", icon: "🥩", bg: "bg-amber-50/90 dark:bg-amber-950/40", border: "border-amber-200 dark:border-amber-500/30", text: "text-amber-900 dark:text-amber-200", dot: "bg-amber-500", btn: "bg-amber-600 hover:bg-amber-700" },
-                  { key: "coldTasks", name: "Cold Salad Task", icon: "🥗", bg: "bg-emerald-50/90 dark:bg-emerald-950/40", border: "border-emerald-200 dark:border-emerald-500/30", text: "text-emerald-900 dark:text-emerald-200", dot: "bg-emerald-500", btn: "bg-emerald-600 hover:bg-emerald-700" },
-                  { key: "pizzaTasks", name: "Pizza Task", icon: "🍕", bg: "bg-rose-50/90 dark:bg-rose-950/40", border: "border-rose-200 dark:border-rose-500/30", text: "text-rose-900 dark:text-rose-200", dot: "bg-rose-500", btn: "bg-rose-600 hover:bg-rose-700" },
-                  { key: "fryerTasks", name: "Fryer Task", icon: "🍤", bg: "bg-purple-50/90 dark:bg-purple-950/40", border: "border-purple-200 dark:border-purple-500/30", text: "text-purple-900 dark:text-purple-200", dot: "bg-purple-500", btn: "bg-purple-600 hover:bg-purple-700" },
-                  { key: "beverageTasks", name: "Beverage Station Task", icon: "🥤", bg: "bg-sky-50/90 dark:bg-sky-950/40", border: "border-sky-200 dark:border-sky-500/30", text: "text-sky-900 dark:text-sky-200", dot: "bg-sky-500", btn: "bg-sky-600 hover:bg-sky-700" }
-                ].map(({ key, name, icon, bg, border, text, dot, btn }) => {
-                  const tasks = ord[key] || [];
-                  if (tasks.length === 0) return null;
-
-                  return (
-                    <div key={key} className={`p-3.5 rounded-xl ${bg} border ${border} text-xs space-y-2`}>
-                      <div className="flex items-center justify-between border-b border-black/10 dark:border-white/10 pb-1.5">
-                        <span className={`font-extrabold ${text} flex items-center gap-1.5 uppercase tracking-wider text-[11px]`}>
-                          {icon} {name} (Order #{ord.orderNo})
-                        </span>
-                        <span className={`text-[10px] font-bold ${text}`}>
-                          Received: {ord.timestamp}
-                        </span>
-                      </div>
-
-                      <ul className="space-y-1 font-bold text-slate-900 dark:text-white">
-                        {tasks.map((t, idx) => (
-                          <li key={idx} className="flex items-center justify-between text-xs py-0.5">
-                            <span className="flex items-center gap-1.5">
-                              <span className={`h-1.5 w-1.5 rounded-full ${dot}`}></span>
-                              {t.item}
-                            </span>
-                            <div className="flex items-center gap-2">
-                              <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
-                                Assigned: <span className="font-bold text-slate-900 dark:text-white">{t.assignedStaff}</span>
-                              </span>
-                              {t.status === "Prepared" ? (
-                                <span className="px-2 py-0.5 rounded bg-emerald-600 text-white text-[10px] font-bold">
-                                  ✓ Prepared
-                                </span>
-                              ) : (
-                                <button
-                                  type="button"
-                                  onClick={() => handleCompleteOrderTask(ord.id, key, idx)}
-                                  className={`px-2 py-0.5 rounded text-white text-[10px] font-bold cursor-pointer transition-all ${btn}`}
-                                >
-                                  Mark Prepared
-                                </button>
-                              )}
-                            </div>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
 
       {/* Research ML Model Performance & Evaluation Card */}
+      {(activeKitchenTab === 'optimization' || activeKitchenTab === 'all') && (
+      <>
       {(() => {
         const mlEval = data?.ml_model_evaluation || {
           model_name: "Random Forest Regressor (Multi-Output)",
@@ -1759,6 +2310,8 @@ export default function KitchenStaffDashboard({ isDarkMode, currentRole = 'admin
           })}
         </div>
       </div>
+      </>
+      )}
 
       {/* Waiter Mobile Order Entry Modal */}
       {showOrderSimulatorModal && (

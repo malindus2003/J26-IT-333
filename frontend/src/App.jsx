@@ -143,6 +143,7 @@ export default function App() {
             currentRole={currentRole}
             viewMode={activeModule === 'orders' ? 'all' : activeModule}
             refreshTrigger={refreshTrigger}
+            onNavigateModule={setActiveModule}
           />
         )}
 
@@ -335,7 +336,13 @@ export default function App() {
 
         {/* Module 5: Kitchen & Staff */}
         {activeModule === 'kitchen' && (
-          <KitchenStaffDashboard isDarkMode={isDarkMode} currentRole={currentRole} />
+          <KitchenStaffDashboard
+            isDarkMode={isDarkMode}
+            currentRole={currentRole}
+            refreshTrigger={refreshTrigger}
+            onRefresh={fetchAllData}
+            onNavigateModule={setActiveModule}
+          />
         )}
 
         {/* Module 6: Demand Prediction */}
