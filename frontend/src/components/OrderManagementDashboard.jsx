@@ -558,8 +558,8 @@ export default function OrderManagementDashboard({ onRefresh, isDarkMode, curren
     const matchesSearch = modalSearch.trim() === ""
       ? true
       : (dish.name?.toLowerCase().includes(modalSearch.toLowerCase()) ||
-         dish.description?.toLowerCase().includes(modalSearch.toLowerCase()) ||
-         dish.category?.toLowerCase().includes(modalSearch.toLowerCase()));
+        dish.description?.toLowerCase().includes(modalSearch.toLowerCase()) ||
+        dish.category?.toLowerCase().includes(modalSearch.toLowerCase()));
     return matchesCategory && matchesSearch;
   });
 
@@ -814,22 +814,22 @@ export default function OrderManagementDashboard({ onRefresh, isDarkMode, curren
 
             {/* Category Filter Pills */}
             <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
-                {["all", "main", "seafood", "pizza", "salad", "dessert", "beverage"].map(cat => (
-                  <button
-                    key={cat}
-                    onClick={() => {
-                      setSelectedCategory(cat);
-                      setCurrentDishPage(1);
-                    }}
-                    className={`px-3.5 py-1.5 rounded-xl text-xs font-bold capitalize transition-all ${selectedCategory === cat
-                      ? 'bg-emerald-700 text-white shadow-sm'
-                      : 'bg-[#f0f5f2] dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-emerald-50 dark:hover:bg-slate-700 border border-[#d1ded5] dark:border-slate-700'
-                      }`}
-                  >
-                    {cat}
-                  </button>
-                ))}
-              </div>
+              {["all", "main", "seafood", "pizza", "salad", "dessert", "beverage"].map(cat => (
+                <button
+                  key={cat}
+                  onClick={() => {
+                    setSelectedCategory(cat);
+                    setCurrentDishPage(1);
+                  }}
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold capitalize transition-all ${selectedCategory === cat
+                    ? 'bg-emerald-700 text-white shadow-sm'
+                    : 'bg-[#f0f5f2] dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-emerald-50 dark:hover:bg-slate-700 border border-[#d1ded5] dark:border-slate-700'
+                    }`}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* Dish Search Bar */}
