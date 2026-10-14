@@ -17,7 +17,7 @@ class FoodQualityVisionEngine:
     """
 
     CATEGORIES = ["Fruits", "Vegetables", "Dairy", "Fish", "Meat"]
-    CLASS_LABELS = {0: "Fresh (Grade A)", 1: "Ripe / Good (Grade B)", 2: "Degraded / Consumable (Grade C)", 3: "Spoiled / Mouldy (Grade F)"}
+    CLASS_LABELS = {0: "Fresh (Grade A)", 1: "Ripe / Good (Grade B)", 2: "Spoiled / Rotten (Grade F)"}
 
     def __init__(self):
         self.models_loaded = False
@@ -90,13 +90,10 @@ class FoodQualityVisionEngine:
                     ripeness_percent = 92.0
                     risk_level = "Low"
                 elif pred_cls_idx == 1:
-                    ripeness_percent = 78.0
-                    risk_level = "Low"
-                elif pred_cls_idx == 2:
-                    ripeness_percent = 45.0
+                    ripeness_percent = 75.0
                     risk_level = "Medium"
-                else:
-                    ripeness_percent = 10.0
+                else: # 2: Spoiled / Rotten
+                    ripeness_percent = 12.0
                     risk_level = "Critical"
             except Exception as e:
                 print(f"[FoodQualityVisionEngine] ML inference error: {e}")
@@ -213,3 +210,4 @@ class FoodQualityVisionEngine:
         }
 
 food_vision_engine = FoodQualityVisionEngine()
+vision_engine = food_vision_engine

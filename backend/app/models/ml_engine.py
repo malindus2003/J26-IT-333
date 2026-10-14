@@ -100,13 +100,21 @@ class MultiModalSpoilageMLEngine:
                     with open(meta_path, "r", encoding="utf-8") as f:
                         self.metadata = json.load(f)
                         
+                uci_gas_path = os.path.join(saved_models_dir, "uci_gas_spoilage_model.joblib")
+                if os.path.exists(uci_gas_path):
+                    self.uci_gas_model = joblib.load(uci_gas_path)
+                else:
+                    self.uci_gas_model = None
+
                 self.models_loaded = True
                 print(f"[MultiModalSpoilageMLEngine] Successfully loaded trained ML models from {saved_models_dir}")
             else:
+                self.uci_gas_model = None
                 print("[MultiModalSpoilageMLEngine] Pre-trained models not found; using calibrated biological baseline engine.")
         except Exception as e:
             print(f"[MultiModalSpoilageMLEngine] Warning loading ML models: {e}. Falling back to domain model.")
             self.models_loaded = False
+            self.uci_gas_model = None
 
     def predict(
         self,

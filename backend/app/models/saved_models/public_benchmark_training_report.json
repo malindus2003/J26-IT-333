@@ -1,0 +1,19 @@
+{
+  "computer_vision_benchmark": {
+    "sample_count": 3202,
+    "random_forest_accuracy": 0.936,
+    "random_forest_f1": 0.9359,
+    "xgboost_accuracy": 0.9314,
+    "xgboost_f1": 0.9312,
+    "regressor_r2": 0.7597,
+    "regressor_rmse": 15.01
+  },
+  "uci_gas_sensor_benchmark": {
+    "uci_records_count": 5008,
+    "xgboost_r2": 0.9996,
+    "xgboost_rmse": 0.58,
+    "random_forest_r2": 0.9996,
+    "random_forest_rmse": 0.59
+  },
+  "completed_at": "2026-10-13 12:30:23"
+}

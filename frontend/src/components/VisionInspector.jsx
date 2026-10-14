@@ -46,83 +46,110 @@ const getFallbackSvg = (name, category, icon) => {
 };
 
 const SAMPLE_PRESETS = [
-  // 1. Fruits (3 presets: Rotten, Overripe, Prime Fresh)
+  // 1. Fruits (Authentic Sri Lankan Produce & Benchmark Specimens)
   {
-    id: "strawberries_mould",
-    name: "Mouldy Strawberries",
+    id: "banana_embul_fresh",
+    name: "Embul Banana (Ambul Kesel)",
     category: "Fruits",
-    icon: "🍓",
-    container: "Container #C-104 (Fruit Chamber)",
-    imageUrl: "/images/specimens/strawberries_mould.jpg",
-    remoteFallbackUrl: "https://images.unsplash.com/photo-1543158181-e6f9f6712055?w=600&auto=format&fit=crop&q=80",
-    ripeness_stage: "Spoiled / Senescent (Rotting)",
-    ripeness_percent: 98,
-    visual_spoilage_score: 92,
-    risk_level: "Critical",
-    discoloration_score: 38,
-    mould_detected: true,
-    mould_coverage: 14.5,
-    texture_degradation: 65,
-    baseline_shelf_life_hours: 120.0,
-    remaining_shelf_life_hours: 0.0,
+    icon: "🍌",
+    container: "Container #C-101 (Zone 1: Fruit Chiller 11°C)",
+    imageUrl: "/images/specimens/banana_fresh.jpg",
+    remoteFallbackUrl: "https://images.unsplash.com/photo-1571771894821-ce9b6c11b08e?w=600&auto=format&fit=crop&q=80",
+    ripeness_stage: "Fresh (Grade A - Prime Harvest)",
+    ripeness_percent: 25,
+    visual_spoilage_score: 11.5,
+    risk_level: "Low",
+    discoloration_score: 3.2,
+    mould_detected: false,
+    mould_coverage: 0.0,
+    texture_degradation: 6.0,
+    baseline_shelf_life_hours: 168.0,
+    remaining_shelf_life_hours: 115.0,
     detected_defects: [
-      "Active fungal mould colony (Botrytis cinerea)",
-      "Surface tissue softening & cellular collapse",
-      "Enzymatic browning across 38% surface area"
+      "Intact epidermal cuticle",
+      "Optimal chlorophyll-to-carotenoid ratio (Grade A)"
     ],
     bounding_boxes: [
-      { label: "MOULD SPORE PATCH (92%)", type: "spoilage", x: 28, y: 35, width: 44, height: 38, color: "#ef4444" },
-      { label: "TISSUE ROT (85%)", type: "spoilage", x: 60, y: 55, width: 28, height: 26, color: "#ef4444" }
+      { label: "PRIME INTACT PEEL", type: "fresh", x: 22, y: 20, width: 56, height: 60, color: "#10b981" }
     ]
   },
   {
     id: "banana_overripe",
-    name: "Overripe Brown Banana",
+    name: "Overripe Ambul Kesel (Senescent)",
     category: "Fruits",
     icon: "🍌",
-    container: "Container #C-102 (Fruit Chamber)",
+    container: "Container #C-102 (Zone 4: Ambient Kitchen Rack)",
     imageUrl: "/images/specimens/banana_overripe.jpg",
     remoteFallbackUrl: "https://images.unsplash.com/photo-1571771894821-ce9b6c11b08e?w=600&auto=format&fit=crop&q=80",
-    ripeness_stage: "Overripe (Use Immediately)",
-    ripeness_percent: 85,
-    visual_spoilage_score: 74,
+    ripeness_stage: "Ripe / Good (Grade B - High Ethylene)",
+    ripeness_percent: 75,
+    visual_spoilage_score: 68.0,
     risk_level: "High",
-    discoloration_score: 42,
+    discoloration_score: 38.5,
     mould_detected: false,
     mould_coverage: 0.0,
-    texture_degradation: 48,
-    baseline_shelf_life_hours: 120.0,
-    remaining_shelf_life_hours: 16.5,
+    texture_degradation: 45.0,
+    baseline_shelf_life_hours: 72.0,
+    remaining_shelf_life_hours: 12.5,
     detected_defects: [
-      "Extensive senescence brown spotting (tyrosine oxidation)",
-      "Sugar inversion & soft pulp texture",
-      "High ethylene degassing emission"
+      "Senescence tyrosine browning spots (38%)",
+      "Pulp softening & high ethylene degassing"
     ],
     bounding_boxes: [
-      { label: "SENESCENCE BROWNING", type: "overripe", x: 25, y: 30, width: 52, height: 42, color: "#f59e0b" }
+      { label: "SENESCENCE BROWNING", type: "overripe", x: 25, y: 28, width: 50, height: 45, color: "#f59e0b" }
     ]
   },
   {
-    id: "apple_fresh",
-    name: "Fresh Crisp Green Apple",
+    id: "rotten_fruit_mould",
+    name: "Rotten Fruit (Botrytis Mould Colony)",
     category: "Fruits",
-    icon: "🍏",
-    container: "Container #C-101 (Fruit Chamber)",
-    imageUrl: "/images/specimens/apple_fresh.jpg",
-    remoteFallbackUrl: "https://images.unsplash.com/photo-1619546813926-a78fa6372cd2?w=600&auto=format&fit=crop&q=80",
-    ripeness_stage: "Optimal Ripe (Prime Quality)",
-    ripeness_percent: 45,
-    visual_spoilage_score: 8,
+    icon: "🍎",
+    container: "Container #C-104 (Quarantine Vault)",
+    imageUrl: "/images/specimens/strawberries_mould.jpg",
+    remoteFallbackUrl: "https://images.unsplash.com/photo-1543158181-e6f9f6712055?w=600&auto=format&fit=crop&q=80",
+    ripeness_stage: "Spoiled / Rotten (Grade F)",
+    ripeness_percent: 98,
+    visual_spoilage_score: 92.5,
+    risk_level: "Critical",
+    discoloration_score: 42.0,
+    mould_detected: true,
+    mould_coverage: 18.2,
+    texture_degradation: 72.0,
+    baseline_shelf_life_hours: 96.0,
+    remaining_shelf_life_hours: 0.0,
+    detected_defects: [
+      "Active fungal mycelium & spore colony detected",
+      "Severe enzymatic browning and necrotic tissue breakdown"
+    ],
+    bounding_boxes: [
+      { label: "MOULD SPORE COLONY", type: "spoilage", x: 28, y: 32, width: 44, height: 40, color: "#ef4444" },
+      { label: "NECROTIC TISSUE ROT", type: "spoilage", x: 58, y: 52, width: 28, height: 26, color: "#ef4444" }
+    ]
+  },
+  {
+    id: "mango_karthakolomban",
+    name: "Karthakolomban Mango (Ripe)",
+    category: "Fruits",
+    icon: "🥭",
+    container: "Container #C-103 (Zone 1: Tropical Fruit Chiller)",
+    imageUrl: "/images/specimens/mango_ripe.jpg",
+    remoteFallbackUrl: "https://images.unsplash.com/photo-1553279768-865429fa0078?w=600&auto=format&fit=crop&q=80",
+    ripeness_stage: "Ripe / Good (Grade B - Peak Flavour)",
+    ripeness_percent: 78,
+    visual_spoilage_score: 32.0,
     risk_level: "Low",
-    discoloration_score: 2,
+    discoloration_score: 8.5,
     mould_detected: false,
     mould_coverage: 0.0,
-    texture_degradation: 4,
-    baseline_shelf_life_hours: 120.0,
-    remaining_shelf_life_hours: 96.0,
-    detected_defects: [],
+    texture_degradation: 14.0,
+    baseline_shelf_life_hours: 192.0,
+    remaining_shelf_life_hours: 38.0,
+    detected_defects: [
+      "Rich golden-yellow carotenoid skin gloss",
+      "Slight lenticel spotting at stem end"
+    ],
     bounding_boxes: [
-      { label: "PRIME CRISP TURGOR", type: "fresh", x: 20, y: 15, width: 60, height: 70, color: "#10b981" }
+      { label: "PEAK CAROTENOID RIPENESS", type: "fresh", x: 20, y: 15, width: 60, height: 65, color: "#10b981" }
     ]
   },
 
