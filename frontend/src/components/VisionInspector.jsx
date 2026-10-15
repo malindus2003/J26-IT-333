@@ -46,6 +46,10 @@ const SAMPLE_PRESETS = [
     name: "Embul Banana (Ambul Kesel)",
     category: "Fruits",
     icon: "🍌",
+    identified_produce: "Banana",
+    produce_confidence: 96.5,
+    produce_icon: "🍌",
+    scientific_name: "Musa acuminata",
     container: "Container #C-101 (Zone 1: Fruit Chiller 11°C)",
     imageUrl: "/images/specimens/banana_fresh.jpg",
     remoteFallbackUrl: "https://images.unsplash.com/photo-1571771894821-ce9b6c11b08e?w=600&auto=format&fit=crop&q=80",
@@ -72,6 +76,10 @@ const SAMPLE_PRESETS = [
     name: "Overripe Ambul Kesel (Senescent)",
     category: "Fruits",
     icon: "🍌",
+    identified_produce: "Banana",
+    produce_confidence: 94.8,
+    produce_icon: "🍌",
+    scientific_name: "Musa acuminata",
     container: "Container #C-102 (Zone 4: Ambient Kitchen Rack)",
     imageUrl: "/images/specimens/banana_overripe.jpg",
     remoteFallbackUrl: "https://images.unsplash.com/photo-1571771894821-ce9b6c11b08e?w=600&auto=format&fit=crop&q=80",
@@ -94,10 +102,45 @@ const SAMPLE_PRESETS = [
     ]
   },
   {
+    id: "peach_rotting",
+    name: "Senescent Peach (Brown Rot Softening)",
+    category: "Fruits",
+    icon: "🍑",
+    identified_produce: "Peach",
+    produce_confidence: 96.5,
+    produce_icon: "🍑",
+    scientific_name: "Prunus persica",
+    container: "Container #C-106 (Ambient Produce Tray)",
+    imageUrl: "/images/specimens/peach_rotting.jpg",
+    remoteFallbackUrl: "https://images.unsplash.com/photo-1523049673857-eb18f1d7b578?w=600&auto=format&fit=crop&q=80",
+    ripeness_stage: "Overripe / Softening (Use Today)",
+    ripeness_percent: 47,
+    visual_spoilage_score: 60.0,
+    risk_level: "High",
+    discoloration_score: 13.7,
+    mould_detected: false,
+    mould_coverage: 0.0,
+    texture_degradation: 62.0,
+    baseline_shelf_life_hours: 120.0,
+    remaining_shelf_life_hours: 36.5,
+    detected_defects: [
+      "Senescent sunken necrotic lesion / brown rot discoloration (13.7%)",
+      "Epidermal texture wrinkling & soft tissue breakdown"
+    ],
+    bounding_boxes: [
+      { label: "SENESCENCE BROWNING", type: "overripe", x: 48, y: 23, width: 20, height: 38, color: "#f59e0b" },
+      { label: "SENESCENCE BROWNING", type: "overripe", x: 27, y: 19, width: 15, height: 32, color: "#f59e0b" }
+    ]
+  },
+  {
     id: "rotten_fruit_mould",
     name: "Rotten Fruit (Botrytis Mould Colony)",
     category: "Fruits",
-    icon: "🍎",
+    icon: "🍓",
+    identified_produce: "Strawberry",
+    produce_confidence: 91.2,
+    produce_icon: "🍓",
+    scientific_name: "Fragaria × ananassa",
     container: "Container #C-104 (Quarantine Vault)",
     imageUrl: "/images/specimens/strawberries_mould.jpg",
     remoteFallbackUrl: "https://images.unsplash.com/photo-1543158181-e6f9f6712055?w=600&auto=format&fit=crop&q=80",
@@ -125,6 +168,10 @@ const SAMPLE_PRESETS = [
     name: "Karthakolomban Mango (Ripe)",
     category: "Fruits",
     icon: "🥭",
+    identified_produce: "Mango",
+    produce_confidence: 95.0,
+    produce_icon: "🥭",
+    scientific_name: "Mangifera indica",
     container: "Container #C-103 (Zone 1: Tropical Fruit Chiller)",
     imageUrl: "/images/specimens/mango_ripe.jpg",
     remoteFallbackUrl: "https://images.unsplash.com/photo-1553279768-865429fa0078?w=600&auto=format&fit=crop&q=80",
@@ -151,26 +198,30 @@ const SAMPLE_PRESETS = [
     name: "Overripe Avocado (Butter Fruit)",
     category: "Fruits",
     icon: "🥑",
+    identified_produce: "Avocado",
+    produce_confidence: 96.0,
+    produce_icon: "🥑",
+    scientific_name: "Persea americana",
     container: "Container #C-105 (Zone 4: Ambient Kitchen Rack)",
     imageUrl: "/images/specimens/avocado_overripe.jpg",
     remoteFallbackUrl: "https://images.unsplash.com/photo-1523049673857-eb18f1d7b578?w=600&auto=format&fit=crop&q=80",
     ripeness_stage: "Overripe / Softening (Use Today)",
     ripeness_percent: 44,
-    visual_spoilage_score: 72.0,
+    visual_spoilage_score: 63.5,
     risk_level: "High",
-    discoloration_score: 28.5,
+    discoloration_score: 30.2,
     mould_detected: false,
     mould_coverage: 0.0,
     texture_degradation: 68.0,
-    baseline_shelf_life_hours: 120.0,
-    remaining_shelf_life_hours: 14.0,
+    baseline_shelf_life_hours: 96.0,
+    remaining_shelf_life_hours: 25.7,
     detected_defects: [
-      "Loss of skin firmness & localized sunken browning",
+      "Loss of skin firmness & localized sunken browning (30.2%)",
       "Pulp softening & high lipid cellular oxidation (Stage 3)"
     ],
     bounding_boxes: [
-      { label: "SENESCENCE BROWNING", type: "overripe", x: 22, y: 25, width: 56, height: 50, color: "#f59e0b" },
-      { label: "SOFTENING TISSUE", type: "overripe", x: 55, y: 40, width: 32, height: 35, color: "#f59e0b" }
+      { label: "SENESCENCE BROWNING", type: "overripe", x: 0, y: 37, width: 82, height: 51, color: "#f59e0b" },
+      { label: "SENESCENCE BROWNING", type: "overripe", x: 55, y: 41, width: 44, height: 58, color: "#f59e0b" }
     ]
   },
 
@@ -180,6 +231,10 @@ const SAMPLE_PRESETS = [
     name: "Wilted Yellowing Spinach",
     category: "Vegetables",
     icon: "🥬",
+    identified_produce: "Spinach / Leafy Greens",
+    produce_confidence: 97.4,
+    produce_icon: "🥬",
+    scientific_name: "Spinacia oleracea",
     container: "Container #C-205 (Veg Crisper)",
     imageUrl: "/images/specimens/spinach_wilted.jpg",
     remoteFallbackUrl: "https://images.unsplash.com/photo-1576045057995-568f588f82fb?w=600&auto=format&fit=crop&q=80",
@@ -207,6 +262,10 @@ const SAMPLE_PRESETS = [
     name: "Fresh Romaine Lettuce",
     category: "Vegetables",
     icon: "🥗",
+    identified_produce: "Spinach / Leafy Greens",
+    produce_confidence: 93.8,
+    produce_icon: "🥗",
+    scientific_name: "Lactuca sativa",
     container: "Container #C-201 (Veg Crisper)",
     imageUrl: "/images/specimens/lettuce_crisp.jpg",
     remoteFallbackUrl: "https://images.unsplash.com/photo-1622206151226-18ca2c9ab4a1?w=600&auto=format&fit=crop&q=80",
@@ -230,6 +289,10 @@ const SAMPLE_PRESETS = [
     name: "Overripe Soft Tomato",
     category: "Vegetables",
     icon: "🍅",
+    identified_produce: "Tomato",
+    produce_confidence: 96.2,
+    produce_icon: "🍅",
+    scientific_name: "Solanum lycopersicum",
     container: "Container #C-204 (Veg Crisper)",
     imageUrl: "/images/specimens/tomato_overripe.jpg",
     remoteFallbackUrl: "https://images.unsplash.com/photo-1592924357228-91a4daadcfea?w=600&auto=format&fit=crop&q=80",
@@ -359,7 +422,7 @@ export default function VisionInspector({ onInspectionComplete }) {
     stopCamera();
     const file = e.target.files[0];
     if (file) {
-      setCurrentContainerName("Uploaded Container Photo");
+      setCurrentContainerName("Scanning Uploaded Specimen...");
       setSelectedPresetId(null);
       const reader = new FileReader();
       reader.onload = async (event) => {
@@ -408,6 +471,7 @@ export default function VisionInspector({ onInspectionComplete }) {
     const dataUrl = canvas.toDataURL("image/jpeg");
     stopCamera();
     setPreviewImage(dataUrl);
+    setCurrentContainerName("Scanning Captured Photo...");
     runBackendAnalysis(dataUrl, cvResult?.category || "Fruits");
   };
 
@@ -419,11 +483,15 @@ export default function VisionInspector({ onInspectionComplete }) {
       formData.append("image_base64", imageDataUrl);
 
       const res = await axios.post("http://localhost:8000/api/vision/inspect", formData);
-      setCvResult(res.data.features);
-      setDummyLevel(res.data.features.visual_spoilage_score || 50);
+      const feat = res.data.features;
+      setCvResult(feat);
+      if (feat.identified_produce) {
+        setCurrentContainerName(`Detected: ${feat.identified_produce} (${feat.category || targetCategory})`);
+      }
+      setDummyLevel(feat.visual_spoilage_score || 50);
       setIsManualOverride(false);
       if (onInspectionComplete) {
-        onInspectionComplete(res.data.features);
+        onInspectionComplete(feat);
       }
     } catch (err) {
       console.error("CV inspection error:", err);
@@ -967,13 +1035,51 @@ export default function VisionInspector({ onInspectionComplete }) {
         <div className="lg:col-span-5 flex flex-col items-center justify-between p-3.5 sm:p-4 bg-[#f8faf9] dark:bg-slate-850 rounded-xl sm:rounded-2xl border border-[#d1ded5] dark:border-slate-800 relative dark:bg-slate-900/60 shadow-2xs">
           
           <div className="w-full flex items-center justify-between text-xs text-slate-700 dark:text-slate-300 pb-2 mb-2 border-b border-[#e1eae4] dark:border-slate-800">
-            <span className="font-bold flex items-center gap-1.5 text-slate-900 dark:text-white">
-              <Camera className="h-4 w-4 text-emerald-700 dark:text-emerald-400" /> {currentContainerName}
+            <span className="font-bold flex items-center gap-1.5 text-slate-900 dark:text-white truncate mr-2">
+              <Camera className="h-4 w-4 text-emerald-700 dark:text-emerald-400 flex-shrink-0" />
+              <span className="truncate">{currentContainerName}</span>
             </span>
-            <span className="text-[10px] px-2.5 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 font-bold border border-emerald-200 dark:border-emerald-800">
+            <span className="text-[10px] px-2.5 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 font-bold border border-emerald-200 dark:border-emerald-800 flex-shrink-0">
               Optical Sensor
             </span>
           </div>
+
+          {/* Identified Produce & AI Confidence Badge */}
+          {cvResult && cvResult.identified_produce && (
+            <div className="w-full mb-2 p-2.5 rounded-xl bg-gradient-to-r from-emerald-50 via-teal-50/70 to-emerald-50 dark:from-emerald-950/70 dark:via-teal-950/50 dark:to-emerald-950/70 border border-emerald-300 dark:border-emerald-700/80 shadow-2xs flex items-center justify-between">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <span className="text-2xl p-1 bg-white dark:bg-slate-800 rounded-lg shadow-2xs flex-shrink-0 border border-emerald-200 dark:border-emerald-800">
+                  {cvResult.produce_icon || "🍎"}
+                </span>
+                <div className="flex flex-col min-w-0">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="text-[10px] font-black uppercase tracking-wider text-emerald-800 dark:text-emerald-400">
+                      Detected Produce:
+                    </span>
+                    <span className="text-xs sm:text-sm font-black text-slate-900 dark:text-white">
+                      {cvResult.identified_produce}
+                    </span>
+                    {cvResult.scientific_name && (
+                      <span className="text-[10px] italic text-slate-500 dark:text-slate-400 hidden sm:inline">
+                        ({cvResult.scientific_name})
+                      </span>
+                    )}
+                  </div>
+                  <span className="text-[10px] font-semibold text-emerald-900 dark:text-emerald-300 truncate">
+                    Category: {cvResult.category || "Produce"} • Baseline: {cvResult.baseline_shelf_life_hours || 120}h Shelf-Life
+                  </span>
+                </div>
+              </div>
+              {cvResult.produce_confidence && (
+                <div className="flex flex-col items-end flex-shrink-0 ml-2">
+                  <span className="text-[9px] font-bold text-slate-500 dark:text-slate-400 uppercase">Confidence</span>
+                  <span className="text-xs font-black px-2 py-0.5 rounded-full bg-emerald-200/90 dark:bg-emerald-900 text-emerald-900 dark:text-emerald-100 border border-emerald-300 dark:border-emerald-700 font-mono">
+                    {cvResult.produce_confidence}%
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Risk Diagnostic Banner (Placed outside photo frame to prevent text overlapping with bounding boxes) */}
           {cvResult && (
@@ -996,7 +1102,7 @@ export default function VisionInspector({ onInspectionComplete }) {
                 ) : (
                   <CheckCircle2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-emerald-600 dark:text-emerald-400 flex-shrink-0" />
                 )}
-                <span>{cvResult.risk_level.toUpperCase()}: {cvResult.ripeness_stage.toUpperCase()}</span>
+                <span>{cvResult.identified_produce ? `${cvResult.identified_produce.toUpperCase()} — ` : ""}{cvResult.risk_level.toUpperCase()}: {cvResult.ripeness_stage.toUpperCase()}</span>
               </span>
               <span className="font-mono text-[11px] sm:text-xs font-black flex-shrink-0 ml-2">{cvResult.visual_spoilage_score}% Spoilage</span>
             </div>

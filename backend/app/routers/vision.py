@@ -32,6 +32,10 @@ async def inspect_food_image(
     results = vision_engine.analyze_image(image_bytes, category=category)
     return {
         "status": "success",
-        "category": category,
+        "category": results.get("category", category),
+        "identified_produce": results.get("identified_produce", "Produce"),
+        "produce_confidence": results.get("produce_confidence", 85.0),
+        "produce_icon": results.get("produce_icon", "🍎"),
+        "scientific_name": results.get("scientific_name", ""),
         "features": results
     }

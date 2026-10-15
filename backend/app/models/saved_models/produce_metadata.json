@@ -1,0 +1,133 @@
+{
+  "produce_classes": [
+    "Peach",
+    "Avocado",
+    "Banana",
+    "Mango",
+    "Tomato",
+    "Papaya",
+    "Apple",
+    "Strawberry",
+    "Carrot",
+    "Spinach / Leafy Greens",
+    "Green Chillies",
+    "Pineapple",
+    "Cucumber",
+    "Potato",
+    "Eggplant",
+    "Orange / Citrus",
+    "Grapes"
+  ],
+  "produce_info": {
+    "Peach": {
+      "icon": "\ud83c\udf51",
+      "category": "Fruits",
+      "shelf_life": 120.0,
+      "scientific": "Prunus persica"
+    },
+    "Avocado": {
+      "icon": "\ud83e\udd51",
+      "category": "Fruits",
+      "shelf_life": 96.0,
+      "scientific": "Persea americana"
+    },
+    "Banana": {
+      "icon": "\ud83c\udf4c",
+      "category": "Fruits",
+      "shelf_life": 120.0,
+      "scientific": "Musa acuminata"
+    },
+    "Mango": {
+      "icon": "\ud83e\udd6d",
+      "category": "Fruits",
+      "shelf_life": 144.0,
+      "scientific": "Mangifera indica"
+    },
+    "Tomato": {
+      "icon": "\ud83c\udf45",
+      "category": "Vegetables",
+      "shelf_life": 144.0,
+      "scientific": "Solanum lycopersicum"
+    },
+    "Papaya": {
+      "icon": "\ud83c\udf48",
+      "category": "Fruits",
+      "shelf_life": 96.0,
+      "scientific": "Carica papaya"
+    },
+    "Apple": {
+      "icon": "\ud83c\udf4e",
+      "category": "Fruits",
+      "shelf_life": 336.0,
+      "scientific": "Malus domestica"
+    },
+    "Strawberry": {
+      "icon": "\ud83c\udf53",
+      "category": "Fruits",
+      "shelf_life": 72.0,
+      "scientific": "Fragaria \u00d7 ananassa"
+    },
+    "Carrot": {
+      "icon": "\ud83e\udd55",
+      "category": "Vegetables",
+      "shelf_life": 240.0,
+      "scientific": "Daucus carota"
+    },
+    "Spinach / Leafy Greens": {
+      "icon": "\ud83e\udd6c",
+      "category": "Vegetables",
+      "shelf_life": 72.0,
+      "scientific": "Spinacia oleracea / Mukunuwenna"
+    },
+    "Green Chillies": {
+      "icon": "\ud83c\udf36\ufe0f",
+      "category": "Vegetables",
+      "shelf_life": 168.0,
+      "scientific": "Capsicum frutescens"
+    },
+    "Pineapple": {
+      "icon": "\ud83c\udf4d",
+      "category": "Fruits",
+      "shelf_life": 168.0,
+      "scientific": "Ananas comosus"
+    },
+    "Cucumber": {
+      "icon": "\ud83e\udd52",
+      "category": "Vegetables",
+      "shelf_life": 120.0,
+      "scientific": "Cucumis sativus"
+    },
+    "Potato": {
+      "icon": "\ud83e\udd54",
+      "category": "Vegetables",
+      "shelf_life": 480.0,
+      "scientific": "Solanum tuberosum"
+    },
+    "Eggplant": {
+      "icon": "\ud83c\udf46",
+      "category": "Vegetables",
+      "shelf_life": 120.0,
+      "scientific": "Solanum melongena"
+    },
+    "Orange / Citrus": {
+      "icon": "\ud83c\udf4a",
+      "category": "Fruits",
+      "shelf_life": 240.0,
+      "scientific": "Citrus sinensis"
+    },
+    "Grapes": {
+      "icon": "\ud83c\udf47",
+      "category": "Fruits",
+      "shelf_life": 120.0,
+      "scientific": "Vitis vinifera"
+    }
+  },
+  "feature_count": 36,
+  "training_samples": 5520,
+  "stage_classes": {
+    "0": "Fresh / Firm (Grade A)",
+    "1": "Optimal Ripe (Grade B)",
+    "2": "Overripe / Softening (Use Today)",
+    "3": "Spoiled / Rotten (Grade F)"
+  }
+}
