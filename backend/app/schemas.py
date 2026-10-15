@@ -12,13 +12,13 @@ class SensorReading(BaseModel):
     timestamp: Optional[datetime] = None
 
 class VisionFeatures(BaseModel):
-    category: str = Field(..., example="Fruits")
-    discoloration_score: float = Field(..., description="0-100% surface discoloration", example=12.5)
-    mould_detected: bool = Field(..., example=False)
-    mould_coverage: float = Field(..., description="0-100% mould surface area", example=0.0)
-    ripeness_stage: str = Field(..., example="Fresh / Optimal")
-    texture_degradation: float = Field(..., description="0-100% texture defect score", example=15.0)
-    visual_spoilage_score: float = Field(..., description="Aggregated visual risk 0-100", example=18.0)
+    category: str = Field(default="Fruits", example="Fruits")
+    discoloration_score: float = Field(default=0.0, description="0-100% surface discoloration", example=12.5)
+    mould_detected: bool = Field(default=False, example=False)
+    mould_coverage: float = Field(default=0.0, description="0-100% mould surface area", example=0.0)
+    ripeness_stage: str = Field(default="Fresh / Optimal", example="Fresh / Optimal")
+    texture_degradation: float = Field(default=0.0, description="0-100% texture defect score", example=15.0)
+    visual_spoilage_score: float = Field(default=0.0, description="Aggregated visual risk 0-100", example=18.0)
 
 class PredictionRequest(BaseModel):
     item_name: str = Field(..., example="Embul Banana (Ambul Kesel)")

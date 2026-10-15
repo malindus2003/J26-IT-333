@@ -341,8 +341,19 @@ export default function InventoryHealthTable({ items = [], zones = [], onRefresh
 
                   {/* Remaining Shelf Life */}
                   <td className="py-3.5 px-4">
-                    <div className={`text-sm font-black ${item.remaining_shelf_life_hours < 16 ? 'text-rose-700 dark:text-rose-400' : 'text-emerald-700 dark:text-emerald-400'}`}>
-                      {item.remaining_shelf_life_hours} hrs
+                    <div className={`text-sm flex items-baseline gap-1.5 ${
+                      item.remaining_shelf_life_hours <= 0
+                        ? 'text-rose-700 dark:text-rose-400 font-black animate-pulse'
+                        : item.remaining_shelf_life_hours < 24
+                        ? 'text-amber-700 dark:text-amber-400 font-black'
+                        : 'text-emerald-700 dark:text-emerald-400 font-bold'
+                    }`}>
+                      <span>{item.remaining_shelf_life_hours} hrs</span>
+                      {item.remaining_shelf_life_hours > 0 && (
+                        <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">
+                          (~{(item.remaining_shelf_life_hours / 24.0).toFixed(1)}d)
+                        </span>
+                      )}
                     </div>
                     <div className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">
                       Spoilage Prob: {item.spoilage_prob}%

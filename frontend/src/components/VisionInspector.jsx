@@ -122,7 +122,7 @@ const SAMPLE_PRESETS = [
     mould_coverage: 0.0,
     texture_degradation: 62.0,
     baseline_shelf_life_hours: 120.0,
-    remaining_shelf_life_hours: 36.5,
+    remaining_shelf_life_hours: 16.5,
     detected_defects: [
       "Senescent sunken necrotic lesion / brown rot discoloration (13.7%)",
       "Epidermal texture wrinkling & soft tissue breakdown"
@@ -214,7 +214,7 @@ const SAMPLE_PRESETS = [
     mould_coverage: 0.0,
     texture_degradation: 68.0,
     baseline_shelf_life_hours: 96.0,
-    remaining_shelf_life_hours: 25.7,
+    remaining_shelf_life_hours: 18.0,
     detected_defects: [
       "Loss of skin firmness & localized sunken browning (30.2%)",
       "Pulp softening & high lipid cellular oxidation (Stage 3)"
@@ -483,7 +483,7 @@ export default function VisionInspector({ onInspectionComplete }) {
       formData.append("image_base64", imageDataUrl);
 
       const res = await axios.post("http://localhost:8000/api/vision/inspect", formData);
-      const feat = res.data.features;
+      const feat = res.data.features || res.data;
       setCvResult(feat);
       if (feat.identified_produce) {
         setCurrentContainerName(`Detected: ${feat.identified_produce} (${feat.category || targetCategory})`);
@@ -506,7 +506,28 @@ export default function VisionInspector({ onInspectionComplete }) {
       "Fruits": 120.0,
       "Vegetables": 96.0
     };
-    const baseline = baselines[category] || 120.0;
+    const baseline = cvResult?.baseline_shelf_life_hours || baselines[category] || 120.0;
+
+    // Use AI-model analyzed remaining_shelf_life_hours directly if available and user is not manually sliding:
+    if (!isManualOverride && cvResult?.remaining_shelf_life_hours !== undefined) {
+      const h = Math.round(cvResult.remaining_shelf_life_hours * 10) / 10;
+      const isExpired = h <= 0 || cvResult.mould_detected || cvResult.risk_level === 'Critical' || (cvResult.ripeness_stage && cvResult.ripeness_stage.toLowerCase().includes('spoiled'));
+      const isUrgent = h < 24 || cvResult.risk_level === 'High' || (cvResult.ripeness_stage && cvResult.ripeness_stage.toLowerCase().includes('overripe'));
+      return {
+        hours: isExpired ? 0.0 : h,
+        days: isExpired ? 0.0 : Math.round((h / 24.0) * 10) / 10,
+        percentage: isExpired ? 0 : Math.max(0, Math.min(100, Math.round(100 - (cvResult.visual_spoilage_score || val)))),
+        action: isExpired 
+          ? "EXPIRED: Quarantine & Dispose Immediately" 
+          : (isUrgent ? "PRIORITY CHEF USE (Cook / Divert Today)" : (h > 48 ? "Optimal Quality (Standard FIFO Rotation)" : "Prime Culinary Quality (Cook within 2-3 days)")),
+        safeDeadline: isExpired 
+          ? "Expired - Do not cook or serve" 
+          : (isUrgent ? `Must consume within ${Math.max(2, Math.round(h))} hours!` : `Safe for ~${Math.max(1, Math.round(h / 24.0))} days in cold storage`),
+        decayRate: isExpired 
+          ? "Severe degradation (> 5.2x baseline decay)" 
+          : (isUrgent ? "Accelerated cellular breakdown (3.4x decay)" : "Normal baseline metabolic aging (1.0x)")
+      };
+    }
 
     if (val >= 78 || isMould) {
       return {
@@ -544,9 +565,10 @@ export default function VisionInspector({ onInspectionComplete }) {
     }
 
     // Overripe / High Risk (55% - 77%)
-    const h = Math.round(baseline * 0.22 * (1.0 - ((val - 55) / 23) * 0.6) * 10) / 10;
+    const rawH = baseline * 0.22 * (1.0 - ((val - 55) / 23) * 0.6);
+    const h = Math.min(24.0, Math.max(2.0, Math.round(rawH * 10) / 10));
     return {
-      hours: Math.max(2.0, h),
+      hours: h,
       days: Math.round((h / 24.0) * 10) / 10,
       percentage: Math.round(100 - val),
       action: "PRIORITY CHEF USE (Cook / Divert Today)",
@@ -590,12 +612,14 @@ export default function VisionInspector({ onInspectionComplete }) {
       defects = ["Active fungal mould growth detected", "Severe microbial decomposition", "Deleterious odour / spoilage risk"];
     }
 
+    const sliderRsl = computeRemainingShelfLife(val, cvResult?.category || "Fruits", mould);
     const updated = {
       ...cvResult,
       ripeness_stage: stage,
       ripeness_percent: val,
       visual_spoilage_score: val,
       risk_level: risk,
+      remaining_shelf_life_hours: sliderRsl.hours,
       discoloration_score: Math.round(val * 0.45),
       mould_detected: mould,
       mould_coverage: mould ? Math.round((val - 75) * 0.6) : 0,

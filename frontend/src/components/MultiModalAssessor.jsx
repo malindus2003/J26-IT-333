@@ -103,6 +103,8 @@ export default function MultiModalAssessor({ currentVisionFeatures, selectedZone
           voc: Number(voc)
         },
         vision_data: useVision ? {
+          category: category,
+          ripeness_stage: currentVisionFeatures?.ripeness_stage || "Optimal Ripe (Grade B)",
           discoloration_score: Number(discoloration),
           mould_detected: mouldDetected,
           mould_coverage: mouldDetected ? 12.0 : 0.0,

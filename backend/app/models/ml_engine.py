@@ -130,17 +130,24 @@ class MultiModalSpoilageMLEngine:
             risk_score = round(float(np.clip(fused_risk_score, 0.0, 100.0)), 1)
             spoilage_prob = round(float(np.clip(fused_risk_score * 0.95, 0.0, 99.9)), 1)
 
-            if vision.mould_detected:
+            # Health decay factor from visual defects
+            visual_health = max(0.0, (100.0 - visual_risk) / 100.0)
+            remaining_rsl = remaining_rsl * (visual_health ** 1.2)
+
+            if vision.mould_detected or (vision.visual_spoilage_score and vision.visual_spoilage_score >= 78.0) or (vision.ripeness_stage and "Spoiled" in vision.ripeness_stage):
                 spoilage_prob = max(spoilage_prob, 95.0)
                 remaining_rsl = 0.0
                 risk_level = "Critical"
             elif risk_score >= 76.0:
                 risk_level = "Critical"
-                remaining_rsl = min(remaining_rsl, 4.0)
-            elif risk_score >= 52.0:
+                remaining_rsl = 0.0
+            elif risk_score >= 52.0 or (vision.ripeness_stage and "Overripe" in vision.ripeness_stage):
                 risk_level = "High"
+                remaining_rsl = min(remaining_rsl, 24.0)
+                remaining_rsl = max(2.0, remaining_rsl)
             elif risk_score >= 25.0:
                 risk_level = "Medium"
+                remaining_rsl = min(remaining_rsl, 72.0)
             else:
                 risk_level = "Low"
 
@@ -200,10 +207,16 @@ class MultiModalSpoilageMLEngine:
             # Inference
             rsl_pred = float(self.rsl_model.predict(x_input)[0])
             prob_pred = float(self.prob_model.predict(x_input)[0])
-            risk_idx = int(self.risk_model.predict(x_input)[0])
-
             inv_map = {0: "Low", 1: "Medium", 2: "High", 3: "Critical"}
             risk_str = inv_map.get(risk_idx, "Medium")
+
+            if risk_str == "Critical" or prob_pred >= 76.0:
+                rsl_pred = 0.0
+            elif risk_str == "High" or prob_pred >= 52.0:
+                rsl_pred = min(rsl_pred, 24.0)
+                rsl_pred = max(2.0, rsl_pred)
+            elif risk_str == "Medium":
+                rsl_pred = min(rsl_pred, 72.0)
 
             return (rsl_pred, prob_pred, risk_str)
         except Exception as e:
@@ -256,10 +269,14 @@ class MultiModalSpoilageMLEngine:
             risk_level = "Low"
         elif risk_score < 52.0:
             risk_level = "Medium"
+            calculated_rsl = min(calculated_rsl, 72.0)
         elif risk_score < 76.0:
             risk_level = "High"
+            calculated_rsl = min(calculated_rsl, 24.0)
+            calculated_rsl = max(2.0, calculated_rsl)
         else:
             risk_level = "Critical"
+            calculated_rsl = 0.0
 
         return risk_score, spoilage_prob, calculated_rsl, risk_level
 

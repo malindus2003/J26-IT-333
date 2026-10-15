@@ -151,8 +151,14 @@ class FoodQualityVisionEngine:
         # 5. Remaining Shelf-Life Estimation
         decay_factor = max(0.0, (100.0 - visual_score) / 100.0)
         remaining_shelf_life = round(baseline_shelf_life * (decay_factor ** 1.3), 1)
-        if visual_score >= 80.0 or mould_detected:
+        if visual_score >= 78.0 or mould_detected or "Spoiled" in ripeness_stage or risk_level == "Critical":
             remaining_shelf_life = 0.0
+        elif "Overripe" in ripeness_stage or risk_level == "High":
+            # Overripe produce must be consumed or diverted today (maximum 24 hours shelf-life)
+            remaining_shelf_life = round(min(remaining_shelf_life, 24.0), 1)
+            remaining_shelf_life = max(2.0, remaining_shelf_life)
+        elif risk_level == "Medium":
+            remaining_shelf_life = round(min(remaining_shelf_life, 72.0), 1)
 
         # 6. Extract Normalized Bounding Boxes strictly inside produce boundary
         bounding_boxes, detected_defects = self._extract_defect_contours(
