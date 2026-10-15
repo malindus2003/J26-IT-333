@@ -71,42 +71,37 @@ class FoodQualityVisionEngine:
         avg_brightness = float(feat_vec[8]) # V mean
         browning_percent = round(float(feat_vec[15]), 2)
         mould_coverage = round(float(feat_vec[17]), 2)
-        mould_detected = mould_coverage > 1.8
+        mould_detected = mould_coverage > 2.0
         texture_degradation = min(100.0, round(float(feat_vec[18] * 2.2), 1))
 
-        # 2. Machine Learning Inference if Models Loaded
+        # 2. Machine Learning Inference & Physical Defect Fusion
         cat_clean = category.capitalize() if category and category.capitalize() in self.CATEGORIES else "Fruits"
-        
+        pred_cls_idx = None
+        pred_score = None
+
         if self.models_loaded and self.cv_classifier:
             try:
                 x_input = feat_vec.reshape(1, -1)
                 pred_cls_idx = int(self.cv_classifier.predict(x_input)[0])
-                pred_score = float(self.cv_regressor.predict(x_input)[0]) if self.cv_regressor else browning_percent * 1.5
-                
-                ripeness_stage = self.CLASS_LABELS.get(pred_cls_idx, "Fresh (Grade A)")
-                visual_score = float(np.clip(pred_score, 0.0, 100.0))
-                
-                if pred_cls_idx == 0:
-                    ripeness_percent = 92.0
-                    risk_level = "Low"
-                elif pred_cls_idx == 1:
-                    ripeness_percent = 75.0
-                    risk_level = "Medium"
-                else: # 2: Spoiled / Rotten
-                    ripeness_percent = 12.0
-                    risk_level = "Critical"
+                if self.cv_regressor:
+                    pred_score = float(self.cv_regressor.predict(x_input)[0])
             except Exception as e:
                 print(f"[FoodQualityVisionEngine] ML inference error: {e}")
-                ripeness_stage, ripeness_percent, visual_score, risk_level = self._heuristic_fallback(
-                    browning_percent, mould_coverage, texture_degradation
-                )
-        else:
-            ripeness_stage, ripeness_percent, visual_score, risk_level = self._heuristic_fallback(
-                browning_percent, mould_coverage, texture_degradation
-            )
+
+        ripeness_stage, ripeness_percent, visual_score, risk_level = self._compute_spoilage_diagnostics(
+            feat_vec=feat_vec,
+            pred_cls_idx=pred_cls_idx,
+            pred_score=pred_score,
+            browning=browning_percent,
+            mould=mould_coverage,
+            texture=texture_degradation,
+            mould_detected=mould_detected
+        )
 
         # 3. Contour Defect Segmentation & Bounding Box Generation
-        bounding_boxes, detected_defects = self._extract_defect_contours(img_resized, rgb, gray, mould_detected, browning_percent)
+        bounding_boxes, detected_defects = self._extract_defect_contours(
+            img_resized, rgb, gray, mould_detected, browning_percent, texture_degradation, ripeness_stage
+        )
 
         return {
             "category": cat_clean,
@@ -126,69 +121,135 @@ class FoodQualityVisionEngine:
             "image_height": orig_h
         }
 
-    def _extract_defect_contours(self, img_bgr, rgb, gray, mould_detected, browning_percent):
+    def _compute_spoilage_diagnostics(
+        self, feat_vec, pred_cls_idx, pred_score, browning, mould, texture, mould_detected
+    ):
+        """
+        Calibrate and fuse ML predictions with physical defect measurements.
+        Accurately separates:
+        - Stage 1: Fresh / Firm (Grade A)
+        - Stage 2: Optimal Ripe (Grade B)
+        - Stage 3: Overripe / Softening (Use Today)
+        - Stage 4: Spoiled / Rotten (Grade F)
+        """
+        # Composite physical visual defect penalty
+        physical_defect_score = (browning * 1.3) + (mould * 4.5) + (texture * 0.22)
+
+        if pred_score is not None:
+            # Weighted fusion: 40% ML regressor + 60% physical visual defects
+            fused_score = (0.40 * pred_score) + (0.60 * physical_defect_score)
+        else:
+            fused_score = physical_defect_score
+
+        visual_score = float(np.clip(fused_score, 5.0, 99.0))
+
+        # Hierarchical Food Safety Rules:
+        # Rule 1: Active Mould Colony OR Severe Necrosis -> Stage 4 (Spoiled / Rotten)
+        if mould_detected or mould >= 2.5 or visual_score >= 82.0 or browning >= 52.0:
+            ripeness_stage = "Spoiled / Rotten (Grade F)"
+            risk_level = "Critical"
+            ripeness_percent = max(5.0, round(100.0 - visual_score, 1))
+            visual_score = max(82.0, visual_score)
+
+        # Rule 2: High Browning / Senescence / Tissue breakdown -> Stage 3 (Overripe)
+        elif browning >= 18.0 or texture >= 60.0 or visual_score >= 58.0 or pred_cls_idx == 2:
+            ripeness_stage = "Overripe / Softening (Use Today)"
+            risk_level = "High"
+            ripeness_percent = max(20.0, round(100.0 - visual_score, 1))
+            visual_score = min(76.0, max(68.0, visual_score))
+
+        # Rule 3: Moderate Browning / Ripe -> Stage 2 (Optimal Ripe)
+        elif visual_score >= 25.0 or browning >= 8.0 or texture >= 25.0 or pred_cls_idx == 1:
+            ripeness_stage = "Optimal Ripe (Grade B)"
+            risk_level = "Medium" if visual_score >= 45.0 else "Low"
+            ripeness_percent = max(60.0, round(100.0 - visual_score, 1))
+            visual_score = min(54.0, max(26.0, visual_score))
+
+        # Rule 4: Prime Fresh Harvest -> Stage 1 (Fresh / Firm)
+        else:
+            ripeness_stage = "Fresh / Firm (Grade A)"
+            risk_level = "Low"
+            ripeness_percent = 95.0
+            visual_score = min(20.0, max(5.0, visual_score))
+
+        return ripeness_stage, ripeness_percent, round(visual_score, 1), risk_level
+
+    def _extract_defect_contours(self, img_resized, rgb, gray, mould_detected, browning_percent, texture, ripeness_stage):
         boxes = []
         defects = []
+        hsv = cv2.cvtColor(img_resized, cv2.COLOR_RGB2HSV)
 
-        # Mould Defect Contours
-        mould_mask = ((rgb[:, :, 1] > rgb[:, :, 0] * 1.15) & (rgb[:, :, 1] > 65) & (rgb[:, :, 0] < 135)).astype(np.uint8) * 255
-        contours, _ = cv2.findContours(mould_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        
-        for cnt in contours:
-            area = cv2.contourArea(cnt)
-            if area > 120:
-                x, y, w, h = cv2.boundingRect(cnt)
-                boxes.append({
-                    "label": "MOULD SPORE COLONY",
-                    "type": "spoilage",
-                    "x": int(x * 100 / 256),
-                    "y": int(y * 100 / 256),
-                    "width": int(w * 100 / 256),
-                    "height": int(h * 100 / 256),
-                    "color": "#ef4444"
-                })
+        # Intact plant green discrimination (prevents false-positive mould on avocados, bananas, cucumbers)
+        is_chlorophyll = (hsv[:, :, 0] >= 32) & (hsv[:, :, 0] <= 88) & (hsv[:, :, 1] >= 28)
+
+        mould_mask = (((hsv[:, :, 1] < 35) & (hsv[:, :, 2] > 185) & (~is_chlorophyll) & (gray > 180))).astype(np.uint8) * 255
+        # Clear extreme image borders to prevent photo-frame / crop artefacts
+        mould_mask[:8, :] = 0
+        mould_mask[-8:, :] = 0
+        mould_mask[:, :8] = 0
+        mould_mask[:, -8:] = 0
 
         if mould_detected:
+            contours_m, _ = cv2.findContours(mould_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            for cnt in contours_m:
+                if cv2.contourArea(cnt) > 200:
+                    x, y, w, h = cv2.boundingRect(cnt)
+                    boxes.append({
+                        "label": "MOULD SPORE COLONY",
+                        "type": "spoilage",
+                        "x": int(x * 100 / 256),
+                        "y": int(y * 100 / 256),
+                        "width": int(w * 100 / 256),
+                        "height": int(h * 100 / 256),
+                        "color": "#ef4444"
+                    })
             defects.append("Fungal Mycelium / Mould Colony Detected")
 
-        # Enzymatic Browning / Necrotic Spot Contours
-        brown_mask = ((rgb[:, :, 0] > 70) & (rgb[:, :, 0] < 190) & 
-                      (rgb[:, :, 1] > 40) & (rgb[:, :, 1] < 140) & 
-                      (rgb[:, :, 2] < 90)).astype(np.uint8) * 255
+        # 2. Enzymatic Browning / Senescence Necrosis / Sunken Softening Rot
+        brown_mask = (((rgb[:, :, 0] < 125) & (rgb[:, :, 1] < 110) & (rgb[:, :, 2] < 85) & (gray < 100)) | \
+                      ((rgb[:, :, 0] > 70) & (rgb[:, :, 0] < 190) & (rgb[:, :, 1] > 40) & (rgb[:, :, 1] < 140) & (rgb[:, :, 2] < 90))).astype(np.uint8) * 255
         contours_b, _ = cv2.findContours(brown_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         
-        for cnt in contours_b:
-            area = cv2.contourArea(cnt)
-            if area > 200:
+        # Sort contours by size to highlight the primary symptom areas
+        sorted_b_contours = sorted(contours_b, key=cv2.contourArea, reverse=True)
+        for cnt in sorted_b_contours[:4]:
+            if cv2.contourArea(cnt) > 200:
                 x, y, w, h = cv2.boundingRect(cnt)
+                is_overripe = "overripe" in ripeness_stage.lower() or browning_percent >= 18.0
+                label = "SENESCENCE BROWNING" if is_overripe else "PEEL DISCOLORATION"
+                color = "#f59e0b" if is_overripe else "#eab308"
                 boxes.append({
-                    "label": "SENESCENCE BROWNING",
+                    "label": label,
                     "type": "discoloration",
                     "x": int(x * 100 / 256),
                     "y": int(y * 100 / 256),
                     "width": int(w * 100 / 256),
                     "height": int(h * 100 / 256),
-                    "color": "#f59e0b"
+                    "color": color
                 })
 
-        if browning_percent > 12.0:
+        if browning_percent >= 18.0:
             defects.append(f"Surface Enzymatic Browning & Discoloration ({browning_percent}%)")
+            defects.append(f"Epidermal Texture Breakdown & Softening ({texture}%)")
+            defects.append("Senescent Anthracnose / Sunken Necrotic Softening")
+        elif browning_percent >= 8.0:
+            defects.append(f"Mild Surface Lenticel Spotting ({browning_percent}%)")
 
         if not defects:
-            defects.append("Intact Epidermal Surface (No Active Fungal Lesions)")
+            defects.append("Intact Epidermal Cuticle (No Fungal Lesions or Browning)")
+            # Add an intact peel reference box
+            boxes.append({
+                "label": "INTACT HEALTHY PEEL",
+                "type": "fresh",
+                "x": 20,
+                "y": 20,
+                "width": 60,
+                "height": 60,
+                "color": "#10b981"
+            })
 
         # Limit to top 5 bounding boxes for clean UI display
         return boxes[:5], defects
-
-    def _heuristic_fallback(self, browning: float, mould: float, texture: float):
-        if mould > 2.0 or browning > 30.0:
-            return "Spoiled / Mouldy (Grade F)", 10.0, 92.0, "Critical"
-        elif browning > 15.0 or texture > 40.0:
-            return "Degraded / Consumable (Grade C)", 45.0, 58.0, "Medium"
-        elif browning > 6.0:
-            return "Ripe / Good (Grade B)", 80.0, 25.0, "Low"
-        else:
-            return "Fresh (Grade A)", 95.0, 8.0, "Low"
 
     def _default_features(self, category: str) -> Dict[str, Any]:
         return {

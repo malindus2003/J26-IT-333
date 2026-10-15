@@ -49,18 +49,22 @@ def extract_visual_features_from_image(img_bgr):
     l_mean, a_mean, b_lab_mean = np.mean(lab[:, :, 0]), np.mean(lab[:, :, 1]), np.mean(lab[:, :, 2])
 
     # 2. Browning & Chlorophyll Indices
-    # Browning index derived from CIE Lab: ratio of a* (redness) to b* (yellowness) and L (lightness)
-    browning_index = float(np.sum((rgb[:, :, 0] > 70) & (rgb[:, :, 0] < 190) & 
-                                  (rgb[:, :, 1] > 40) & (rgb[:, :, 1] < 140) & 
-                                  (rgb[:, :, 2] < 90)) / (256 * 256) * 100.0)
-    
-    green_chlorophyll_ratio = float(np.sum((rgb[:, :, 1] > rgb[:, :, 0] * 1.1) & 
-                                           (rgb[:, :, 1] > rgb[:, :, 2] * 1.1)) / (256 * 256) * 100.0)
+    # Plant green chlorophyll discrimination (excludes false-positive mould on green produce like avocados)
+    is_chlorophyll = (hsv[:, :, 0] >= 32) & (hsv[:, :, 0] <= 88) & (hsv[:, :, 1] >= 28)
+    green_chlorophyll_ratio = float(np.sum(is_chlorophyll) / (256 * 256) * 100.0)
+
+    # Browning: broad spectrum of enzymatic browning, dark necrotic lesions & senescence rot
+    browning_mask = (((rgb[:, :, 0] < 125) & (rgb[:, :, 1] < 110) & (rgb[:, :, 2] < 85) & (gray < 100)) | \
+                    ((rgb[:, :, 0] > 70) & (rgb[:, :, 0] < 190) & (rgb[:, :, 1] > 40) & (rgb[:, :, 1] < 140) & (rgb[:, :, 2] < 90))) & (~is_chlorophyll)
+    browning_index = float(np.sum(browning_mask) / (256 * 256) * 100.0)
 
     # 3. Mould & Fungal Defect Extraction
-    mould_mask = ((rgb[:, :, 1] > rgb[:, :, 0] * 1.15) & (rgb[:, :, 1] > 65) & (rgb[:, :, 0] < 135)) | \
-                 ((np.abs(rgb[:, :, 0].astype(int) - rgb[:, :, 1].astype(int)) < 15) & (v_mean > 190)) | \
-                 ((v_mean < 45) & (np.abs(rgb[:, :, 0].astype(int) - rgb[:, :, 1].astype(int)) < 12))
+    # Genuine fungal mycelium (fuzzy whitish/greyish hyphae or powdery bluish-green Penicillium, strictly excluding natural plant green)
+    mould_mask = ((hsv[:, :, 1] < 35) & (hsv[:, :, 2] > 185) & (~is_chlorophyll) & (gray > 180))
+    mould_mask[:8, :] = False
+    mould_mask[-8:, :] = False
+    mould_mask[:, :8] = False
+    mould_mask[:, -8:] = False
     mould_coverage = float(np.sum(mould_mask) / (256 * 256) * 100.0)
 
     # 4. Texture & Edge Density (Canny & Sobel gradients)

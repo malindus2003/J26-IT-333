@@ -146,6 +146,33 @@ const SAMPLE_PRESETS = [
       { label: "PEAK CAROTENOID RIPENESS", type: "fresh", x: 20, y: 15, width: 60, height: 65, color: "#10b981" }
     ]
   },
+  {
+    id: "avocado_overripe",
+    name: "Overripe Avocado (Butter Fruit)",
+    category: "Fruits",
+    icon: "🥑",
+    container: "Container #C-105 (Zone 4: Ambient Kitchen Rack)",
+    imageUrl: "/images/specimens/avocado_overripe.jpg",
+    remoteFallbackUrl: "https://images.unsplash.com/photo-1523049673857-eb18f1d7b578?w=600&auto=format&fit=crop&q=80",
+    ripeness_stage: "Overripe / Softening (Use Today)",
+    ripeness_percent: 44,
+    visual_spoilage_score: 72.0,
+    risk_level: "High",
+    discoloration_score: 28.5,
+    mould_detected: false,
+    mould_coverage: 0.0,
+    texture_degradation: 68.0,
+    baseline_shelf_life_hours: 120.0,
+    remaining_shelf_life_hours: 14.0,
+    detected_defects: [
+      "Loss of skin firmness & localized sunken browning",
+      "Pulp softening & high lipid cellular oxidation (Stage 3)"
+    ],
+    bounding_boxes: [
+      { label: "SENESCENCE BROWNING", type: "overripe", x: 22, y: 25, width: 56, height: 50, color: "#f59e0b" },
+      { label: "SOFTENING TISSUE", type: "overripe", x: 55, y: 40, width: 32, height: 35, color: "#f59e0b" }
+    ]
+  },
 
   // 2. Vegetables (3 presets: Wilted, Crisp, Softening)
   {
@@ -519,9 +546,10 @@ export default function VisionInspector({ onInspectionComplete }) {
     if (!stage) return 2;
     const s = stage.toLowerCase();
     if (s.includes("unripe")) return 1;
-    if (s.includes("optimal") || s.includes("fresh") || s.includes("prime") || s.includes("crisp")) return 2;
-    if (s.includes("overripe") || s.includes("wilted") || s.includes("soft")) return 3;
-    return 4; // Spoiled
+    if (s.includes("overripe") || s.includes("wilted") || s.includes("soft") || s.includes("grade c")) return 3;
+    if (s.includes("spoiled") || s.includes("mould") || s.includes("mold") || s.includes("rot") || s.includes("grade f")) return 4;
+    if (s.includes("optimal") || s.includes("fresh") || s.includes("prime") || s.includes("crisp") || s.includes("ripe") || s.includes("grade b") || s.includes("grade a")) return 2;
+    return 2;
   };
 
   const ripenessStep = cvResult ? getRipenessStep(cvResult.ripeness_stage) : 2;
@@ -529,7 +557,7 @@ export default function VisionInspector({ onInspectionComplete }) {
   const getLevelColor = (val) => {
     if (val < 25) return { text: "text-emerald-800 dark:text-emerald-400", bg: "bg-emerald-600", border: "border-emerald-500", badge: "bg-emerald-100 dark:bg-emerald-950/60 text-emerald-950 dark:text-emerald-300 border border-emerald-400 dark:border-emerald-600", label: "LOW RISK (UNRIPE / FIRM)", colorHex: "#059669" };
     if (val < 55) return { text: "text-emerald-800 dark:text-emerald-400", bg: "bg-emerald-600", border: "border-emerald-500", badge: "bg-emerald-100 dark:bg-emerald-950/60 text-emerald-950 dark:text-emerald-300 border border-emerald-400 dark:border-emerald-600", label: "LOW RISK (OPTIMAL RIPE)", colorHex: "#047857" };
-    if (val < 78) return { text: "text-amber-800 dark:text-amber-400", bg: "bg-amber-600", border: "border-amber-500", badge: "bg-amber-100 dark:bg-amber-950/60 text-amber-950 dark:text-amber-300 border border-amber-400 dark:border-amber-600", label: "HIGH RISK (OVERRIPE / WILTED)", colorHex: "#d97706" };
+    if (val < 78) return { text: "text-amber-800 dark:text-amber-400", bg: "bg-amber-600", border: "border-amber-500", badge: "bg-amber-100 dark:bg-amber-950/60 text-amber-950 dark:text-amber-300 border border-amber-400 dark:border-amber-600", label: "HIGH RISK (OVERRIPE / SOFTENING)", colorHex: "#d97706" };
     return { text: "text-rose-800 dark:text-rose-400", bg: "bg-rose-600", border: "border-rose-500", badge: "bg-rose-100 dark:bg-rose-950/60 text-rose-950 dark:text-rose-300 border border-rose-400 dark:border-rose-600 animate-pulse", label: "CRITICAL RISK (SPOILED / MOULD)", colorHex: "#dc2626" };
   };
 
@@ -786,8 +814,8 @@ export default function VisionInspector({ onInspectionComplete }) {
           {/* Category Filter Tabs (Fruits & Vegetables Only) */}
           <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
             {[
-              { id: "all", label: "All Produce (7)", icon: null },
-              { id: "fruits", label: "Fruits (4)", icon: <Apple className="h-3 w-3" /> },
+              { id: "all", label: "All Produce (8)", icon: null },
+              { id: "fruits", label: "Fruits (5)", icon: <Apple className="h-3 w-3" /> },
               { id: "vegetables", label: "Vegetables (3)", icon: <Carrot className="h-3 w-3" /> },
             ].map((cat) => (
               <button
@@ -954,10 +982,20 @@ export default function VisionInspector({ onInspectionComplete }) {
                 ? 'bg-rose-50 text-rose-950 border-rose-300 dark:bg-rose-950/60 dark:text-rose-200 dark:border-rose-800'
                 : cvResult.risk_level === 'High'
                 ? 'bg-amber-50 text-amber-950 border-amber-300 dark:bg-amber-950/60 dark:text-amber-200 dark:border-amber-800'
+                : cvResult.risk_level === 'Medium'
+                ? 'bg-amber-50/70 text-amber-900 border-amber-300 dark:bg-amber-950/40 dark:text-amber-200 dark:border-amber-700'
                 : 'bg-emerald-50 text-emerald-950 border-emerald-300 dark:bg-emerald-950/60 dark:text-emerald-200 dark:border-emerald-800'
             }`}>
               <span className="flex items-center gap-1.5 truncate">
-                {cvResult.risk_level === 'Critical' ? <XCircle className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-rose-600 dark:text-rose-400 animate-pulse flex-shrink-0" /> : (cvResult.risk_level === 'High' ? <AlertTriangle className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-amber-600 dark:text-amber-400 flex-shrink-0" /> : <CheckCircle2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-emerald-600 dark:text-emerald-400 flex-shrink-0" />)}
+                {cvResult.risk_level === 'Critical' ? (
+                  <XCircle className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-rose-600 dark:text-rose-400 animate-pulse flex-shrink-0" />
+                ) : cvResult.risk_level === 'High' ? (
+                  <AlertTriangle className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-amber-600 dark:text-amber-400 flex-shrink-0" />
+                ) : cvResult.risk_level === 'Medium' ? (
+                  <AlertTriangle className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-amber-500 dark:text-amber-400 flex-shrink-0" />
+                ) : (
+                  <CheckCircle2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-emerald-600 dark:text-emerald-400 flex-shrink-0" />
+                )}
                 <span>{cvResult.risk_level.toUpperCase()}: {cvResult.ripeness_stage.toUpperCase()}</span>
               </span>
               <span className="font-mono text-[11px] sm:text-xs font-black flex-shrink-0 ml-2">{cvResult.visual_spoilage_score}% Spoilage</span>
