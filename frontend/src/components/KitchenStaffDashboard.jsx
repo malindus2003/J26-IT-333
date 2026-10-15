@@ -3,9 +3,10 @@ import {
   Users, Clock, Flame, Award, AlertTriangle, ArrowRight, ShieldCheck, CheckCircle2,
   TrendingUp, Utensils, X, Lock, LogIn, Key, Smartphone, Coffee, ChefHat, Send,
   CheckSquare, Pizza, Plus, Minus, Hash, Search, Cpu, Sparkles, Database, Layers,
-  CheckCheck, Armchair, PackageCheck, RefreshCw, Filter, ArrowUpRight, ShoppingBag, Check
+  CheckCheck, Armchair, PackageCheck, RefreshCw, Filter, ArrowUpRight, ShoppingBag, Check, Zap,
+  ChevronDown, Bell, Calendar, BarChart2, Target, Sunrise, Sun, Moon, UserPlus, Star, BadgeCheck
 } from 'lucide-react';
-import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, Legend, ReferenceArea } from 'recharts';
+import { ResponsiveContainer, LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Legend, ReferenceArea } from 'recharts';
 import axios from 'axios';
 
 export default function KitchenStaffDashboard({
@@ -17,11 +18,6 @@ export default function KitchenStaffDashboard({
 }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
-
-  const [showSeasonalRush, setShowSeasonalRush] = useState(true);
-  const [showLunchRush, setShowLunchRush] = useState(true);
-  const [showBreakfastRush, setShowBreakfastRush] = useState(true);
-  const [showDinnerRush, setShowDinnerRush] = useState(true);
   const [simulateLowEfficiency, setSimulateLowEfficiency] = useState(false);
   const [dismissedToast, setDismissedToast] = useState("");
   const [last4HourUpdate, setLast4HourUpdate] = useState("Shift Sync Active (Live Queue Computed)");
@@ -51,6 +47,38 @@ export default function KitchenStaffDashboard({
   const [staffStationFilter, setStaffStationFilter] = useState("all");
   const [proactiveScheduleActive, setProactiveScheduleActive] = useState(false);
   const [proactiveRosterList, setProactiveRosterList] = useState([]);
+  const [simulatingSurge, setSimulatingSurge] = useState(false);
+  const [simulatingSurgeStation, setSimulatingSurgeStation] = useState(null);
+  const [showSurgeModal, setShowSurgeModal] = useState(false);
+  const [dismissedSurgeStations, setDismissedSurgeStations] = useState(new Set());
+  const [stationSurgeFulfillment, setStationSurgeFulfillment] = useState({}); // { [stationName]: { active: bool, chefName, fromStation, targetStation, reassignedAt, initialCompletedIds: [], fulfilledCount: 0, targetCount: 2, stabilized: bool } }
+  const [stabilizedStations, setStabilizedStations] = useState(new Set()); // Set of station names whose workload normalized & returned to normal
+  const [showStationSurgeMenu, setShowStationSurgeMenu] = useState(false);
+  const [workloadAnalytics, setWorkloadAnalytics] = useState(null);
+  const [analyticsViewTab, setAnalyticsViewTab] = useState('daily'); // 'daily' | 'weekly' | 'summary'
+
+  // --- Staff Sub-Tab State & Admin Onboarding State ---
+  const [staffSubTab, setStaffSubTab] = useState('directory'); // 'directory' | 'onboard'
+  const [isSubmittingStaff, setIsSubmittingStaff] = useState(false);
+  const [lastAddedStaff, setLastAddedStaff] = useState(null);
+  const [newStaffForm, setNewStaffForm] = useState({
+    emp_id: '',
+    name: '',
+    role: 'Chef de Partie (Level 3)',
+    base_station: 'Hot Kitchen',
+    shift: '07:00 AM - 04:00 PM',
+    hot_kitchen: 4,
+    grill_station: 3,
+    cold_salad: 3,
+    pizza_station: 3,
+    fryer_station: 3,
+    efficiency_rating: 81,
+    skill_gap: 'Cold Salad Presentation & Fast Dressing Emulsions',
+    training_recommendation: 'Cold Chain Hygiene & Fast Garde Manger Dressing Emulsions',
+    career_progression: 'Target: Line Specialist Track (72% Milestones Complete)',
+    contact_phone: '+94 77 123 4567',
+    join_date: new Date().toISOString().split('T')[0]
+  });
 
   const fetchLiveOrders = async () => {
     try {
@@ -60,6 +88,13 @@ export default function KitchenStaffDashboard({
         setLiveOrders(res.data.orders);
         setLastOrderSyncTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
       }
+
+      try {
+        const trendsRes = await axios.get("http://localhost:8000/api/kitchen/workload-analytics-trends");
+        if (trendsRes?.data?.success) {
+          setWorkloadAnalytics(trendsRes.data);
+        }
+      } catch (tErr) { }
 
       try {
         const upskillRes = await axios.get("http://localhost:8000/api/kitchen/upskilling-recommendations");
@@ -138,51 +173,410 @@ export default function KitchenStaffDashboard({
     }
   };
 
-  const filteredStaffList = useMemo(() => {
-    const list = data?.staff || [];
-    return list.filter(m => {
-      const q = staffSearchQuery.toLowerCase();
-      const matchesSearch = !staffSearchQuery ||
-        (m.name && m.name.toLowerCase().includes(q)) ||
-        (m.id && m.id.toLowerCase().includes(q)) ||
-        (m.assigned_station && m.assigned_station.toLowerCase().includes(q)) ||
-        (m.skill_gap && m.skill_gap.toLowerCase().includes(q)) ||
-        (m.training_recommendation && m.training_recommendation.toLowerCase().includes(q)) ||
-        (m.career_progression && m.career_progression.toLowerCase().includes(q));
-
-      const matchesStation = staffStationFilter === 'all' ||
-        (m.assigned_station && m.assigned_station.toLowerCase().includes(staffStationFilter.toLowerCase()));
-
-      return matchesSearch && matchesStation;
-    });
-  }, [data?.staff, staffSearchQuery, staffStationFilter]);
-
-  const handleApplyProactiveSchedule = async () => {
-    try {
-      const res = await axios.post("http://localhost:8000/api/kitchen/schedule/proactive");
-      if (res?.data?.success) {
-        setProactiveScheduleActive(true);
-        if (res.data.proactive_roster) setProactiveRosterList(res.data.proactive_roster);
-        setDismissedToast("✅ Proactive peak-hour staffing successfully applied across all rush intervals!");
-        setTimeout(() => setDismissedToast(""), 4000);
-      }
-    } catch (err) {
-      setProactiveScheduleActive(true);
-      setDismissedToast("✅ Proactive peak-hour staffing applied locally.");
-      setTimeout(() => setDismissedToast(""), 4000);
-    }
-  };
-
-  const handleResetProactiveSchedule = async () => {
-    try {
-      await axios.post("http://localhost:8000/api/kitchen/schedule/reset");
-    } catch (e) { }
-    setProactiveScheduleActive(false);
-    setProactiveRosterList([]);
-    setDismissedToast("✅ Roster reset to standard kitchen shift allocation.");
-    setTimeout(() => setDismissedToast(""), 3500);
-  };
-
+  // Real-Time Today Order Intake & Meal Period Aggregation (Updates Reactively on Incoming Orders)
+  const todayMealStats = useMemo(() => {
+    let liveMorning = 0;
+    let liveAfternoon = 0;
+    let liveEvening = 0;
+
+    liveOrders.forEach(o => {
+      const timeStr = o.created_at || "";
+      const [hStr, mStr] = timeStr.split(":");
+      const h = parseInt(hStr, 10);
+      const m = parseInt(mStr, 10) || 0;
+      const t = isNaN(h) ? 13 : h + m / 60;
+      if (t < 11.5) liveMorning++;
+      else if (t < 16.5) liveAfternoon++;
+      else liveEvening++;
+    });
+
+    const morningBase = 92;
+    const afternoonBase = 124;
+    const eveningBase = 28;
+
+    const morningTotal = morningBase + liveMorning;
+    const afternoonTotal = afternoonBase + liveAfternoon;
+    const eveningTotal = eveningBase + liveEvening;
+    const totalActualToday = morningTotal + afternoonTotal + eveningTotal;
+
+    const predictedToday = workloadAnalytics?.predicted_daily_orders?.[0]?.predicted_orders || 417;
+    const progressPct = Math.min(100, Math.round((totalActualToday / predictedToday) * 100));
+
+    const now = new Date();
+    const curTime = now.getHours() + now.getMinutes() / 60;
+    const activeShift = curTime < 11.5 ? 'morning' : (curTime < 16.5 ? 'afternoon' : 'evening');
+
+    return {
+      totalActualToday,
+      predictedToday,
+      progressPct,
+      activeShift,
+      liveTicketsCount: liveOrders.length,
+      periods: [
+        {
+          key: 'morning',
+          name: 'Morning',
+          shiftLabel: 'Breakfast Shift',
+          timeRange: '06:00 – 11:30',
+          orders: morningTotal,
+          dishes: Math.round(morningTotal * 0.21),
+          status: curTime >= 11.5 ? 'Completed' : 'Active Now',
+          isCurrent: activeShift === 'morning',
+          icon: '🌅',
+          popularItems: 'Fresh Berry Smoothie Bowl, Belgian Waffle'
+        },
+        {
+          key: 'afternoon',
+          name: 'Afternoon/Lunch',
+          shiftLabel: 'Lunch Rush Peak',
+          timeRange: '11:30 – 16:30',
+          orders: afternoonTotal,
+          dishes: Math.round(afternoonTotal * 0.22),
+          status: curTime >= 16.5 ? 'Completed' : (curTime >= 11.5 ? 'Active Now' : 'Upcoming'),
+          isCurrent: activeShift === 'afternoon',
+          icon: '☀️',
+          popularItems: 'Chicken Kottu Roti, Salmon Steak, Garden Salad'
+        },
+        {
+          key: 'evening',
+          name: 'Evening/Night',
+          shiftLabel: 'Dinner & Late Service',
+          timeRange: '16:30 – 23:00',
+          orders: eveningTotal,
+          dishes: Math.round(eveningTotal * 0.24),
+          status: curTime >= 16.5 ? 'Active Now' : 'Upcoming',
+          isCurrent: activeShift === 'evening',
+          icon: '🌙',
+          popularItems: 'Prime Beef Sirloin, Woodfired Pizza, Calamari'
+        }
+      ]
+    };
+  }, [liveOrders, workloadAnalytics]);
+
+  const handleSimulateQuickOrder = async () => {
+    try {
+      const res = await axios.post("http://localhost:8000/api/kitchen/simulate-quick-order");
+      if (res?.data?.success) {
+        setDismissedToast(`⚡ Live incoming order #${res.data.order?.order_number} received (${res.data.order?.items?.[0]?.name})! Real-time intake updated.`);
+        setTimeout(() => setDismissedToast(""), 4000);
+        await fetchLiveOrders();
+      }
+    } catch (e) {
+      setLiveOrders(prev => [
+        {
+          id: `ORD-${Date.now().toString().slice(-4)}`,
+          order_number: prev.length + 85,
+          table_no: "Table 08",
+          order_type: "Dine-In",
+          items: [{ menu_id: "sim-quick", name: "Chicken Kottu Roti Supreme", quantity: 1, unit_price: 1450 }],
+          total_amount_lkr: 1450,
+          status: "in_prep",
+          created_at: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+          target_prep_mins: 8
+        },
+        ...prev
+      ]);
+      setDismissedToast("⚡ Live order received! Real-time intake updated.");
+      setTimeout(() => setDismissedToast(""), 3500);
+    }
+  };
+
+  const filteredStaffList = useMemo(() => {
+    const list = data?.staff || [];
+    return list.filter(m => {
+      const q = staffSearchQuery.toLowerCase();
+      const matchesSearch = !staffSearchQuery ||
+        (m.name && m.name.toLowerCase().includes(q)) ||
+        (m.id && m.id.toLowerCase().includes(q)) ||
+        (m.assigned_station && m.assigned_station.toLowerCase().includes(q)) ||
+        (m.skill_gap && m.skill_gap.toLowerCase().includes(q)) ||
+        (m.training_recommendation && m.training_recommendation.toLowerCase().includes(q)) ||
+        (m.career_progression && m.career_progression.toLowerCase().includes(q));
+
+      const matchesStation = staffStationFilter === 'all' ||
+        (m.assigned_station && m.assigned_station.toLowerCase().includes(staffStationFilter.toLowerCase()));
+
+      return matchesSearch && matchesStation;
+    });
+  }, [data?.staff, staffSearchQuery, staffStationFilter]);
+
+  const handleApplyProactiveSchedule = async () => {
+    try {
+      const res = await axios.post("http://localhost:8000/api/kitchen/schedule/proactive");
+      if (res?.data?.success) {
+        setProactiveScheduleActive(true);
+        if (res.data.proactive_roster) setProactiveRosterList(res.data.proactive_roster);
+        setDismissedToast("✅ Proactive peak-hour staffing successfully applied across all rush intervals!");
+        setTimeout(() => setDismissedToast(""), 4000);
+      }
+    } catch (err) {
+      setProactiveScheduleActive(true);
+      setDismissedToast("✅ Proactive peak-hour staffing applied locally.");
+      setTimeout(() => setDismissedToast(""), 4000);
+    }
+  };
+
+  const handleResetProactiveSchedule = async () => {
+    try {
+      await axios.post("http://localhost:8000/api/kitchen/schedule/reset");
+    } catch (e) { }
+    setProactiveScheduleActive(false);
+    setProactiveRosterList([]);
+    setDismissedToast("✅ Roster reset to standard kitchen shift allocation.");
+    setTimeout(() => setDismissedToast(""), 3500);
+  };
+
+  const computeDerivedStaffMetrics = (scores, role, baseStation) => {
+    const avg = ((Number(scores.hot_kitchen) || 3) + 
+                 (Number(scores.grill_station) || 3) + 
+                 (Number(scores.cold_salad) || 3) + 
+                 (Number(scores.pizza_station) || 3) + 
+                 (Number(scores.fryer_station) || 3)) / 5.0;
+    const eff = Math.min(98, Math.max(55, Math.round(avg * 17.5 + 11.0)));
+    
+    const stationKeys = ['hot_kitchen', 'grill_station', 'cold_salad', 'pizza_station', 'fryer_station'];
+    const minKey = stationKeys.reduce((min, k) => (Number(scores[k]) || 3) < (Number(scores[min]) || 3) ? k : min, stationKeys[0]);
+    
+    const gapMap = {
+      hot_kitchen: {
+        gap: "High-Heat Saute & Fast Wok Stir-Fry Control",
+        training: "High-Volume Stir-Fry Optimization & Saucier Temperature Control",
+        progression: "Target: Line Specialist Track (72% Milestones Complete)"
+      },
+      grill_station: {
+        gap: "HACCP Core Seafood & Meat Temperature Monitoring",
+        training: "Seafood Freshness Grading & Quick-Sear Precision Techniques",
+        progression: "Target: Grill Master Track (74% Milestones Complete)"
+      },
+      cold_salad: {
+        gap: "Cold Salad Presentation & Fast Dressing Emulsions",
+        training: "Cold Chain Hygiene & Fast Garde Manger Dressing Emulsions",
+        progression: "Target: Pantry Operations Specialist (70% Milestones Complete)"
+      },
+      pizza_station: {
+        gap: "Wood-Fired Pizza Deck Oven Proofing & Stretch Pacing",
+        training: "Wood-Fired Pizza Deck Oven Management & Crust Proofing",
+        progression: "Target: Head of Pizza Track (75% Milestones Complete)"
+      },
+      fryer_station: {
+        gap: "Deep Fryer Temperature Recovery & Oil Filtration",
+        training: "Foundation Deep Fryer Safety & Continuous Oil Filtering",
+        progression: "Target: Fryer Line Lead Track (68% Milestones Complete)"
+      }
+    };
+
+    let prog = gapMap[minKey]?.progression || "Station Line Lead Track";
+    if (role && (role.includes("Head") || role.includes("Level 5"))) {
+      prog = "Executive Chef Certification (92% Milestones Complete)";
+    } else if (role && (role.includes("Sous") || role.includes("Level 4"))) {
+      prog = "Ready for Head Chef Promotion (86% Milestones Complete)";
+    } else if (role && role.includes("Trainee")) {
+      prog = "Apprentice Onboarding & Basics (35% Completed)";
+    }
+
+    return {
+      efficiency: eff,
+      speedScore: `${Math.min(5.0, Math.round((avg * 0.85 + 0.65) * 10) / 10).toFixed(1)} / 5.0`,
+      derivedGap: gapMap[minKey]?.gap || "Line Cooking Fundamentals",
+      derivedTraining: gapMap[minKey]?.training || "Enrolled in Foundation Line Cook Safety",
+      derivedProgression: prog
+    };
+  };
+
+  const handleStaffRatingChange = (stationKey, newRating) => {
+    setNewStaffForm(prev => {
+      const updatedScores = {
+        ...prev,
+        [stationKey]: newRating
+      };
+      const derived = computeDerivedStaffMetrics(updatedScores, prev.role, prev.base_station);
+      return {
+        ...updatedScores,
+        efficiency_rating: derived.efficiency,
+        skill_gap: derived.derivedGap,
+        training_recommendation: derived.derivedTraining,
+        career_progression: derived.derivedProgression
+      };
+    });
+  };
+
+  const handlePrefillSampleStaff = (customSample) => {
+    const samples = [
+      {
+        name: "Chef Nuwan Bandara",
+        role: "Chef de Partie (Level 3)",
+        base_station: "Hot Kitchen",
+        shift: "07:00 AM - 04:00 PM",
+        hot_kitchen: 5,
+        grill_station: 4,
+        cold_salad: 2,
+        pizza_station: 3,
+        fryer_station: 4,
+        contact_phone: "+94 77 482 9102"
+      },
+      {
+        name: "Chef Sandun Wickrema",
+        role: "Station Line Specialist (Level 3)",
+        base_station: "Grill",
+        shift: "11:00 AM - 09:30 PM",
+        hot_kitchen: 4,
+        grill_station: 5,
+        cold_salad: 3,
+        pizza_station: 2,
+        fryer_station: 4,
+        contact_phone: "+94 71 839 2011"
+      },
+      {
+        name: "Chef Dilshan Jayawardena",
+        role: "Chef de Partie (Level 3)",
+        base_station: "Pizza",
+        shift: "01:00 PM - 10:00 PM",
+        hot_kitchen: 3,
+        grill_station: 2,
+        cold_salad: 4,
+        pizza_station: 5,
+        fryer_station: 3,
+        contact_phone: "+94 76 991 3840"
+      },
+      {
+        name: "Chef Malsha Weerasinghe",
+        role: "Demi Chef de Partie (Level 3)",
+        base_station: "Cold Salad",
+        shift: "07:00 AM - 04:00 PM",
+        hot_kitchen: 3,
+        grill_station: 2,
+        cold_salad: 5,
+        pizza_station: 3,
+        fryer_station: 2,
+        contact_phone: "+94 72 314 8890"
+      }
+    ];
+
+    const pick = customSample || samples[Math.floor(Math.random() * samples.length)];
+    const derived = computeDerivedStaffMetrics(pick, pick.role, pick.base_station);
+    const nextNum = (data?.staff?.length || 30) + 1;
+    const generatedId = `EMP${nextNum < 10 ? '0' + nextNum : nextNum}`;
+
+    setNewStaffForm({
+      ...pick,
+      emp_id: generatedId,
+      efficiency_rating: derived.efficiency,
+      skill_gap: derived.derivedGap,
+      training_recommendation: derived.derivedTraining,
+      career_progression: derived.derivedProgression,
+      join_date: new Date().toISOString().split('T')[0]
+    });
+
+    setDismissedToast(`⚡ Sample chef profile prefilled for ${pick.name}!`);
+    setTimeout(() => setDismissedToast(""), 3500);
+  };
+
+  const handleResetStaffForm = () => {
+    const nextNum = (data?.staff?.length || 30) + 1;
+    setNewStaffForm({
+      emp_id: `EMP${nextNum < 10 ? '0' + nextNum : nextNum}`,
+      name: '',
+      role: 'Chef de Partie (Level 3)',
+      base_station: 'Hot Kitchen',
+      shift: '07:00 AM - 04:00 PM',
+      hot_kitchen: 4,
+      grill_station: 3,
+      cold_salad: 3,
+      pizza_station: 3,
+      fryer_station: 3,
+      efficiency_rating: 81,
+      skill_gap: 'Cold Salad Presentation & Fast Dressing Emulsions',
+      training_recommendation: 'Cold Chain Hygiene & Fast Garde Manger Dressing Emulsions',
+      career_progression: 'Target: Line Specialist Track (72% Milestones Complete)',
+      contact_phone: '',
+      join_date: new Date().toISOString().split('T')[0]
+    });
+  };
+
+  const handleRegisterStaff = async (e) => {
+    if (e) e.preventDefault();
+    if (!newStaffForm.name.trim()) {
+      setDismissedToast("⚠️ Please enter the chef's full name to register.");
+      setTimeout(() => setDismissedToast(""), 3500);
+      return;
+    }
+
+    setIsSubmittingStaff(true);
+    try {
+      const payload = {
+        emp_id: newStaffForm.emp_id.trim() || undefined,
+        name: newStaffForm.name.trim(),
+        role: newStaffForm.role,
+        base_station: newStaffForm.base_station,
+        shift: newStaffForm.shift,
+        hot_kitchen: Number(newStaffForm.hot_kitchen),
+        grill_station: Number(newStaffForm.grill_station),
+        cold_salad: Number(newStaffForm.cold_salad),
+        pizza_station: Number(newStaffForm.pizza_station),
+        fryer_station: Number(newStaffForm.fryer_station),
+        efficiency_rating: Number(newStaffForm.efficiency_rating),
+        skill_gap: newStaffForm.skill_gap,
+        training_recommendation: newStaffForm.training_recommendation,
+        career_progression: newStaffForm.career_progression,
+        contact_phone: newStaffForm.contact_phone
+      };
+
+      const res = await axios.post("http://localhost:8000/api/kitchen/staff", payload);
+      if (res?.data?.status === 'success' && res.data.staff_member) {
+        const newMember = res.data.staff_member;
+        setLastAddedStaff(newMember);
+
+        // Update state in data so that Directory, Roster Matrix, and Filters instantly update
+        setData(prev => {
+          if (!prev) return prev;
+          const currStaff = prev.staff || [];
+          return {
+            ...prev,
+            staff: [...currStaff.filter(s => (s.id !== newMember.id && s.emp_id !== newMember.emp_id)), newMember]
+          };
+        });
+
+        // Also refresh upskilling data from backend if needed
+        try {
+          const upRes = await axios.get("http://localhost:8000/api/kitchen/upskilling-recommendations");
+          if (upRes?.data && Array.isArray(upRes.data)) {
+            setUpskillingData(upRes.data);
+          }
+        } catch (uErr) { }
+
+        setDismissedToast(`🎉 Success: ${newMember.name} (${newMember.emp_id}) onboarded to ${newMember.assigned_station}!`);
+        setTimeout(() => setDismissedToast(""), 5000);
+
+        // Re-initialize the form for next entry
+        const nextNum = (data?.staff?.length || 30) + 2;
+        setNewStaffForm({
+          emp_id: `EMP${nextNum < 10 ? '0' + nextNum : nextNum}`,
+          name: '',
+          role: 'Chef de Partie (Level 3)',
+          base_station: 'Hot Kitchen',
+          shift: '07:00 AM - 04:00 PM',
+          hot_kitchen: 4,
+          grill_station: 3,
+          cold_salad: 3,
+          pizza_station: 3,
+          fryer_station: 3,
+          efficiency_rating: 81,
+          skill_gap: 'Cold Salad Presentation & Fast Dressing Emulsions',
+          training_recommendation: 'Cold Chain Hygiene & Fast Garde Manger Dressing Emulsions',
+          career_progression: 'Target: Line Specialist Track (72% Milestones Complete)',
+          contact_phone: '',
+          join_date: new Date().toISOString().split('T')[0]
+        });
+      }
+    } catch (err) {
+      console.error("Staff registration failed:", err);
+      setDismissedToast("❌ Failed to register staff member. Please check backend connection.");
+      setTimeout(() => setDismissedToast(""), 4000);
+    } finally {
+      setIsSubmittingStaff(false);
+    }
+  };
+
   const handleClearCompletedOrders = async () => {
     try {
       try {
@@ -212,6 +606,189 @@ export default function KitchenStaffDashboard({
     return () => clearInterval(interval);
   }, [refreshTrigger]);
 
+  const getStationForDish = (dishName = "") => {
+    const nl = (dishName || "").toLowerCase();
+    if (nl.includes("pizza") || nl.includes("margherita") || nl.includes("calzone") || nl.includes("diavola") || nl.includes("pepperoni") || nl.includes("garlic pizza")) return "Pizza";
+    if (nl.includes("salmon") || nl.includes("steak") || nl.includes("beef") || nl.includes("sirloin") || nl.includes("grill") || nl.includes("charbroil") || nl.includes("platter") || nl.includes("bbq") || nl.includes("lamb")) return "Grill";
+    if (nl.includes("salad") || nl.includes("smoothie") || nl.includes("avocado") || nl.includes("feta") || nl.includes("bowl") || nl.includes("fruit") || nl.includes("greens")) return "Cold Salad";
+    if (nl.includes("cuttlefish") || nl.includes("calamari") || nl.includes("fry") || nl.includes("samosa") || nl.includes("fries") || nl.includes("crispy") || nl.includes("nugget") || nl.includes("wedges")) return "Fryer";
+    if (nl.includes("juice") || nl.includes("tea") || nl.includes("coke") || nl.includes("sprite") || nl.includes("beverage") || nl.includes("coffee") || nl.includes("cola")) return "Beverages";
+    return "Hot Kitchen";
+  };
+
+  const getStationsForOrder = (ord) => {
+    if (!ord) return [];
+    const stations = new Set();
+    if (ord.station_name && ord.station_name !== 'Beverages') {
+      stations.add(ord.station_name);
+    }
+    (ord.items || []).forEach(it => {
+      const st = getStationForDish(it.name);
+      if (st && st !== 'Beverages') stations.add(st);
+    });
+    return Array.from(stations);
+  };
+
+  const registerStationReassignment = (targetStation, chefName, fromStation) => {
+    if (!targetStation) return;
+    const cleanTarget = targetStation.replace(" (Reallocated via AI)", "").trim();
+    const cleanChef = (chefName || "Chef").split('(')[0].trim();
+    const cleanFrom = (fromStation || "Prep Station").replace(" (Reallocated via AI)", "").trim();
+
+    // Snapshot existing completed order IDs for this station
+    const existingCompleted = liveOrders
+      .filter(o => o.status === 'completed' && getStationsForOrder(o).includes(cleanTarget))
+      .map(o => o.id);
+
+    setStationSurgeFulfillment(prev => ({
+      ...prev,
+      [cleanTarget]: {
+        active: true,
+        chefName: cleanChef,
+        fromStation: cleanFrom,
+        targetStation: cleanTarget,
+        reassignedAt: Date.now(),
+        initialCompletedIds: existingCompleted,
+        fulfilledCount: 0,
+        targetCount: 2,
+        stabilized: false
+      }
+    }));
+
+    // Remove from stabilized stations so fresh surge tracking begins
+    setStabilizedStations(prev => {
+      const next = new Set(prev);
+      next.delete(cleanTarget);
+      return next;
+    });
+  };
+
+  const triggerStationStabilization = async (targetStation, tracker) => {
+    const cleanStation = targetStation.replace(" (Reallocated via AI)", "").trim();
+    const chefName = tracker?.chefName || "Assigned Cook";
+    const fromStation = tracker?.fromStation || "Prep Station";
+
+    // 1. Mark station as stabilized and active=false
+    setStabilizedStations(prev => new Set([...prev, cleanStation]));
+    setStationSurgeFulfillment(prev => ({
+      ...prev,
+      [cleanStation]: {
+        ...prev[cleanStation],
+        active: false,
+        stabilized: true,
+        fulfilledCount: Math.max(2, prev[cleanStation]?.fulfilledCount || 2)
+      }
+    }));
+
+    // 2. Dismiss this station's pop-up alert in dismissedSurgeStations
+    setDismissedSurgeStations(prev => new Set([...prev, cleanStation]));
+
+    // 3. Remove directives targeting this station so the 'Reallocate' section/button disappears
+    setDirectives(prev => prev.filter(d => d.targetStation !== cleanStation));
+    setCustomSurges(prev => prev.filter(d => d.targetStation !== cleanStation));
+    setResolvedDirectiveIds(prev => {
+      const next = new Set(prev);
+      directives.forEach(d => {
+        if (d.targetStation === cleanStation || d.stationId === `station-${cleanStation}`) {
+          next.add(d.id);
+        }
+      });
+      return next;
+    });
+
+    // 4. Return station's card in "Workload & Station Capacity" to normal status
+    setData(prev => {
+      if (!prev) return prev;
+      const updatedStations = (prev.stations || []).map(st => {
+        if (st.name === cleanStation) {
+          return {
+            ...st,
+            bottleneck_status: "Smooth Flow",
+            load_level: Math.min(st.load_level || 30, 35),
+            queue_length: Math.max(0, (st.queue_length || 2) - 2),
+            action: `Optimal staffing restored — Workload normalized. ${chefName} returned to ${fromStation}.`,
+            surge_alert: null
+          };
+        }
+        return st;
+      });
+
+      // Revert staff back to original station
+      const updatedStaff = (prev.staff || []).map(s => {
+        if (s.name && (s.name.includes(chefName) || chefName.includes(s.name.split('(')[0].trim()))) {
+          return {
+            ...s,
+            assigned_station: fromStation,
+            isReallocated: false,
+            reallocatedTo: undefined
+          };
+        }
+        return s;
+      });
+
+      return {
+        ...prev,
+        stations: updatedStations,
+        staff: updatedStaff
+      };
+    });
+
+    // 5. Notify backend to normalize station workload & revert staff allocations
+    try {
+      await axios.post("http://localhost:8000/api/kitchen/normalize-station-workload", {
+        station_name: cleanStation
+      });
+    } catch (apiErr) {
+      console.warn("Could not post to /api/kitchen/normalize-station-workload:", apiErr);
+    }
+
+    // 6. Real-time toast confirmation
+    setDismissedToast(`🎉 Station (${cleanStation}) Workload Normalized! 2 surge orders fulfilled & moved to Completed Orders. Pop-up alert dismissed & ${chefName} returned to ${fromStation}.`);
+    setTimeout(() => setDismissedToast(""), 5000);
+  };
+
+  const handleFastFulfillStationOrder = async (targetStation) => {
+    const cleanStation = targetStation.replace(" (Reallocated via AI)", "").trim();
+
+    // Find an active order for this station in liveOrders
+    const candidateOrder = liveOrders.find(o =>
+      o.status !== 'completed' &&
+      getStationsForOrder(o).includes(cleanStation)
+    );
+
+    if (candidateOrder) {
+      await handleUpdateOrderStatus(candidateOrder.id, 'completed');
+    } else {
+      // If no active ticket exists for this station, generate and complete one
+      const newCompId = `sim-comp-${cleanStation.toLowerCase().replace(/\s+/g, '-')}-${Date.now()}`;
+      const cfg = stationSurgeConfigs.find(c => c.station === cleanStation) || stationSurgeConfigs[0];
+      const newOrder = {
+        id: newCompId,
+        order_number: 950 + Math.floor(Math.random() * 40),
+        table_no: `Table 0${Math.floor(Math.random() * 8) + 1}`,
+        status: "completed",
+        order_type: "Dine-In",
+        station_name: cleanStation,
+        created_at: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        items: [{ name: cfg.defaultDish, quantity: 1, unit_price: 2400 }]
+      };
+
+      setLiveOrders(prev => [newOrder, ...prev]);
+
+      const tracker = stationSurgeFulfillment[cleanStation];
+      if (tracker && tracker.active && !tracker.stabilized) {
+        const nextCount = (tracker.fulfilledCount || 0) + 1;
+        setStationSurgeFulfillment(prev => ({
+          ...prev,
+          [cleanStation]: { ...prev[cleanStation], fulfilledCount: nextCount }
+        }));
+        if (nextCount >= (tracker.targetCount || 2)) {
+          await triggerStationStabilization(cleanStation, tracker);
+        }
+      }
+    }
+  };
+
   const handleUpdateOrderStatus = async (orderId, newStatus) => {
     try {
       await axios.patch(`http://localhost:8000/api/orders/${orderId}/status`, { status: newStatus });
@@ -226,6 +803,28 @@ export default function KitchenStaffDashboard({
           return nextSet;
         });
       }
+
+      // Check if this fulfilled order belongs to any station tracking surge reassignment
+      if (newStatus === 'completed') {
+        const targetOrder = liveOrders.find(o => o.id === orderId);
+        if (targetOrder) {
+          const affectedStations = getStationsForOrder(targetOrder);
+          affectedStations.forEach(stName => {
+            const tracker = stationSurgeFulfillment[stName];
+            if (tracker && tracker.active && !tracker.stabilized) {
+              const nextCount = (tracker.fulfilledCount || 0) + 1;
+              setStationSurgeFulfillment(prev => ({
+                ...prev,
+                [stName]: { ...prev[stName], fulfilledCount: nextCount }
+              }));
+              if (nextCount >= (tracker.targetCount || 2)) {
+                triggerStationStabilization(stName, tracker);
+              }
+            }
+          });
+        }
+      }
+
       const statusLabels = {
         'in_prep': 'Cooking Started',
         'ready': 'Marked Ready on Pass',
@@ -252,16 +851,6 @@ export default function KitchenStaffDashboard({
     }
   };
 
-  const getStationForDish = (dishName = "") => {
-    const nl = dishName.toLowerCase();
-    if (nl.includes("pizza") || nl.includes("margherita") || nl.includes("calzone")) return "Pizza";
-    if (nl.includes("salmon") || nl.includes("steak") || nl.includes("beef") || nl.includes("sirloin") || nl.includes("grill") || nl.includes("charbroil") || nl.includes("platter")) return "Grill";
-    if (nl.includes("salad") || nl.includes("smoothie") || nl.includes("avocado") || nl.includes("feta") || nl.includes("bowl")) return "Cold Salad";
-    if (nl.includes("cuttlefish") || nl.includes("calamari") || nl.includes("fry") || nl.includes("samosa") || nl.includes("fries") || nl.includes("crispy")) return "Fryer";
-    if (nl.includes("juice") || nl.includes("tea") || nl.includes("coke") || nl.includes("sprite") || nl.includes("beverage") || nl.includes("coffee") || nl.includes("cola")) return "Beverages";
-    return "Hot Kitchen";
-  };
-
   const getStaffForStation = (station) => {
     switch (station) {
       case 'Hot Kitchen': return 'K. Perera (Senior Line Chef)';
@@ -273,6 +862,35 @@ export default function KitchenStaffDashboard({
       default: return 'Beverage Counter';
     }
   };
+
+  // Real-time automated observer: detects when 2 orders are fulfilled & moved to 'COMPLETED ORDERS' for reassigned stations
+  useEffect(() => {
+    Object.entries(stationSurgeFulfillment).forEach(([stName, tracker]) => {
+      if (!tracker?.active || tracker?.stabilized) return;
+
+      const completedOrdersForStation = liveOrders.filter(o =>
+        o.status === 'completed' &&
+        getStationsForOrder(o).includes(stName) &&
+        !clearedCompletedIds.has(o.id)
+      );
+
+      const newlyCompleted = completedOrdersForStation.filter(
+        o => !tracker.initialCompletedIds?.includes(o.id)
+      );
+
+      const count = newlyCompleted.length;
+      if (count !== tracker.fulfilledCount) {
+        setStationSurgeFulfillment(prev => ({
+          ...prev,
+          [stName]: { ...prev[stName], fulfilledCount: count }
+        }));
+      }
+
+      if (count >= (tracker.targetCount || 2)) {
+        triggerStationStabilization(stName, tracker);
+      }
+    });
+  }, [liveOrders, stationSurgeFulfillment, clearedCompletedIds]);
 
   const filteredOrders = liveOrders.filter(ord => {
     const matchesSearch = !kdsSearchQuery ||
@@ -361,7 +979,7 @@ export default function KitchenStaffDashboard({
       { id: "station-1", name: "Hot Kitchen", baseShift: 4.0, targetPrep: 8.0, defaultCooks: 3, thresh: 76.5 },
       { id: "station-2", name: "Grill", baseShift: 0.0, targetPrep: 10.0, defaultCooks: 2, thresh: 17.9 },
       { id: "station-3", name: "Cold Salad", baseShift: 0.0, targetPrep: 4.0, defaultCooks: 1, thresh: 17.6 },
-      { id: "station-4", name: "Pizza", baseShift: 0.0, targetPrep: 7.0, defaultCooks: 2, thresh: 16.3 },
+      { id: "station-4", name: "Pizza", baseShift: 0.0, targetPrep: 7.0, defaultCooks: 3, thresh: 16.3 },
       { id: "station-5", name: "Fryer", baseShift: 1.0, targetPrep: 5.0, defaultCooks: 1, thresh: 10.0 }
     ];
 
@@ -398,20 +1016,24 @@ export default function KitchenStaffDashboard({
       const predictedLoad = actualLoad > 0 ? Number((actualLoad * 0.94 + 0.1).toFixed(1)) : 0.0;
 
       // Load vs capacity percentage
-      const loadPercentage = actualLoad > 0 ? Math.min(100, Math.round((actualLoad / cfg.thresh) * 80)) : 0;
-      const isBottleneck = actualLoad >= cfg.thresh || liveQueue >= 6;
+      const rawLoadPercentage = actualLoad > 0 ? Math.min(100, Math.round((actualLoad / cfg.thresh) * 80)) : 0;
+      const isStabilized = stabilizedStations.has(cfg.name);
+      const isBottleneck = !isStabilized && (actualLoad >= cfg.thresh || liveQueue >= 6);
+      const loadPercentage = isStabilized ? Math.min(rawLoadPercentage, 35) : rawLoadPercentage;
 
       // Avg prep time dynamically stretches with queue pressure
-      const dynamicPrep = Number((cfg.targetPrep + liveQueue * 0.45).toFixed(1));
+      const dynamicPrep = Number((cfg.targetPrep + (isStabilized ? 0 : liveQueue * 0.45)).toFixed(1));
 
       // Active cooks (preserve any reallocation updates from existingStation)
       const activeCooks = existingStation.active_cooks !== undefined ? existingStation.active_cooks : cfg.defaultCooks;
       const recCooks = isBottleneck ? Math.max(activeCooks + 1, cfg.defaultCooks + 1) : cfg.defaultCooks;
 
-      const status = isBottleneck ? "High Delay Risk" : (loadPercentage > 65 ? "Moderate Load" : "Smooth Flow");
-      const action = existingStation.action && existingStation.action.includes("reallocated")
-        ? existingStation.action
-        : (isBottleneck ? `Add +1 Cook to ${cfg.name} due to peak backlog` : `Maintain current ${cfg.name} line staffing`);
+      const status = isStabilized ? "Smooth Flow" : (isBottleneck ? "High Delay Risk" : (loadPercentage > 65 ? "Moderate Load" : "Smooth Flow"));
+      const action = isStabilized
+        ? `Optimal staffing restored — Workload normalized`
+        : (existingStation.action && existingStation.action.includes("reallocated")
+          ? existingStation.action
+          : (isBottleneck ? `Add +1 Cook to ${cfg.name} due to peak backlog` : `Maintain current ${cfg.name} line staffing`));
 
       return {
         ...existingStation,
@@ -425,20 +1047,242 @@ export default function KitchenStaffDashboard({
         recommended_cooks: recCooks,
         avg_prep_time_mins: dynamicPrep,
         target_prep_time_mins: cfg.targetPrep,
-        queue_length: liveQueue,
+        queue_length: isStabilized ? Math.min(liveQueue, 1) : liveQueue,
         bottleneck_status: status,
         action: action
       };
     });
-  }, [liveOrders, clearedCompletedIds, data?.stations]);
+  }, [liveOrders, clearedCompletedIds, data?.stations, stabilizedStations]);
 
   const stationsList = dynamicStations && dynamicStations.length > 0 ? dynamicStations : (data?.stations || []);
   const dynamicActualTotal = Number(stationsList.reduce((acc, s) => acc + (Number(s.actual_load) || 0), 0).toFixed(1));
   const dynamicPredictedTotal = Number(stationsList.reduce((acc, s) => acc + (Number(s.predicted_load) || 0), 0).toFixed(1));
 
+  // Dynamic Real-Time Dish Types Analysis & Skill-Based Staff Reallocation Engine
+  const stationDishAnalysis = useMemo(() => {
+    const stationNames = ["Hot Kitchen", "Grill", "Cold Salad", "Pizza", "Fryer"];
+    const skillCols = {
+      "Hot Kitchen": "hot_kitchen",
+      "Grill": "grill_station",
+      "Cold Salad": "cold_salad",
+      "Pizza": "pizza_station",
+      "Fryer": "fryer_station"
+    };
+
+    const stats = {};
+    stationNames.forEach(st => {
+      stats[st] = {
+        stationName: st,
+        pendingDishes: 0,
+        activeDishes: 0,
+        pendingTickets: 0,
+        dishMap: {},
+        isOverloaded: false,
+        severity: "NORMAL",
+        recommendedStaff: [],
+        neededStaffCount: 0
+      };
+    });
+
+    const activeTickets = liveOrders.filter(o => o.status === 'pending' || o.status === 'in_prep');
+
+    activeTickets.forEach(ord => {
+      const isPending = ord.status === 'pending';
+      const stationsInOrder = new Set();
+
+      (ord.items || []).forEach(it => {
+        const qty = it.quantity || 1;
+        const dishName = it.name || "Dish";
+        const st = getStationForDish(dishName);
+        if (stats[st]) {
+          stationsInOrder.add(st);
+          stats[st].activeDishes += qty;
+          if (isPending) {
+            stats[st].pendingDishes += qty;
+            stats[st].dishMap[dishName] = (stats[st].dishMap[dishName] || 0) + qty;
+          }
+        }
+      });
+
+      if (isPending) {
+        stationsInOrder.forEach(st => {
+          stats[st].pendingTickets += 1;
+        });
+      }
+    });
+
+    const allStaff = data?.staff || [];
+    const staffDirectivesMap = new Map();
+    const surgeAlertsList = [];
+
+    stationNames.forEach(st => {
+      if (stabilizedStations.has(st)) {
+        stats[st].isOverloaded = false;
+        stats[st].severity = "NORMAL";
+        stats[st].recommendedStaff = [];
+        return;
+      }
+      const stationObj = (dynamicStations || []).find(s => s.name === st) || {};
+      const currentCooks = stationObj.active_cooks || (st === "Pizza" ? 3 : (st === "Hot Kitchen" ? 3 : (st === "Grill" ? 2 : 1)));
+      const pendingCount = stats[st].pendingDishes;
+      const ratio = Number((pendingCount / Math.max(1, currentCooks)).toFixed(1));
+
+      // Overload surge condition: e.g. 10 pizza orders arriving at once with 3 cooks
+      const isOverloaded = (pendingCount >= 5) || (pendingCount >= 3 && ratio >= 1.4) || (stats[st].pendingTickets >= 4);
+
+      stats[st].currentCooks = currentCooks;
+      stats[st].ratio = ratio;
+      stats[st].isOverloaded = isOverloaded;
+
+      if (isOverloaded) {
+        const neededCooks = pendingCount >= 8 ? 2 : 1;
+        stats[st].neededStaffCount = neededCooks;
+        stats[st].severity = pendingCount >= 8 ? "CRITICAL" : "HIGH";
+
+        const skillCol = skillCols[st];
+
+        const candidates = [];
+        allStaff.forEach(s => {
+          const assigned = (s.assigned_station || "").toLowerCase();
+          if (assigned.includes(st.toLowerCase())) return;
+          if (s.isReallocated && (s.reallocatedTo || "").toLowerCase().includes(st.toLowerCase())) return;
+
+          const skillScore = Number(s[skillCol]) || 3;
+          if (skillScore >= 3) {
+            let fromSt = "Cold Salad";
+            for (const sn of stationNames) {
+              if (assigned.includes(sn.toLowerCase())) {
+                fromSt = sn;
+                break;
+              }
+            }
+            const sourcePending = stats[fromSt]?.pendingDishes || 0;
+
+            candidates.push({
+              staff: s,
+              skillScore,
+              fromStation: fromSt,
+              sourceWorkload: sourcePending,
+              efficiency: Number(s.efficiency_rating) || 80
+            });
+          }
+        });
+
+        candidates.sort((a, b) => {
+          if (b.skillScore !== a.skillScore) return b.skillScore - a.skillScore;
+          if (a.sourceWorkload !== b.sourceWorkload) return a.sourceWorkload - b.sourceWorkload;
+          return b.efficiency - a.efficiency;
+        });
+
+        const selected = candidates.slice(0, neededCooks);
+        const dishSummary = Object.entries(stats[st].dishMap)
+          .map(([name, count]) => `${count}x ${name}`)
+          .join(', ') || `${pendingCount}x incoming dishes`;
+
+        stats[st].dishSummary = dishSummary;
+
+        const recommendedStaffItems = selected.map(c => {
+          const staffObj = c.staff;
+          const staffName = staffObj.name || "Chef";
+          const staffId = staffObj.id || staffObj.emp_id;
+
+          const rec = {
+            staffId,
+            staffName,
+            station: st,
+            stationName: st,
+            targetStation: st,
+            currentStation: c.fromStation,
+            fromStation: c.fromStation,
+            stationSkillScore: c.skillScore,
+            skillRating: c.skillScore,
+            skillStars: `${c.skillScore}★`,
+            skillLevel: staffObj.skill_level || "Experienced Specialist",
+            efficiency: c.efficiency,
+            pendingDishes: pendingCount,
+            currentCooks,
+            reason: `Qualified with ${c.skillScore}★ rating in ${st}; currently assigned to ${c.fromStation} (${c.sourceWorkload} pending orders).`,
+            notificationMessage: `🚨 URGENT STATION TRANSFER DIRECTIVE: Report to ${st} Station immediately! High volume surge of ${pendingCount} incoming ${st.toLowerCase()} orders detected. Station currently has only ${currentCooks} cooks assigned. Qualified skill rating: ${c.skillScore}★.`,
+            message: `Surge of ${pendingCount} incoming orders detected at ${st}! You have a ${c.skillScore}★ skill rating in ${st}. Reassign now to support the surge.`,
+            stationCardMessage: `Surge of ${pendingCount} ${st} orders detected. Recommend reallocating ${staffName} (${c.skillScore}★) from ${c.fromStation} to ${st} to handle the surge.`
+          };
+
+          if (staffId) staffDirectivesMap.set(staffId, rec);
+          if (staffName) {
+            staffDirectivesMap.set(staffName, rec);
+            staffDirectivesMap.set(staffName.split('(')[0].trim(), rec);
+          }
+          return rec;
+        });
+
+        stats[st].recommendedStaff = recommendedStaffItems;
+
+        surgeAlertsList.push({
+          station: st,
+          stationName: st,
+          pendingDishes: pendingCount,
+          activeDishes: stats[st].activeDishes,
+          pendingTickets: stats[st].pendingTickets,
+          currentCooks,
+          recommendedCooks: currentCooks + recommendedStaffItems.length,
+          neededStaffCount: recommendedStaffItems.length,
+          ratio,
+          dishSummary,
+          severity: stats[st].severity,
+          recommendedStaff: recommendedStaffItems,
+          alertTitle: `🔥 ${st.toUpperCase()} STATION SURGE: ${pendingCount} Incoming Orders (${currentCooks} Cooks Assigned)`,
+          alertDescription: `Queue load is ${ratio} dishes/cook. Reallocate ${recommendedStaffItems.length} qualified staff (${recommendedStaffItems.map(s => s.staffName.split('(')[0].trim()).join(', ')}) to ${st} to handle the surge.`
+        });
+      }
+    });
+
+    return {
+      stationStats: stats,
+      surgeAlerts: surgeAlertsList,
+      staffDirectivesMap
+    };
+  }, [liveOrders, dynamicStations, data?.staff, stabilizedStations]);
+
   // Dynamic AI Staff Allocation Directives Engine: updates in real-time based on station queues & load surges
-  const generateDynamicDirectives = (currentStations = [], currentStaff = [], customSurges = [], resolvedSet = new Set()) => {
-    const results = [...customSurges.filter(d => !resolvedSet.has(d.id))];
+  const generateDynamicDirectives = (currentStations = [], currentStaff = [], customSurges = [], resolvedSet = new Set(), dishSurgeAlerts = [], stabilizedSet = new Set()) => {
+    const results = [];
+
+    // 0. Top Priority: Real-time Dish Surges from KDS live tickets analysis
+    for (const surge of dishSurgeAlerts) {
+      const surgeSt = surge.station || surge.stationName || "Pizza";
+      if (stabilizedSet.has(surgeSt)) continue; // Automatically skip stabilized stations
+
+      for (const rec of (surge.recommendedStaff || [])) {
+        const staffCleanName = (rec.staffName || "Chef").split('(')[0].trim();
+        const dirId = `dir-dish-surge-${surgeSt}-${rec.staffId || staffCleanName}`;
+        if (!resolvedSet.has(dirId)) {
+          results.push({
+            id: dirId,
+            stationId: `station-${surgeSt}`,
+            priority: "CRITICAL",
+            title: surge.alertTitle,
+            actionText: `Reassign ${staffCleanName} (${rec.stationSkillScore || rec.skillRating || 4}★ skill) from ${rec.currentStation || rec.fromStation || "Prep Station"} to ${surgeSt} to handle surge of ${surge.pendingDishes} incoming orders.`,
+            targetStaff: staffCleanName,
+            fromStation: rec.currentStation || rec.fromStation || "Prep Station",
+            targetStation: surgeSt,
+            mitigatedLoad: 50,
+            mitigatedQueue: 2,
+            resolved: false,
+            isDishSurge: true,
+            dishSummary: surge.dishSummary,
+            staffScore: rec.stationSkillScore || rec.skillRating || 4
+          });
+        }
+      }
+    }
+
+    // Next append active custom surges
+    for (const d of customSurges) {
+      if (stabilizedSet.has(d.targetStation)) continue; // Skip stabilized stations
+      if (!resolvedSet.has(d.id)) {
+        results.push(d);
+      }
+    }
 
     // Priority sorting of stations: queue_length first, then load_level
     const sortedStations = [...currentStations].sort((a, b) => {
@@ -489,6 +1333,8 @@ export default function KitchenStaffDashboard({
     // 1. Generate queue surge / active load directives for busy stations
     for (const st of sortedStations) {
       if (results.length >= 3) break;
+      if (stabilizedSet.has(st.name)) continue; // Station workload already normalized
+
       const q = st.queue_length || 0;
       const load = st.actual_load || 0;
       const loadPct = st.load_level || 0;
@@ -533,7 +1379,7 @@ export default function KitchenStaffDashboard({
     }
 
     // 2. Line balancing directive if an overloaded station exists alongside an underutilized station
-    const busySt = sortedStations.find(s => (s.queue_length || 0) > 0 || (s.load_level || 0) >= 20);
+    const busySt = sortedStations.find(s => ((s.queue_length || 0) > 0 || (s.load_level || 0) >= 20) && !stabilizedSet.has(s.name));
     const idleSt = sortedStations.slice().reverse().find(s => (s.queue_length || 0) === 0 && (s.load_level || 0) < 15);
 
     if (busySt && idleSt && busySt.name !== idleSt.name && results.length < 3) {
@@ -626,6 +1472,7 @@ export default function KitchenStaffDashboard({
 
     for (const fb of fallbackDirectives) {
       if (results.length >= 3) break;
+      if (stabilizedSet.has(fb.targetStation)) continue; // Skip stabilized stations
       if (!resolvedSet.has(fb.id) && !results.some(r => r.id === fb.id || r.targetStation === fb.targetStation)) {
         results.push(fb);
       }
@@ -634,11 +1481,34 @@ export default function KitchenStaffDashboard({
     return results.slice(0, 3);
   };
 
-  // Dynamically auto-update directives whenever stationsList, staff, custom surges, or resolved directives change
+  // Dynamically auto-update directives whenever stationsList, staff, custom surges, resolved directives, dish surges, or stabilized stations change
   useEffect(() => {
-    const dyn = generateDynamicDirectives(stationsList, data?.staff || [], customSurges, resolvedDirectiveIds);
+    const dyn = generateDynamicDirectives(
+      stationsList,
+      data?.staff || [],
+      customSurges,
+      resolvedDirectiveIds,
+      stationDishAnalysis?.surgeAlerts || [],
+      stabilizedStations
+    );
     setDirectives(dyn);
-  }, [stationsList, customSurges, resolvedDirectiveIds, data?.staff]);
+  }, [stationsList, customSurges, resolvedDirectiveIds, data?.staff, stationDishAnalysis?.surgeAlerts, stabilizedStations]);
+
+  // Auto-pop up alert modal as soon as high volume of orders arrives for ANY station/category
+  useEffect(() => {
+    if (stationDishAnalysis?.surgeAlerts?.length > 0) {
+      const hasUndismissed = stationDishAnalysis.surgeAlerts.some(
+        a => !dismissedSurgeStations.has(a.station || a.stationName) && !stabilizedStations.has(a.station || a.stationName)
+      );
+      if (hasUndismissed) {
+        setShowSurgeModal(true);
+      } else {
+        setShowSurgeModal(false);
+      }
+    } else {
+      setShowSurgeModal(false);
+    }
+  }, [stationDishAnalysis?.surgeAlerts, dismissedSurgeStations, stabilizedStations]);
 
   // Fetch metrics data dynamically from FastAPI backend
   useEffect(() => {
@@ -652,6 +1522,15 @@ export default function KitchenStaffDashboard({
       const backendData = res.data;
 
       setData(backendData);
+
+      try {
+        const trendsRes = await axios.get("http://localhost:8000/api/kitchen/workload-analytics-trends");
+        if (trendsRes?.data?.success) {
+          setWorkloadAnalytics(trendsRes.data);
+        }
+      } catch (trendErr) {
+        console.warn("⚠️ Workload analytics trends endpoint offline, using local model:", trendErr);
+      }
 
       console.log("✅ Backend API connected successfully:", backendData);
     } catch (err) {
@@ -714,10 +1593,13 @@ export default function KitchenStaffDashboard({
   };
 
   const handleExecuteDirective = async (directive) => {
-    // 1. Mark resolved immediately with green feedback
-    setDirectives(prev => prev.map(d => d.id === directive.id ? { ...d, resolved: true } : d));
+    // 1. Register station reassignment for automated 2-order fulfillment tracking
+    registerStationReassignment(directive.targetStation, directive.targetStaff, directive.fromStation || "Cold Salad");
 
-    // 2. Persist reallocation to backend CSV logger
+    // 2. Mark this directive as in-progress fulfillment
+    setDirectives(prev => prev.map(d => d.id === directive.id ? { ...d, inProgressFulfillment: true } : d));
+
+    // 3. Persist reallocation to backend CSV logger
     try {
       await axios.post("http://localhost:8000/api/kitchen/reallocate", {
         chef_name: directive.targetStaff,
@@ -730,7 +1612,7 @@ export default function KitchenStaffDashboard({
       console.warn("Could not post to /api/kitchen/reallocate:", apiErr);
     }
 
-    // 3. Update stations capacity and staff matrices dynamically
+    // 4. Update stations capacity and staff matrices dynamically
     if (data && data.stations) {
       const updatedStations = data.stations.map(st => {
         if (st.id === directive.stationId || st.name === directive.targetStation) {
@@ -738,9 +1620,6 @@ export default function KitchenStaffDashboard({
           return {
             ...st,
             active_cooks: currentCooks + 1,
-            load_level: directive.mitigatedLoad || Math.max(30, (st.load_level || 50) - 25),
-            queue_length: directive.mitigatedQueue !== undefined ? directive.mitigatedQueue : Math.max(0, (st.queue_length || 1) - 1),
-            avg_prep_time_mins: "4.2",
             bottleneck_status: "Relieved — Extra Cook Assigned",
             action: `Optimal staffing restored — ${directive.targetStaff} reallocated based on skill matching`
           };
@@ -767,14 +1646,8 @@ export default function KitchenStaffDashboard({
       }));
     }
 
-    setDismissedToast(`⚡ Dynamic Reallocation Triggered: ${directive.targetStaff} reassigned to ${directive.targetStation}! Staff Skill Matrix updated in real time.`);
+    setDismissedToast(`⚡ Dynamic Reallocation Triggered: ${directive.targetStaff} reassigned to ${directive.targetStation}! Complete 2 orders on KDS to normalize.`);
     setTimeout(() => setDismissedToast(""), 4500);
-
-    setTimeout(() => {
-      setDirectives(prev => prev.filter(d => d.id !== directive.id));
-      setResolvedDirectiveIds(prev => new Set([...prev, directive.id]));
-      setCustomSurges(prev => prev.filter(d => d.id !== directive.id));
-    }, 1200);
   };
 
   const handleSimulateSurge = () => {
@@ -791,6 +1664,17 @@ export default function KitchenStaffDashboard({
       mitigatedQueue: 3,
       resolved: false
     };
+
+    setStabilizedStations(prev => {
+      const next = new Set(prev);
+      next.delete("Hot Kitchen");
+      return next;
+    });
+    setStationSurgeFulfillment(prev => {
+      const next = { ...prev };
+      delete next["Hot Kitchen"];
+      return next;
+    });
 
     setCustomSurges(prev => [newDirective, ...prev]);
 
@@ -818,6 +1702,8 @@ export default function KitchenStaffDashboard({
   const handleResetDirectives = () => {
     setResolvedDirectiveIds(new Set());
     setCustomSurges([]);
+    setStabilizedStations(new Set());
+    setStationSurgeFulfillment({});
     setData(prev => {
       if (!prev || !prev.staff) return prev;
       const resetStaff = prev.staff.map(s => ({
@@ -830,6 +1716,266 @@ export default function KitchenStaffDashboard({
     });
     setDismissedToast("✅ Directives & Staff Allocations reset to standard kitchen roster.");
     setTimeout(() => setDismissedToast(""), 3500);
+  };
+
+  // Dynamic staff reallocation handler linked with backend
+  const handleExecuteStaffReallocation = async (targetStaffName, fromStation, targetStation, reason = "Surge reallocation") => {
+    const cleanStaffName = (targetStaffName || "").split('(')[0].trim();
+    const cleanFrom = (fromStation || "Prep Station").split('(')[0].replace(" (Reallocated via AI)", "").trim();
+    const cleanTo = (targetStation || "Hot Kitchen").trim();
+
+    registerStationReassignment(cleanTo, cleanStaffName, cleanFrom);
+
+    try {
+      // 1. Send to backend reallocation endpoint
+      await axios.post("http://localhost:8000/api/kitchen/reallocate", {
+        staff_name: cleanStaffName,
+        from_station: cleanFrom,
+        to_station: cleanTo,
+        reason: reason
+      });
+    } catch (err) {
+      console.warn("Backend reallocation call failed, applying client-side state update:", err);
+    }
+
+    // 2. Update local staff state
+    setData(prev => {
+      if (!prev || !prev.staff) return prev;
+      const updatedStaff = prev.staff.map(member => {
+        if (member.name.toLowerCase().includes(cleanStaffName.toLowerCase()) || cleanStaffName.toLowerCase().includes(member.name.toLowerCase())) {
+          return {
+            ...member,
+            assigned_station: `${cleanTo} (Reallocated via AI)`,
+            isReallocated: true,
+            reallocatedTo: cleanTo,
+            originalStation: member.originalStation || cleanFrom
+          };
+        }
+        return member;
+      });
+
+      // Update station cook count in local state
+      const updatedStations = (prev.stations || []).map(st => {
+        if (st.name === cleanTo) {
+          return { ...st, active_cooks: (st.active_cooks || 3) + 1 };
+        }
+        if (st.name === cleanFrom && (st.active_cooks || 3) > 1) {
+          return { ...st, active_cooks: Math.max(1, (st.active_cooks || 3) - 1) };
+        }
+        return st;
+      });
+
+      return { ...prev, staff: updatedStaff, stations: updatedStations };
+    });
+
+    setDismissedToast(`⚡ Staff Reallocation Executed: ${cleanStaffName} reassigned to ${cleanTo} station! Staff Matrix updated.`);
+    setTimeout(() => setDismissedToast(""), 4500);
+
+    // Refresh metrics and orders from backend to sync state
+    setTimeout(() => {
+      fetchKitchenData();
+      fetchLiveOrders();
+    }, 600);
+  };
+
+  const handleRevertStaffStation = async (targetStaffName, originalStation) => {
+    const cleanStaffName = (targetStaffName || "").split('(')[0].trim();
+    const revertTarget = (originalStation || "Hot Kitchen").replace(" (Reallocated via AI)", "").trim();
+
+    try {
+      await axios.post("http://localhost:8000/api/kitchen/reallocate", {
+        staff_name: cleanStaffName,
+        from_station: "Reallocated",
+        to_station: revertTarget,
+        reason: "Reverting staff assignment back to home station"
+      });
+    } catch (err) {
+      console.warn("Backend revert call failed:", err);
+    }
+
+    setData(prev => {
+      if (!prev || !prev.staff) return prev;
+      const updatedStaff = prev.staff.map(member => {
+        if (member.name.toLowerCase().includes(cleanStaffName.toLowerCase()) || cleanStaffName.toLowerCase().includes(member.name.toLowerCase())) {
+          return {
+            ...member,
+            assigned_station: revertTarget,
+            isReallocated: false,
+            reallocatedTo: undefined
+          };
+        }
+        return member;
+      });
+      return { ...prev, staff: updatedStaff };
+    });
+
+    setDismissedToast(`✓ Staff Assignment Reverted: ${cleanStaffName} returned to ${revertTarget}.`);
+    setTimeout(() => setDismissedToast(""), 3500);
+
+    setTimeout(() => {
+      fetchKitchenData();
+      fetchLiveOrders();
+    }, 600);
+  };
+
+  const stationSurgeConfigs = [
+    {
+      station: "Pizza",
+      icon: "🍕",
+      label: "Pizza Station",
+      defaultDish: "Artisan Wood-Fired Margherita Pizza",
+      badgeColor: "bg-orange-500",
+      textColor: "text-orange-600 dark:text-orange-400",
+      borderColor: "border-orange-500",
+      bgSoft: "bg-orange-50 dark:bg-orange-950/40",
+      description: "Woodfired oven pizza orders"
+    },
+    {
+      station: "Hot Kitchen",
+      icon: "🍳",
+      label: "Hot Kitchen",
+      defaultDish: "Chicken Kottu Roti Supreme",
+      badgeColor: "bg-red-500",
+      textColor: "text-red-600 dark:text-red-400",
+      borderColor: "border-red-500",
+      bgSoft: "bg-red-50 dark:bg-red-950/40",
+      description: "Wok, Kottu & Rice cooking orders"
+    },
+    {
+      station: "Grill",
+      icon: "🥩",
+      label: "Grill Station",
+      defaultDish: "Prime Beef Sirloin Medallion",
+      badgeColor: "bg-rose-500",
+      textColor: "text-rose-600 dark:text-rose-400",
+      borderColor: "border-rose-500",
+      bgSoft: "bg-rose-50 dark:bg-rose-950/40",
+      description: "Steak & charbroiled grill orders"
+    },
+    {
+      station: "Cold Salad",
+      icon: "🥗",
+      label: "Cold Salad Station",
+      defaultDish: "Cold Avocado Garden Salad",
+      badgeColor: "bg-emerald-500",
+      textColor: "text-emerald-600 dark:text-emerald-400",
+      borderColor: "border-emerald-500",
+      bgSoft: "bg-emerald-50 dark:bg-emerald-950/40",
+      description: "Fresh bowls, greens & cold salads"
+    },
+    {
+      station: "Fryer",
+      icon: "🍤",
+      label: "Fryer Station",
+      defaultDish: "Crispy Salt & Pepper Calamari",
+      badgeColor: "bg-amber-500",
+      textColor: "text-amber-600 dark:text-amber-400",
+      borderColor: "border-amber-500",
+      bgSoft: "bg-amber-50 dark:bg-amber-950/40",
+      description: "Deep fryer basket & crispy appetizers"
+    }
+  ];
+
+  const handleSimulateStationSurge = async (targetStation = "Pizza", count = 10, customDish = null) => {
+    try {
+      setSimulatingSurge(true);
+      setSimulatingSurgeStation(targetStation);
+      setShowStationSurgeMenu(false);
+
+      // Un-dismiss and un-stabilize this station so pop-up alert appears
+      setDismissedSurgeStations(prev => {
+        const next = new Set(prev);
+        next.delete(targetStation);
+        return next;
+      });
+      setStabilizedStations(prev => {
+        const next = new Set(prev);
+        next.delete(targetStation);
+        return next;
+      });
+      setStationSurgeFulfillment(prev => {
+        const next = { ...prev };
+        delete next[targetStation];
+        return next;
+      });
+
+      await axios.post("http://localhost:8000/api/kitchen/simulate-dish-surge", {
+        station: targetStation,
+        order_count: count,
+        count: count,
+        dish_name: customDish
+      });
+
+      setDismissedToast(`🚨 ${targetStation} Surge Simulation: ${count} incoming orders injected! Alert monitoring active.`);
+      setTimeout(() => setDismissedToast(""), 5000);
+
+      await fetchLiveOrders();
+      await fetchKitchenData();
+      setShowSurgeModal(true);
+    } catch (err) {
+      console.error("Failed to simulate dish surge:", err);
+      const cfg = stationSurgeConfigs.find(c => c.station === targetStation) || stationSurgeConfigs[0];
+      const dish = customDish || cfg.defaultDish;
+      const surgeTickets = Array.from({ length: count }).map((_, i) => ({
+        id: `sim-${targetStation.toLowerCase().replace(/\s+/g, '-')}-${Date.now()}-${i}`,
+        order_number: 900 + i,
+        table_no: `Table ${(i % 8) + 1}`,
+        status: "pending",
+        order_type: "Dine-in",
+        station_name: targetStation,
+        created_at: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        items: [
+          { name: dish, quantity: 1, unit_price: 2400 }
+        ]
+      }));
+      setLiveOrders(prev => [...surgeTickets, ...prev]);
+      setShowSurgeModal(true);
+      setDismissedToast(`⚡ Local Surge Fallback: ${count} ${targetStation} orders added!`);
+      setTimeout(() => setDismissedToast(""), 4500);
+    } finally {
+      setSimulatingSurge(false);
+      setSimulatingSurgeStation(null);
+    }
+  };
+
+  const handleSimulatePizzaSurge = () => handleSimulateStationSurge("Pizza", 10);
+
+  const handleResetSurgeOrders = async () => {
+    try {
+      await axios.post("http://localhost:8000/api/kitchen/reset-dish-surge");
+      await axios.post("http://localhost:8000/api/kitchen/reset-reallocations");
+      setLiveOrders(prev => prev.filter(o => !String(o.order_number).startsWith("9") && !String(o.id).includes("sim-")));
+      setDismissedSurgeStations(new Set());
+      setStabilizedStations(new Set());
+      setStationSurgeFulfillment({});
+      setShowSurgeModal(false);
+      setDismissedToast("✓ All station surge orders and active staff transfers cleared successfully.");
+      setTimeout(() => setDismissedToast(""), 3500);
+      await fetchLiveOrders();
+      await fetchKitchenData();
+    } catch (err) {
+      console.warn("Reset surge error:", err);
+      setLiveOrders(prev => prev.filter(o => !String(o.order_number).startsWith("9") && !String(o.id).includes("sim-")));
+      setDismissedSurgeStations(new Set());
+      setStabilizedStations(new Set());
+      setStationSurgeFulfillment({});
+      setShowSurgeModal(false);
+      setDismissedToast("✓ Cleared surge tickets locally.");
+      setTimeout(() => setDismissedToast(""), 3000);
+    }
+  };
+
+  const handleResetPizzaSurge = handleResetSurgeOrders;
+
+  const handleDismissSurgeModal = () => {
+    if (stationDishAnalysis?.surgeAlerts) {
+      setDismissedSurgeStations(prev => {
+        const next = new Set(prev);
+        stationDishAnalysis.surgeAlerts.forEach(a => next.add(a.station || a.stationName));
+        return next;
+      });
+    }
+    setShowSurgeModal(false);
   };
 
   const [showOrderSimulatorModal, setShowOrderSimulatorModal] = useState(false);
@@ -1408,6 +2554,30 @@ export default function KitchenStaffDashboard({
                   {pendingOrders.length + inPrepOrders.length} Cooking / Incoming
                 </span>
 
+                {/* Pop-Up Surge Alert Opener Badge (when surge is active) */}
+                {stationDishAnalysis?.surgeAlerts?.length > 0 && (
+                  <button
+                    onClick={() => setShowSurgeModal(true)}
+                    className="px-3 py-1 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xs flex items-center gap-1.5 shadow-md shadow-rose-600/30 cursor-pointer transition-all animate-pulse hover:scale-105 active:scale-95"
+                    title="Open Surge Alert modal to inspect overloaded stations and qualified staff reassignments"
+                  >
+                    <Flame className="h-3.5 w-3.5 animate-bounce" />
+                    <span>🚨 View Surge Alert ({stationDishAnalysis.surgeAlerts.length})</span>
+                  </button>
+                )}
+
+                {/* Clear Surge Button */}
+                {(stationDishAnalysis?.surgeAlerts?.length > 0 || liveOrders.some(o => String(o.order_number).startsWith("9") || String(o.id).includes("sim-"))) && (
+                  <button
+                    onClick={handleResetSurgeOrders}
+                    className="px-3 py-1 rounded-xl bg-slate-200 dark:bg-slate-800 hover:bg-rose-100 hover:text-rose-700 dark:hover:bg-rose-950/60 dark:hover:text-rose-300 text-slate-700 dark:text-slate-300 font-bold text-xs flex items-center gap-1.5 border border-slate-300 dark:border-slate-700 cursor-pointer transition-colors"
+                    title="Clear simulated surge orders and reset staff reallocations"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                    <span>Clear Surge</span>
+                  </button>
+                )}
+
                 <button
                   onClick={handleRefreshTickets}
                   disabled={ordersLoading}
@@ -1447,6 +2617,193 @@ export default function KitchenStaffDashboard({
                   className="w-full pl-8 pr-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white text-xs font-medium focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
                 />
               </div>
+            </div>
+
+            {/* KDS Real-Time Station Dish & Surge Monitor */}
+            <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-950/70 border border-slate-200 dark:border-slate-800 space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200 dark:border-slate-800/80 pb-2.5">
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 rounded-lg bg-orange-100 dark:bg-orange-950/50 text-orange-600 dark:text-orange-400">
+                    <Sparkles className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-2">
+                      <span>Real-Time Dish Volume & Station Load Monitor</span>
+                      <span className="flex h-2 w-2 relative">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                      </span>
+                    </h4>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
+                      Dynamically categorizes incoming orders by dish type, tracks cooks vs queue ratio, and recommends skilled chefs
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 bg-white dark:bg-slate-900 px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-800">
+                    Surge Threshold: &gt; 2.5 dishes/cook
+                  </span>
+                </div>
+              </div>
+
+              {/* 5-Station Real-Time Dish Cards */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5">
+                {[
+                  { name: "Pizza", icon: "🍕", label: "Pizza Station" },
+                  { name: "Hot Kitchen", icon: "🍳", label: "Hot Kitchen" },
+                  { name: "Grill", icon: "🥩", label: "Grill Station" },
+                  { name: "Cold Salad", icon: "🥗", label: "Cold Salad" },
+                  { name: "Fryer", icon: "🍤", label: "Fryer Station" }
+                ].map(stCfg => {
+                  const stStats = stationDishAnalysis?.stationStats?.[stCfg.name] || {
+                    pendingDishes: 0,
+                    activeCooks: 3,
+                    isOverloaded: false,
+                    ratio: 0
+                  };
+                  const isOver = stStats.isOverloaded;
+
+                  return (
+                    <div
+                      key={stCfg.name}
+                      className={`p-3 rounded-xl border transition-all ${
+                        isOver
+                          ? 'bg-rose-50/90 dark:bg-rose-950/50 border-2 border-rose-500 shadow-sm animate-pulse'
+                          : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-black text-slate-900 dark:text-white flex items-center gap-1">
+                          <span>{stCfg.icon}</span>
+                          <span>{stCfg.name}</span>
+                        </span>
+                        <span
+                          className={`text-[9px] font-black px-1.5 py-0.5 rounded-full uppercase ${
+                            isOver
+                              ? 'bg-rose-600 text-white'
+                              : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300'
+                          }`}
+                        >
+                          {isOver ? 'Surge Overload' : 'Normal'}
+                        </span>
+                      </div>
+
+                      <div className="mt-2 flex items-baseline justify-between">
+                        <div className="text-xl font-black text-slate-900 dark:text-white">
+                          {stStats.pendingDishes} <span className="text-[10px] font-medium text-slate-500">dishes</span>
+                        </div>
+                        <div className="text-[11px] font-bold text-slate-600 dark:text-slate-300">
+                          {stStats.activeCooks} {stStats.activeCooks === 1 ? 'cook' : 'cooks'}
+                        </div>
+                      </div>
+
+                      <div className="mt-1 text-[10px] text-slate-500 dark:text-slate-400 flex items-center justify-between font-mono">
+                        <span>Ratio:</span>
+                        <span className={isOver ? 'text-rose-600 dark:text-rose-400 font-bold' : 'text-slate-700 dark:text-slate-300'}>
+                          {stStats.ratio} / cook
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Dynamic Station Surge Alert Banner with One-Click Staff Reassignment */}
+              {stationDishAnalysis?.surgeAlerts?.map((alert, alertIdx) => {
+                const targetStation = alert.station || alert.stationName || "Pizza";
+                return (
+                  <div
+                    key={alert.station || alert.stationName || alertIdx}
+                    className="p-4 rounded-xl bg-gradient-to-r from-rose-50 to-amber-50 dark:from-rose-950/60 dark:to-amber-950/40 border-2 border-rose-500 shadow-md space-y-3"
+                  >
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 border-b border-rose-200 dark:border-rose-900/60 pb-2.5">
+                      <div className="flex items-center gap-2">
+                        <div className="p-2 rounded-xl bg-rose-600 text-white font-bold animate-bounce">
+                          <Flame className="h-5 w-5" />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h4 className="text-xs font-black uppercase text-rose-900 dark:text-rose-200 tracking-wider">
+                              🚨 SURGE ALERT: {(targetStation || "PIZZA").toUpperCase()} STATION OVERLOADED ({alert.pendingDishes || 0} Incoming Dishes)
+                            </h4>
+                            <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-rose-600 text-white">
+                              Load Ratio: {alert.ratio} dishes / cook
+                            </span>
+                          </div>
+                          <p className="text-xs text-rose-800 dark:text-rose-300 font-semibold mt-0.5">
+                            Incoming dish queue: <span className="font-extrabold">{alert.dishSummary}</span> • Assigned cooks: {alert.currentCooks} (Needs +{alert.neededStaffCount || 1} skilled cooks)
+                          </p>
+                        </div>
+                      </div>
+
+                      {alert.recommendedStaff?.length > 1 && (
+                        <button
+                          onClick={async () => {
+                            for (const cand of alert.recommendedStaff) {
+                              await handleExecuteStaffReallocation(
+                                cand.staffName,
+                                cand.currentStation || cand.fromStation || "Prep Station",
+                                targetStation,
+                                `Multi-staff surge deployment to ${targetStation}`
+                              );
+                            }
+                          }}
+                          className="px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-black text-xs shadow-md cursor-pointer flex items-center gap-1.5 self-start md:self-auto shrink-0 transition-transform active:scale-95"
+                        >
+                          <Zap className="h-4 w-4" />
+                          <span>Reassign All Qualified Staff ({alert.recommendedStaff.length})</span>
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Qualified Candidates Recommendation Cards */}
+                    <div>
+                      <span className="text-[11px] font-black uppercase text-slate-700 dark:text-slate-300 block mb-2 flex items-center gap-1.5">
+                        <Sparkles className="h-3.5 w-3.5 text-amber-600" />
+                        Qualified Experienced Staff Recommended for Immediate Transfer:
+                      </span>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                        {alert.recommendedStaff?.map((cand, idx) => {
+                          const candName = (cand.staffName || "Chef").split('(')[0].trim();
+                          const candFrom = cand.currentStation || cand.fromStation || "Prep Station";
+                          const candScore = cand.stationSkillScore || cand.skillRating || 4;
+
+                          return (
+                            <div
+                              key={cand.staffId || idx}
+                              className="p-3 bg-white dark:bg-slate-900 rounded-xl border border-rose-200 dark:border-rose-900/80 shadow-2xs flex items-center justify-between gap-3"
+                            >
+                              <div className="space-y-0.5">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="text-xs font-black text-slate-900 dark:text-white">
+                                    {candName}
+                                  </span>
+                                  <span className="text-[10px] font-black px-1.5 py-0.5 rounded bg-amber-100 text-amber-900 dark:bg-amber-950/80 dark:text-amber-300 border border-amber-300 dark:border-amber-700">
+                                    {candScore}★ {targetStation} Skill
+                                  </span>
+                                </div>
+                                <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
+                                  Currently at: <span className="font-semibold text-slate-700 dark:text-slate-300">{candFrom}</span> • Recommendation: <span className="text-rose-700 dark:text-rose-400 font-bold">{cand.reason}</span>
+                                </p>
+                              </div>
+
+                              <button
+                                onClick={() => handleExecuteStaffReallocation(cand.staffName, candFrom, targetStation, `Direct surge reallocation to ${targetStation}`)}
+                                className="px-3 py-1.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs shadow-xs cursor-pointer flex items-center gap-1 shrink-0 transition-transform active:scale-95"
+                                title={`Reassign ${candName} from ${candFrom} to ${targetStation}`}
+                              >
+                                <Zap className="h-3.5 w-3.5" />
+                                <span>Reassign to {targetStation}</span>
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
 
             {/* 4-Column Ticket Flow Grid */}
@@ -1758,6 +3115,687 @@ export default function KitchenStaffDashboard({
             </div>
           )}
 
+          {/* ========================================================================= */}
+          {/* 3-MONTH WORKLOAD MONITORING & WEEKLY / DAILY PREDICTIVE ORDER TRENDS       */}
+          {/* ========================================================================= */}
+          {(() => {
+            const defaultWorkloadAnalytics = {
+              three_month_analysis: {
+                total_days_analyzed: 92,
+                date_range: "01 Jan 2026 – 07 Apr 2026",
+                total_raw_line_items: 13642,
+                total_kitchen_food_dishes: 7223,
+                total_period_revenue_lkr: 24960600.0,
+                avg_daily_kitchen_dishes: 78.5,
+                peak_day_dishes: 163,
+                busiest_station: "Hot Kitchen (55.9%)",
+                station_distribution: {
+                  "Hot Kitchen": { name: "Hot Kitchen", dishes: 4040, pct: 55.9, color: "#ea580c", icon: "🍳" },
+                  "Grill": { name: "Grill Station", dishes: 911, pct: 12.6, color: "#e11d48", icon: "🥩" },
+                  "Cold Salad": { name: "Cold Salad Station", dishes: 851, pct: 11.8, color: "#059669", icon: "🥗" },
+                  "Pizza": { name: "Pizza Station", dishes: 741, pct: 10.3, color: "#d97706", icon: "🍕" },
+                  "Fryer": { name: "Fryer Station", dishes: 415, pct: 5.7, color: "#eab308", icon: "🍤" }
+                }
+              },
+              predicted_weekly_orders: {
+                expected_total_orders: 3140,
+                expected_kitchen_dishes: 582,
+                expected_weekly_revenue_lkr: 3698000.0,
+                weekly_trend_direction: "UPWARD (+4.8%)",
+                weekly_growth_pct: 4.8,
+                confidence_level_pct: 94.6,
+                confidence_interval: "2,980 – 3,290 orders",
+                busiest_projected_day: "Friday (510 orders)",
+                recommended_cook_hours_weekly: 336,
+                recommended_full_time_cooks: 7,
+                station_expected_dishes: {
+                  "Hot Kitchen": 325,
+                  "Grill": 88,
+                  "Cold Salad": 80,
+                  "Pizza": 60,
+                  "Fryer": 29
+                }
+              },
+              predicted_daily_orders: [
+                { day_name: "Today", date: "2026-10-15", formatted_date: "15 Oct", predicted_orders: 417, predicted_kitchen_dishes: 84, revenue_lkr: 497040.0, bar_height_pct: 77, efficiency_rate: "95.1%", top_selling_dish: "Chicken Kottu Roti Supreme", station_lead: "Hot Kitchen", required_cooks: 6, rush_peak: "19:00 Dinner Rush (115 orders/hr)", status: "Active Today" },
+                { day_name: "Tomorrow", date: "2026-10-16", formatted_date: "16 Oct", predicted_orders: 465, predicted_kitchen_dishes: 92, revenue_lkr: 562000.0, bar_height_pct: 87, efficiency_rate: "94.8%", top_selling_dish: "Grilled Atlantic Salmon Steak", station_lead: "Grill", required_cooks: 7, rush_peak: "13:00 Lunch Rush (98 orders/hr)", status: "Predicted" },
+                { day_name: "Sat", date: "2026-10-17", formatted_date: "17 Oct", predicted_orders: 510, predicted_kitchen_dishes: 108, revenue_lkr: 645000.0, bar_height_pct: 100, efficiency_rate: "95.1%", top_selling_dish: "Prime Beef Sirloin Medallion", station_lead: "Grill & Wok", required_cooks: 9, rush_peak: "19:30 Weekend Dinner Surge (125 orders/hr)", status: "Predicted" },
+                { day_name: "Sun", date: "2026-10-18", formatted_date: "18 Oct", predicted_orders: 490, predicted_kitchen_dishes: 102, revenue_lkr: 612400.0, bar_height_pct: 95, efficiency_rate: "93.8%", top_selling_dish: "Artisan Wood-Fired Margherita Pizza", station_lead: "Pizza & Grill", required_cooks: 8, rush_peak: "18:30 Family Dinner Rush (110 orders/hr)", status: "Predicted" },
+                { day_name: "Mon", date: "2026-10-19", formatted_date: "19 Oct", predicted_orders: 442, predicted_kitchen_dishes: 89, revenue_lkr: 538900.0, bar_height_pct: 83, efficiency_rate: "95.1%", top_selling_dish: "Belgian Berry & Banana Waffle", station_lead: "Hot Kitchen", required_cooks: 7, rush_peak: "08:30 Sunday Brunch Surge (88 orders/hr)", status: "Predicted" },
+                { day_name: "Tue", date: "2026-10-20", formatted_date: "20 Oct", predicted_orders: 380, predicted_kitchen_dishes: 76, revenue_lkr: 440200.0, bar_height_pct: 68, efficiency_rate: "93.8%", top_selling_dish: "Chicken Kottu Roti Supreme", station_lead: "Hot Kitchen", required_cooks: 5, rush_peak: "13:00 Corporate Lunch (75 orders/hr)", status: "Predicted" },
+                { day_name: "Wed", date: "2026-10-21", formatted_date: "21 Oct", predicted_orders: 428, predicted_kitchen_dishes: 86, revenue_lkr: 512000.0, bar_height_pct: 79, efficiency_rate: "95.1%", top_selling_dish: "Prime Beef Sirloin Medallion", station_lead: "Grill & Saute", required_cooks: 6, rush_peak: "19:00 Mid-Week Dinner (84 orders/hr)", status: "Predicted" }
+              ],
+              weekly_order_trends: [
+                { week_number: 1, week_label: "Wk 1", period: "01 Jan – 07 Jan", kitchen_dishes: 763, total_orders: 4120, avg_daily_orders: 588.6, wow_growth_pct: 0.0, status: "Historical" },
+                { week_number: 2, week_label: "Wk 2", period: "08 Jan – 14 Jan", kitchen_dishes: 626, total_orders: 3380, avg_daily_orders: 482.9, wow_growth_pct: -18.0, status: "Historical" },
+                { week_number: 3, week_label: "Wk 3", period: "15 Jan – 21 Jan", kitchen_dishes: 631, total_orders: 3410, avg_daily_orders: 487.1, wow_growth_pct: +0.8, status: "Historical" },
+                { week_number: 4, week_label: "Wk 4", period: "22 Jan – 28 Jan", kitchen_dishes: 685, total_orders: 3700, avg_daily_orders: 528.6, wow_growth_pct: +8.6, status: "Historical" },
+                { week_number: 5, week_label: "Wk 5", period: "29 Jan – 04 Feb", kitchen_dishes: 652, total_orders: 3520, avg_daily_orders: 502.9, wow_growth_pct: -4.8, status: "Historical" },
+                { week_number: 6, week_label: "Wk 6", period: "05 Feb – 11 Feb", kitchen_dishes: 706, total_orders: 3810, avg_daily_orders: 544.3, wow_growth_pct: +8.3, status: "Historical" },
+                { week_number: 7, week_label: "Wk 7", period: "12 Feb – 18 Feb", kitchen_dishes: 637, total_orders: 3440, avg_daily_orders: 491.4, wow_growth_pct: -9.8, status: "Historical" },
+                { week_number: 8, week_label: "Wk 8", period: "19 Feb – 25 Feb", kitchen_dishes: 652, total_orders: 3520, avg_daily_orders: 502.9, wow_growth_pct: +2.4, status: "Historical" },
+                { week_number: 9, week_label: "Wk 9", period: "26 Feb – 04 Mar", kitchen_dishes: 670, total_orders: 3620, avg_daily_orders: 517.1, wow_growth_pct: +2.8, status: "Historical" },
+                { week_number: 10, week_label: "Wk 10", period: "05 Mar – 11 Mar", kitchen_dishes: 615, total_orders: 3320, avg_daily_orders: 474.3, wow_growth_pct: -8.2, status: "Historical" },
+                { week_number: 11, week_label: "Wk 11", period: "12 Mar – 18 Mar", kitchen_dishes: 590, total_orders: 3190, avg_daily_orders: 455.7, wow_growth_pct: -4.1, status: "Historical" },
+                { week_number: 12, week_label: "Wk 12", period: "19 Mar – 25 Mar", kitchen_dishes: 605, total_orders: 3270, avg_daily_orders: 467.1, wow_growth_pct: +2.5, status: "Historical" },
+                { week_number: 13, week_label: "Wk 13", period: "26 Mar – 01 Apr", kitchen_dishes: 580, total_orders: 3130, avg_daily_orders: 447.1, wow_growth_pct: -4.1, status: "Historical" },
+                { week_number: 14, week_label: "Wk 14", period: "02 Apr – 07 Apr", kitchen_dishes: 560, total_orders: 3020, avg_daily_orders: 431.4, wow_growth_pct: -3.4, status: "Historical" },
+                { week_number: 15, week_label: "Wk 15 (Forecast)", period: "Upcoming 7 Days", kitchen_dishes: 582, total_orders: 3140, avg_daily_orders: 448.6, wow_growth_pct: +4.8, status: "Predicted" }
+              ],
+              day_of_week_seasonality: [
+                { day: "Monday", avg_orders: 380, avg_dishes: 76, multiplier: 0.88, note: "Moderate start of week" },
+                { day: "Tuesday", avg_orders: 405, avg_dishes: 81, multiplier: 0.94, note: "Steady mid-week lunch" },
+                { day: "Wednesday", avg_orders: 428, avg_dishes: 86, multiplier: 0.99, note: "Balanced dining flow" },
+                { day: "Thursday", avg_orders: 435, avg_dishes: 87, multiplier: 1.01, note: "Evening dining uptick" },
+                { day: "Friday", avg_orders: 510, avg_dishes: 108, multiplier: 1.18, note: "Weekly peak dinner rush" },
+                { day: "Saturday", avg_orders: 490, avg_dishes: 102, multiplier: 1.14, note: "High family & takeaway rush" },
+                { day: "Sunday", avg_orders: 442, avg_dishes: 89, multiplier: 1.02, note: "Brunch & relaxed dinner" }
+              ]
+            };
+
+            const wa = workloadAnalytics || defaultWorkloadAnalytics;
+            const t3m = wa.three_month_analysis || defaultWorkloadAnalytics.three_month_analysis;
+            const predWeek = wa.predicted_weekly_orders || defaultWorkloadAnalytics.predicted_weekly_orders;
+            const dailyPreds = wa.predicted_daily_orders || defaultWorkloadAnalytics.predicted_daily_orders;
+            const weeklyTrends = wa.weekly_order_trends || defaultWorkloadAnalytics.weekly_order_trends;
+            const dowSeasonality = wa.day_of_week_seasonality || defaultWorkloadAnalytics.day_of_week_seasonality;
+            const stationDist = t3m.station_distribution || defaultWorkloadAnalytics.three_month_analysis.station_distribution;
+
+            const maxDailyOrders = Math.max(...dailyPreds.map(d => d.predicted_orders || 0), 1);
+
+            return (
+              <div className="glass-panel p-6 rounded-2xl space-y-5 border border-emerald-200/80 dark:border-emerald-500/30 bg-gradient-to-br from-emerald-50/30 via-white to-orange-50/20 dark:from-slate-900/95 dark:via-emerald-950/15 dark:to-slate-900/95 shadow-sm">
+                
+                {/* Section Header with Mode Toggles */}
+                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-emerald-100 dark:border-emerald-900/50 pb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-3 rounded-2xl bg-gradient-to-tr from-emerald-700 via-emerald-600 to-teal-600 text-white shadow-md shadow-emerald-600/25">
+                      <BarChart2 className="h-6 w-6" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h3 className="text-base font-extrabold text-slate-900 dark:text-white">
+                          3-Month Workload Analytics & Predictive Order Forecasting
+                        </h3>
+                        <span className="px-2.5 py-0.5 rounded-full text-[11px] font-black bg-emerald-100 dark:bg-emerald-900/60 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800 flex items-center gap-1">
+                          <Database className="h-3 w-3 text-emerald-600" />
+                          92 Days Workload CSV Analyzed
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mt-0.5">
+                        Historical workload data ({t3m.date_range}) • Weekly order trend calculation & daily demand predictions
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Mode Selector Tabs */}
+                  <div className="flex items-center gap-1.5 bg-[#f0f5f2] dark:bg-slate-800 p-1 rounded-xl border border-[#d1ded5] dark:border-slate-700 self-start lg:self-auto overflow-x-auto no-scrollbar">
+                    <button
+                      onClick={() => setAnalyticsViewTab('daily')}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                        analyticsViewTab === 'daily'
+                          ? 'bg-emerald-700 text-white shadow-xs'
+                          : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                      }`}
+                    >
+                      <Calendar className="h-3.5 w-3.5" />
+                      <span>Daily Prediction (7 Days)</span>
+                    </button>
+
+                    <button
+                      onClick={() => setAnalyticsViewTab('weekly')}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                        analyticsViewTab === 'weekly'
+                          ? 'bg-emerald-700 text-white shadow-xs'
+                          : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                      }`}
+                    >
+                      <TrendingUp className="h-3.5 w-3.5" />
+                      <span>Weekly Trends & Forecast</span>
+                    </button>
+
+                    <button
+                      onClick={() => setAnalyticsViewTab('summary')}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                        analyticsViewTab === 'summary'
+                          ? 'bg-emerald-700 text-white shadow-xs'
+                          : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                      }`}
+                    >
+                      <Layers className="h-3.5 w-3.5" />
+                      <span>3-Month Workload Summary</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* 4 Summary KPI Cards */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+                  <div className="p-3.5 bg-white dark:bg-slate-900/90 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs space-y-1">
+                    <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 font-bold uppercase">
+                      <span>3-Month Workload Analyzed</span>
+                      <span className="p-1 rounded-md bg-emerald-50 dark:bg-emerald-950 text-emerald-600">92 Days</span>
+                    </div>
+                    <div className="text-2xl font-black text-slate-900 dark:text-white mt-1">
+                      {t3m.total_raw_line_items?.toLocaleString() || "13,642"}
+                      <span className="text-xs font-bold text-slate-500 ml-1.5">items ({t3m.total_kitchen_food_dishes?.toLocaleString() || "7,223"} dishes)</span>
+                    </div>
+                    <p className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">
+                      Date Range: <span className="font-semibold text-slate-700 dark:text-slate-300">{t3m.date_range}</span>
+                    </p>
+                  </div>
+
+                  <div className="p-3.5 bg-white dark:bg-slate-900/90 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs space-y-1">
+                    <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 font-bold uppercase">
+                      <span>Historical Daily Average</span>
+                      <span className="p-1 rounded-md bg-orange-50 dark:bg-orange-950 text-orange-600">Per Day</span>
+                    </div>
+                    <div className="text-2xl font-black text-orange-600 dark:text-orange-400 mt-1">
+                      {t3m.avg_daily_kitchen_dishes || "78.5"}
+                      <span className="text-xs font-bold text-slate-500 ml-1.5">dishes (~425 orders)</span>
+                    </div>
+                    <p className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">
+                      Peak Historical Day: <span className="font-bold text-rose-600">{t3m.peak_day_dishes || 163} dishes</span>
+                    </p>
+                  </div>
+
+                  <div className="p-3.5 bg-white dark:bg-slate-900/90 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs space-y-1">
+                    <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 font-bold uppercase">
+                      <span>Expected Orders Per Week</span>
+                      <span className="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 text-[10px] font-black">
+                        +{predWeek.weekly_growth_pct}% WoW
+                      </span>
+                    </div>
+                    <div className="text-2xl font-black text-emerald-700 dark:text-emerald-400 mt-1">
+                      {predWeek.expected_total_orders?.toLocaleString() || "3,140"}
+                      <span className="text-xs font-bold text-slate-500 ml-1.5">orders ({predWeek.expected_kitchen_dishes || 582} dishes)</span>
+                    </div>
+                    <p className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">
+                      Projected Kitchen Load: <span className="font-bold text-emerald-700 dark:text-emerald-400">~{Math.round((predWeek.expected_kitchen_dishes || 582) / 7)} dishes/day avg</span>
+                    </p>
+                  </div>
+
+                  <div className="p-3.5 bg-white dark:bg-slate-900/90 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs space-y-1">
+                    <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 font-bold uppercase">
+                      <span>Kitchen Capacity Forecast</span>
+                      <span className="p-1 rounded-md bg-purple-50 dark:bg-purple-950 text-purple-600">Model: RF</span>
+                    </div>
+                    <div className="text-2xl font-black text-purple-700 dark:text-purple-400 mt-1">
+                      {predWeek.recommended_full_time_cooks || 7}
+                      <span className="text-xs font-bold text-slate-500 ml-1.5">Cooks Required</span>
+                    </div>
+                    <p className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">
+                      Weekly Cook Hours: <span className="font-bold">{predWeek.recommended_cook_hours_weekly || 336} hrs</span> • {predWeek.confidence_level_pct || "94.6"}% Conf.
+                    </p>
+                  </div>
+                </div>
+
+                {/* VIEW 1: DAILY PREDICTION (7 DAYS) & REAL-TIME TODAY INTAKE */}
+                {analyticsViewTab === 'daily' && (
+                  <div className="space-y-4 pt-1">
+                    {/* Header with Live Status & Test Button */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <div>
+                        <h4 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                          <Calendar className="h-3.5 w-3.5 text-emerald-600" />
+                          Daily Workload & Expected Order Breakdown (7 Days):
+                        </h4>
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
+                          Predictive daily order volume & real-time intake tracking across Morning, Lunch, and Evening meal periods
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={handleSimulateQuickOrder}
+                          title="Click to simulate an arriving customer order in real-time"
+                          className="px-2.5 py-1 rounded-lg bg-emerald-100 hover:bg-emerald-200 dark:bg-emerald-950 dark:hover:bg-emerald-900 text-emerald-800 dark:text-emerald-300 font-bold text-[11px] flex items-center gap-1.5 transition-all border border-emerald-300 dark:border-emerald-700 cursor-pointer shadow-2xs hover:scale-102"
+                        >
+                          <Zap className="h-3 w-3 text-emerald-600 animate-bounce" />
+                          <span>+ Simulate Live Incoming Order</span>
+                        </button>
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+                          Expected Daily Avg: ~448 orders/day
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* REAL-TIME TODAY INTAKE & MEAL PERIODS BREAKDOWN PANEL */}
+                    <div className="p-4 rounded-2xl bg-gradient-to-r from-emerald-500/8 via-white to-teal-500/8 dark:from-slate-900 dark:via-emerald-950/20 dark:to-slate-900 border-2 border-emerald-500/30 dark:border-emerald-600/30 shadow-xs space-y-3.5">
+                      {/* Top Row: Live Sync Header & KPI Comparison */}
+                      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-3 border-b border-emerald-200/60 dark:border-slate-800">
+                        <div className="flex items-center gap-2.5">
+                          <div className="p-2 rounded-xl bg-emerald-600 text-white shadow-xs">
+                            <Clock className="h-4 w-4" />
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <h5 className="text-sm font-extrabold text-slate-900 dark:text-white">
+                                Today's Real-Time Order Intake vs Expected Demand
+                              </h5>
+                              <span className="px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 text-[10px] font-black flex items-center gap-1 border border-emerald-300 dark:border-emerald-800">
+                                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-ping" />
+                                Real-Time Active
+                              </span>
+                            </div>
+                            <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
+                              Live order stream syncing every 4s • Tracking orders received so far today vs 3-month predicted target
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Today's Dual Comparison Stats */}
+                        <div className="flex items-center gap-3">
+                          <div className="px-3 py-1.5 rounded-xl bg-white dark:bg-slate-800 border border-emerald-300/80 dark:border-emerald-700/60 shadow-2xs text-right">
+                            <div className="text-[10px] uppercase font-bold text-slate-400">Actual Received Today</div>
+                            <div className="text-lg font-black text-emerald-700 dark:text-emerald-400 font-mono flex items-center justify-end gap-1">
+                              <span>{todayMealStats.totalActualToday}</span>
+                              <span className="text-[11px] font-bold text-slate-500 font-sans">orders</span>
+                            </div>
+                          </div>
+
+                          <div className="text-slate-300 dark:text-slate-700 font-bold text-lg">/</div>
+
+                          <div className="px-3 py-1.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-2xs">
+                            <div className="text-[10px] uppercase font-bold text-slate-400">Predicted Target</div>
+                            <div className="text-lg font-black text-slate-800 dark:text-slate-200 font-mono">
+                              {todayMealStats.predictedToday} <span className="text-[11px] font-bold text-slate-500 font-sans">orders</span>
+                            </div>
+                          </div>
+
+                          <div className="px-3 py-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800 shadow-2xs text-center">
+                            <div className="text-[10px] uppercase font-bold text-emerald-800 dark:text-emerald-300">Fulfillment</div>
+                            <div className="text-lg font-black text-emerald-700 dark:text-emerald-400 font-mono">
+                              {todayMealStats.progressPct}%
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Overall Today Target Fulfillment Progress Bar */}
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between text-[11px]">
+                          <span className="font-bold text-slate-700 dark:text-slate-300">
+                            Daily Target Fulfillment Progress ({todayMealStats.totalActualToday} of {todayMealStats.predictedToday} expected orders)
+                          </span>
+                          <span className="font-mono font-bold text-emerald-700 dark:text-emerald-400">
+                            {todayMealStats.progressPct}% • {Math.round(todayMealStats.totalActualToday * 0.2)} kitchen food dishes cooked
+                          </span>
+                        </div>
+                        <div className="w-full bg-slate-100 dark:bg-slate-800 h-2.5 rounded-full overflow-hidden p-0.5">
+                          <div
+                            className="bg-gradient-to-r from-emerald-500 to-teal-500 h-full rounded-full transition-all duration-700 shadow-xs"
+                            style={{ width: `${todayMealStats.progressPct}%` }}
+                          />
+                        </div>
+                      </div>
+
+                      {/* 3 MEAL PERIODS BREAKDOWN: Morning, Afternoon/Lunch, Evening/Night */}
+                      <div className="space-y-2 pt-1">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                            <Utensils className="h-3 w-3 text-emerald-600" />
+                            Meal Period Breakdown (Actual Orders Received):
+                          </span>
+                          <span className="text-[10px] text-slate-400 font-medium">
+                            Categorized automatically by order receipt timestamp
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                          {todayMealStats.periods.map(period => (
+                            <div
+                              key={period.key}
+                              className={`p-3 rounded-xl border transition-all ${
+                                period.isCurrent
+                                  ? 'bg-white dark:bg-slate-900 border-2 border-emerald-500 ring-2 ring-emerald-500/10 shadow-sm'
+                                  : 'bg-white/80 dark:bg-slate-900/80 border-slate-200 dark:border-slate-800 hover:border-slate-300'
+                              }`}
+                            >
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-base">{period.icon}</span>
+                                  <div>
+                                    <h6 className="text-xs font-bold text-slate-900 dark:text-white">
+                                      {period.name}
+                                    </h6>
+                                    <span className="text-[10px] text-slate-400 font-medium">{period.timeRange}</span>
+                                  </div>
+                                </div>
+                                <span
+                                  className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${
+                                    period.status === 'Active Now'
+                                      ? 'bg-emerald-600 text-white animate-pulse'
+                                      : period.status === 'Completed'
+                                      ? 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300'
+                                      : 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300'
+                                  }`}
+                                >
+                                  {period.status}
+                                </span>
+                              </div>
+
+                              <div className="mt-2.5 flex items-baseline justify-between pt-2 border-t border-slate-100 dark:border-slate-800">
+                                <div>
+                                  <div className="text-xl font-mono font-black text-slate-900 dark:text-white">
+                                    {period.orders}{' '}
+                                    <span className="text-[11px] font-semibold text-slate-500 font-sans">orders</span>
+                                  </div>
+                                  <span className="text-[10px] text-slate-400 font-medium">
+                                    ~{period.dishes} food dishes prepared
+                                  </span>
+                                </div>
+                                <div className="text-right">
+                                  <span className="text-[11px] font-bold text-emerald-700 dark:text-emerald-400">
+                                    {Math.round((period.orders / Math.max(1, todayMealStats.totalActualToday)) * 100)}%
+                                  </span>
+                                  <span className="text-[9px] text-slate-400 block">of day's total</span>
+                                </div>
+                              </div>
+
+                              <div className="mt-2 pt-2 border-t border-slate-100 dark:border-slate-800 text-[10px] text-slate-500 dark:text-slate-400 truncate" title={period.popularItems}>
+                                🌟 <span className="font-medium text-slate-600 dark:text-slate-300">{period.popularItems}</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* 7-Day Daily Cards Grid */}
+                    <div className="space-y-1.5 pt-1">
+                      <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-600 dark:text-slate-400 block">
+                        7-Day Rolling Horizon Breakdown:
+                      </span>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-2.5">
+                        {dailyPreds.map((day, idx) => {
+                          const isToday = day.day_name === 'Today';
+                          const displayOrders = isToday ? todayMealStats.totalActualToday : day.predicted_orders;
+                          const barPct = isToday
+                            ? todayMealStats.progressPct
+                            : (day.bar_height_pct || Math.round((day.predicted_orders / maxDailyOrders) * 100));
+
+                          return (
+                            <div
+                              key={day.date || idx}
+                              className={`p-3 rounded-xl bg-white dark:bg-slate-900 border flex flex-col justify-between space-y-2 transition-all hover:shadow-md ${
+                                isToday
+                                  ? 'border-2 border-emerald-500 ring-2 ring-emerald-500/10'
+                                  : 'border-[#d7e5dc] dark:border-slate-800 hover:border-emerald-500'
+                              }`}
+                            >
+                              {/* Card Header: Day Name & Date */}
+                              <div className="flex items-center justify-between text-[11px]">
+                                <span className={`font-extrabold flex items-center gap-1 ${isToday ? 'text-emerald-700 dark:text-emerald-400' : 'text-slate-900 dark:text-white'}`}>
+                                  {isToday && <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-ping inline-block" />}
+                                  {day.day_name}
+                                </span>
+                                <span className="text-[10px] text-slate-400 font-medium">{day.formatted_date}</span>
+                              </div>
+
+                              {/* Visual Workload Progress Bar */}
+                              <div className="w-full bg-slate-100 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                                <div
+                                  className={`h-full rounded-full transition-all duration-500 ${
+                                    isToday ? 'bg-emerald-600' : 'bg-emerald-700'
+                                  }`}
+                                  style={{ width: `${barPct}%` }}
+                                />
+                              </div>
+
+                              {/* Order & Workload Stats */}
+                              <div className="space-y-1">
+                                <div className="flex items-baseline justify-between">
+                                  <span className="font-mono font-black text-sm text-slate-900 dark:text-white">
+                                    {displayOrders} <span className="text-[11px] font-bold text-slate-500 font-sans">orders</span>
+                                  </span>
+                                  <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${
+                                    isToday
+                                      ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border-emerald-300'
+                                      : 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800/60'
+                                  }`}>
+                                    {isToday ? `${todayMealStats.progressPct}% Rec` : (day.efficiency_rate || "95.1%")}
+                                  </span>
+                                </div>
+
+                                {isToday ? (
+                                  <div className="text-[9px] text-slate-500 dark:text-slate-400 flex items-center justify-between font-semibold pt-0.5">
+                                    <span className="text-emerald-700 dark:text-emerald-400">Target: {day.predicted_orders} exp</span>
+                                    <span>~{Math.round(todayMealStats.totalActualToday * 0.2)} dishes</span>
+                                  </div>
+                                ) : (
+                                  <div className="text-[10px] text-slate-500 dark:text-slate-400 flex items-center justify-between font-medium pt-0.5">
+                                    <span className="font-bold text-slate-700 dark:text-slate-300">{day.predicted_kitchen_dishes || Math.round(day.predicted_orders * 0.2)} dishes</span>
+                                    <span className="text-[9px] text-slate-500 font-bold">{day.required_cooks || 6} cooks</span>
+                                  </div>
+                                )}
+
+                                {/* If Today, show mini meal period pills */}
+                                {isToday && (
+                                  <div className="pt-1 flex items-center justify-between text-[8px] font-bold text-slate-600 dark:text-slate-300 border-t border-slate-100 dark:border-slate-800">
+                                    <span title="Morning Shift Orders">🌅 {todayMealStats.periods[0].orders}</span>
+                                    <span title="Afternoon / Lunch Shift Orders" className="text-emerald-700 dark:text-emerald-400 font-black">☀️ {todayMealStats.periods[1].orders}</span>
+                                    <span title="Evening / Night Shift Orders">🌙 {todayMealStats.periods[2].orders}</span>
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Top Predicted Dish */}
+                              <div
+                                className="pt-1.5 border-t border-slate-100 dark:border-slate-800 text-[10px] text-slate-500 dark:text-slate-400 truncate"
+                                title={day.top_selling_dish}
+                              >
+                                🌟 {day.top_selling_dish}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* VIEW 2: WEEKLY ORDER TRENDS & FORECAST */}
+                {analyticsViewTab === 'weekly' && (
+                  <div className="space-y-4 pt-1">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <div>
+                        <h4 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                          <TrendingUp className="h-3.5 w-3.5 text-emerald-600" />
+                          Weekly Order Trends Across 3 Months & Upcoming Week Forecast:
+                        </h4>
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
+                          Visual trend of kitchen dishes prepared and total restaurant orders week-over-week
+                        </p>
+                      </div>
+                      <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800">
+                        15 Historical Weeks + 1 Forecast Week
+                      </span>
+                    </div>
+
+                    {/* Interactive Recharts Weekly Chart */}
+                    <div className="h-64 w-full bg-white dark:bg-slate-900/60 p-3 rounded-xl border border-slate-200 dark:border-slate-800">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={weeklyTrends}>
+                          <CartesianGrid strokeDasharray="3 3" stroke={isDarkMode ? "#1e293b" : "#e2e8f0"} />
+                          <XAxis dataKey="week_label" stroke={isDarkMode ? "#64748b" : "#475569"} fontSize={10} />
+                          <YAxis yAxisId="left" stroke={isDarkMode ? "#64748b" : "#475569"} fontSize={10} label={{ value: 'Kitchen Dishes', angle: -90, position: 'insideLeft', fontSize: 10, fill: '#64748b' }} />
+                          <YAxis yAxisId="right" orientation="right" stroke={isDarkMode ? "#64748b" : "#475569"} fontSize={10} label={{ value: 'Total Orders', angle: 90, position: 'insideRight', fontSize: 10, fill: '#64748b' }} />
+                          <Tooltip
+                            contentStyle={{
+                              backgroundColor: isDarkMode ? '#0f172a' : '#ffffff',
+                              borderColor: isDarkMode ? '#334155' : '#cbd5e1',
+                              borderRadius: '8px',
+                              fontSize: '11px',
+                              color: isDarkMode ? '#f8fafc' : '#0f172a',
+                              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                            }}
+                          />
+                          <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }} />
+                          <Bar yAxisId="left" dataKey="kitchen_dishes" name="Kitchen Dishes Prepared" fill="#10b981" radius={[4, 4, 0, 0]} />
+                          <Line yAxisId="right" type="monotone" dataKey="total_orders" name="Total Orders (Est)" stroke="#ea580c" strokeWidth={2.5} dot={{ r: 3 }} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+
+                    {/* Weekly Breakdown Table */}
+                    <div className="overflow-x-auto no-scrollbar rounded-xl border border-slate-200 dark:border-slate-800">
+                      <table className="w-full text-left text-[11px]">
+                        <thead className="bg-[#f0f5f2] dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 font-extrabold uppercase border-b border-slate-200 dark:border-slate-700">
+                          <tr>
+                            <th className="py-2.5 px-3">Week</th>
+                            <th className="py-2.5 px-3">Date Range</th>
+                            <th className="py-2.5 px-3 text-right">Kitchen Dishes</th>
+                            <th className="py-2.5 px-3 text-right">Daily Avg Dishes</th>
+                            <th className="py-2.5 px-3 text-right">Total Orders</th>
+                            <th className="py-2.5 px-3 text-right">WoW Growth %</th>
+                            <th className="py-2.5 px-3 text-center">Status</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 dark:divide-slate-800 bg-white dark:bg-slate-900">
+                          {weeklyTrends.map((w, idx) => (
+                            <tr
+                              key={w.week_number || idx}
+                              className={w.status === 'Predicted' ? 'bg-emerald-50/70 dark:bg-emerald-950/40 font-bold' : 'hover:bg-slate-50 dark:hover:bg-slate-800/50'}
+                            >
+                              <td className="py-2 px-3 font-extrabold text-slate-900 dark:text-white">
+                                {w.week_label}
+                              </td>
+                              <td className="py-2 px-3 text-slate-500 dark:text-slate-400">
+                                {w.period}
+                              </td>
+                              <td className="py-2 px-3 text-right font-mono font-bold text-slate-800 dark:text-slate-200">
+                                {w.kitchen_dishes?.toLocaleString()}
+                              </td>
+                              <td className="py-2 px-3 text-right font-mono text-slate-600 dark:text-slate-400">
+                                {w.avg_daily_kitchen_dishes}
+                              </td>
+                              <td className="py-2 px-3 text-right font-mono font-bold text-orange-600 dark:text-orange-400">
+                                {w.total_orders?.toLocaleString()}
+                              </td>
+                              <td className="py-2 px-3 text-right font-mono">
+                                <span className={`px-1.5 py-0.5 rounded text-[10px] font-black ${
+                                  w.wow_growth_pct > 0
+                                    ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
+                                    : (w.wow_growth_pct < 0 ? 'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300' : 'text-slate-500')
+                                }`}>
+                                  {w.wow_growth_pct > 0 ? `+${w.wow_growth_pct}%` : `${w.wow_growth_pct}%`}
+                                </span>
+                              </td>
+                              <td className="py-2 px-3 text-center">
+                                {w.status === 'Predicted' ? (
+                                  <span className="px-2 py-0.5 rounded-full bg-emerald-600 text-white font-black text-[9px] uppercase shadow-xs animate-pulse">
+                                    ★ Forecast
+                                  </span>
+                                ) : (
+                                  <span className="text-[10px] text-slate-400 font-medium">Historical</span>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {/* VIEW 3: 3-MONTH WORKLOAD SUMMARY & STATION DISTRIBUTION */}
+                {analyticsViewTab === 'summary' && (
+                  <div className="space-y-4 pt-1">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h4 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                          <Layers className="h-3.5 w-3.5 text-emerald-600" />
+                          3-Month Production Workload Distribution Across 5 Kitchen Stations:
+                        </h4>
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
+                          Analysis of 7,223 food items prepared from {t3m.date_range} (Source: {t3m.source_file})
+                        </p>
+                      </div>
+                      <span className="text-[11px] font-bold text-slate-500">
+                        Total Prepared Dishes: <span className="font-extrabold text-emerald-700 dark:text-emerald-400">{t3m.total_kitchen_food_dishes?.toLocaleString() || "7,223"} dishes</span>
+                      </span>
+                    </div>
+
+                    {/* Station Workload Progress Bars */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
+                      {Object.entries(stationDist).map(([stKey, info]) => (
+                        <div
+                          key={stKey}
+                          className="p-3.5 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs space-y-2"
+                        >
+                          <div className="flex items-center justify-between text-xs font-bold">
+                            <span className="flex items-center gap-1.5 text-slate-900 dark:text-white">
+                              <span>{info.icon || "🍳"}</span>
+                              <span>{info.name || stKey}</span>
+                            </span>
+                            <span className="text-[10px] font-black px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800" style={{ color: info.color }}>
+                              {info.pct}%
+                            </span>
+                          </div>
+
+                          <div className="w-full bg-slate-100 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
+                            <div
+                              className="h-full rounded-full transition-all duration-500"
+                              style={{ width: `${info.pct}%`, backgroundColor: info.color }}
+                            />
+                          </div>
+
+                          <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 font-medium">
+                            <span>{info.dishes?.toLocaleString()} dishes</span>
+                            <span className="font-bold text-slate-700 dark:text-slate-300">
+                              ~{Math.round((info.dishes || 0) / (t3m.total_days_analyzed || 92))} / day
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Day-of-Week Seasonality Table */}
+                    <div className="p-4 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 space-y-2.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+                          Day-of-Week Demand Seasonality Index (3-Month Aggregated Mean)
+                        </span>
+                        <span className="text-[10px] text-slate-400">Baseline = 1.00 (Neutral)</span>
+                      </div>
+
+                      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
+                        {dowSeasonality.map((d) => (
+                          <div
+                            key={d.day}
+                            className={`p-2.5 rounded-lg border text-center space-y-1 ${
+                              d.multiplier >= 1.10
+                                ? 'bg-orange-50/70 border-orange-200 dark:bg-orange-950/40 dark:border-orange-800'
+                                : 'bg-slate-50/70 border-slate-200 dark:bg-slate-800/50 dark:border-slate-700'
+                            }`}
+                          >
+                            <span className="text-[11px] font-bold text-slate-900 dark:text-white block">
+                              {d.day}
+                            </span>
+                            <div className="text-sm font-black text-slate-800 dark:text-slate-200">
+                              {d.avg_orders} <span className="text-[10px] font-normal text-slate-400">ord</span>
+                            </div>
+                            <span className={`text-[9px] font-extrabold px-1.5 py-0.5 rounded-full inline-block ${
+                              d.multiplier >= 1.10
+                                ? 'bg-orange-600 text-white'
+                                : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300'
+                            }`}>
+                              x{d.multiplier}
+                            </span>
+                            <p className="text-[9px] text-slate-500 dark:text-slate-400 truncate">
+                              {d.note}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+              </div>
+            );
+          })()}
+
           {/* AI Actionable Directives */}
           <div className="p-5 rounded-2xl bg-orange-50 border border-orange-200 dark:bg-orange-950/40 dark:border-orange-500/30 shadow-sm space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-orange-200 dark:border-orange-800/60 pb-3">
@@ -1788,68 +3826,96 @@ export default function KitchenStaffDashboard({
               </div>
             </div>
 
-            {directives.length === 0 ? (
-              <div className="p-4 rounded-xl bg-emerald-50 text-emerald-900 dark:bg-emerald-950/50 dark:text-emerald-200 border border-emerald-200 dark:border-emerald-800 text-xs font-bold flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <CheckCircle2 className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
-                  <span>All line queues balanced! Kitchen staffing operating at optimal efficiency.</span>
-                </div>
-                <button
-                  onClick={handleResetDirectives}
-                  className="px-3 py-1 rounded-lg bg-emerald-600 text-white font-bold text-[11px] hover:bg-emerald-700 transition-colors cursor-pointer"
-                >
-                  Reset Directives
-                </button>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {directives.map((dir, index) => (
-                  <div
-                    key={dir.id}
-                    className={`p-3.5 rounded-xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${dir.resolved
-                      ? 'bg-emerald-50 border-emerald-300 dark:bg-emerald-950/40 dark:border-emerald-800 opacity-60'
-                      : (index === 0
-                        ? 'bg-white dark:bg-slate-900 border-2 border-orange-400 dark:border-orange-500/60 shadow-sm'
-                        : 'bg-white/80 dark:bg-slate-900/60 border-orange-200 dark:border-orange-900/40 opacity-85')
-                      }`}
-                  >
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className={`text-[10px] font-black px-2 py-0.5 rounded-md text-white ${dir.priority.includes('SURGE') || dir.priority === 'CRITICAL'
-                          ? 'bg-rose-600 animate-pulse'
-                          : (dir.priority === 'HIGH' ? 'bg-amber-600' : 'bg-blue-600')
-                          }`}>
-                          {index === 0 ? `TOP PRIORITY: ${dir.priority}` : `PRIORITY ${index + 1}: ${dir.priority}`}
-                        </span>
-                        <p className="text-xs font-bold text-slate-900 dark:text-white">{dir.title}</p>
-                      </div>
-                      <p className="text-xs text-orange-950 dark:text-orange-200 font-semibold flex items-center gap-1 pt-0.5">
-                        <ArrowRight className="h-3.5 w-3.5 text-orange-600 dark:text-orange-400 flex-shrink-0" />
-                        <span>Action: <span className="font-extrabold text-orange-900 dark:text-orange-100 underline">{dir.actionText}</span></span>
-                      </p>
-                    </div>
+            {(() => {
+              const visibleDirectives = directives.filter(dir => !stabilizedStations.has(dir.targetStation));
 
-                    {dir.resolved ? (
-                      <span className="px-3 py-1.5 rounded-xl bg-emerald-600 text-white font-bold text-xs flex items-center gap-1 whitespace-nowrap self-start sm:self-auto">
-                        <CheckCircle2 className="h-4 w-4" />
-                        <span>Reassigned & Resolved</span>
-                      </span>
-                    ) : (
-                      <button
-                        onClick={() => handleExecuteDirective(dir)}
-                        className={`px-3.5 py-2 rounded-xl text-white font-bold text-xs shadow-md transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap self-start sm:self-auto ${index === 0
-                          ? 'bg-orange-600 hover:bg-orange-700 shadow-orange-600/30 ring-2 ring-orange-400'
-                          : 'bg-slate-800 hover:bg-slate-900 dark:bg-slate-700 dark:hover:bg-slate-600'
+              if (visibleDirectives.length === 0) {
+                return (
+                  <div className="p-4 rounded-xl bg-emerald-50 text-emerald-900 dark:bg-emerald-950/50 dark:text-emerald-200 border border-emerald-200 dark:border-emerald-800 text-xs font-bold flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+                      <span>All line queues balanced! Kitchen staffing operating at optimal efficiency.</span>
+                    </div>
+                    <button
+                      onClick={handleResetDirectives}
+                      className="px-3 py-1 rounded-lg bg-emerald-600 text-white font-bold text-[11px] hover:bg-emerald-700 transition-colors cursor-pointer"
+                    >
+                      Reset Directives
+                    </button>
+                  </div>
+                );
+              }
+
+              return (
+                <div className="space-y-3">
+                  {visibleDirectives.map((dir, index) => {
+                    const tracker = stationSurgeFulfillment[dir.targetStation];
+                    const isReassigned = tracker?.active;
+                    const fulfilledCount = tracker?.fulfilledCount || 0;
+
+                    return (
+                      <div
+                        key={dir.id}
+                        className={`p-3.5 rounded-xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${isReassigned
+                          ? 'bg-amber-50/80 border-amber-300 dark:bg-amber-950/40 dark:border-amber-800'
+                          : (index === 0
+                            ? 'bg-white dark:bg-slate-900 border-2 border-orange-400 dark:border-orange-500/60 shadow-sm'
+                            : 'bg-white/80 dark:bg-slate-900/60 border-orange-200 dark:border-orange-900/40 opacity-85')
                           }`}
                       >
-                        <ShieldCheck className="h-4 w-4" />
-                        <span>Reallocate {dir.targetStaff}</span>
-                      </button>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className={`text-[10px] font-black px-2 py-0.5 rounded-md text-white ${isReassigned
+                              ? 'bg-amber-600'
+                              : (dir.priority?.includes('SURGE') || dir.priority === 'CRITICAL'
+                                ? 'bg-rose-600 animate-pulse'
+                                : (dir.priority === 'HIGH' ? 'bg-amber-600' : 'bg-blue-600'))
+                              }`}>
+                              {isReassigned
+                                ? `IN PROGRESS: ${fulfilledCount}/2 FULFILLED`
+                                : (index === 0 ? `TOP PRIORITY: ${dir.priority}` : `PRIORITY ${index + 1}: ${dir.priority}`)}
+                            </span>
+                            <p className="text-xs font-bold text-slate-900 dark:text-white">{dir.title}</p>
+                          </div>
+                          <p className="text-xs text-orange-950 dark:text-orange-200 font-semibold flex items-center gap-1 pt-0.5">
+                            <ArrowRight className="h-3.5 w-3.5 text-orange-600 dark:text-orange-400 flex-shrink-0" />
+                            <span>Action: <span className="font-extrabold text-orange-900 dark:text-orange-100 underline">{dir.actionText}</span></span>
+                          </p>
+                        </div>
+
+                        {isReassigned ? (
+                          <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
+                            <span className="px-3 py-1.5 rounded-xl bg-amber-500 text-white font-black text-xs flex items-center gap-1.5 shadow-xs whitespace-nowrap">
+                              <span className="h-2 w-2 rounded-full bg-white animate-ping"></span>
+                              <span>Reassigned • {fulfilledCount}/2 Orders Fulfilled</span>
+                            </span>
+                            <button
+                              onClick={() => handleFastFulfillStationOrder(dir.targetStation)}
+                              className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1 cursor-pointer shadow-xs transition-all whitespace-nowrap"
+                              title="Fulfill next station order to move to Completed Orders"
+                            >
+                              <CheckCircle2 className="h-3.5 w-3.5" />
+                              <span>Fulfill Order ({fulfilledCount}/2)</span>
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => handleExecuteDirective(dir)}
+                            className={`px-3.5 py-2 rounded-xl text-white font-bold text-xs shadow-md transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap self-start sm:self-auto ${index === 0
+                              ? 'bg-orange-600 hover:bg-orange-700 shadow-orange-600/30 ring-2 ring-orange-400'
+                              : 'bg-slate-800 hover:bg-slate-900 dark:bg-slate-700 dark:hover:bg-slate-600'
+                              }`}
+                          >
+                            <ShieldCheck className="h-4 w-4" />
+                            <span>Reallocate {dir.targetStaff}</span>
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
           </div>
         </div>
       )}
@@ -2041,234 +4107,6 @@ export default function KitchenStaffDashboard({
             );
           })()}
 
-          {/* Peak-Hour Workload & Staffing Demand Chart */}
-          <div className="glass-panel p-6 rounded-2xl space-y-4">
-            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 border-b border-slate-200 dark:border-slate-800 pb-3">
-              <div>
-                <h3 className="text-base font-bold text-slate-900 dark:text-white">Peak-Hour Workload & Staffing Forecast (07:00 - 22:30)</h3>
-                <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Hourly projected kitchen orders and dynamic cook allocation requirements</p>
-              </div>
-              <div className="flex flex-wrap items-center gap-1.5">
-                <button
-                  onClick={() => setShowBreakfastRush(!showBreakfastRush)}
-                  className={`text-[11px] font-bold px-2.5 py-1 rounded-xl border transition-all cursor-pointer shadow-sm flex items-center gap-1 ${showBreakfastRush
-                    ? 'bg-amber-600 text-white border-amber-600 shadow-amber-500/30'
-                    : 'text-amber-800 dark:text-amber-400 bg-amber-50 dark:bg-amber-500/10 border-amber-200 dark:border-amber-500/20 hover:bg-amber-100 dark:hover:bg-amber-500/20'
-                    }`}
-                >
-                  <Clock className="h-3.5 w-3.5" />
-                  <span>Breakfast Rush: 07:30 – 09:30</span>
-                </button>
-                <button
-                  onClick={() => setShowLunchRush(!showLunchRush)}
-                  className={`text-[11px] font-bold px-2.5 py-1 rounded-xl border transition-all cursor-pointer shadow-sm flex items-center gap-1 ${showLunchRush
-                    ? 'bg-sky-600 text-white border-sky-600 shadow-sky-500/30'
-                    : 'text-sky-800 dark:text-sky-400 bg-sky-50 dark:bg-sky-500/10 border-sky-200 dark:border-sky-500/20 hover:bg-sky-100 dark:hover:bg-sky-500/20'
-                    }`}
-                >
-                  <Utensils className="h-3.5 w-3.5" />
-                  <span>Lunch Rush: 12:00 – 14:00</span>
-                </button>
-                <button
-                  onClick={() => setShowDinnerRush(!showDinnerRush)}
-                  className={`text-[11px] font-bold px-2.5 py-1 rounded-xl border transition-all cursor-pointer shadow-sm flex items-center gap-1 ${showDinnerRush
-                    ? 'bg-orange-600 text-white border-orange-600 shadow-orange-500/30'
-                    : 'text-orange-800 dark:text-orange-400 bg-orange-50 dark:bg-orange-500/10 border-orange-200 dark:border-orange-500/20 hover:bg-orange-100 dark:hover:bg-orange-500/20'
-                    }`}
-                >
-                  <Flame className="h-3.5 w-3.5" />
-                  <span>Dinner Rush: 19:00 – 20:30</span>
-                </button>
-                <button
-                  onClick={() => setShowSeasonalRush(!showSeasonalRush)}
-                  className={`text-[11px] font-bold px-2.5 py-1 rounded-xl border transition-all cursor-pointer shadow-sm flex items-center gap-1 ${showSeasonalRush
-                    ? 'bg-purple-600 text-white border-purple-600 shadow-purple-500/30'
-                    : 'text-purple-800 dark:text-purple-400 bg-purple-50 dark:bg-purple-500/10 border-purple-200 dark:border-purple-500/20 hover:bg-purple-100 dark:hover:bg-purple-500/20'
-                    }`}
-                >
-                  <TrendingUp className="h-3.5 w-3.5" />
-                  <span>Seasonal Rush</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Breakfast Rush Period Section */}
-            {showBreakfastRush && (
-              <div className="p-4 rounded-xl bg-amber-50/80 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-500/30 shadow-sm space-y-3 mt-3">
-                <div className="flex items-center justify-between border-b border-amber-200 dark:border-amber-800/50 pb-2">
-                  <div className="flex items-center gap-2">
-                    <Clock className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-                    <h4 className="text-xs font-bold uppercase tracking-wider text-amber-900 dark:text-amber-200">Breakfast Rush Period Details</h4>
-                  </div>
-                  <span className="text-[11px] font-extrabold text-amber-700 dark:text-amber-300 bg-white dark:bg-slate-900 px-2.5 py-0.5 rounded-full border border-amber-200 dark:border-amber-800">
-                    Peak: 76 Orders/Hr at 08:00
-                  </span>
-                </div>
-                <div className="space-y-2 text-xs text-slate-800 dark:text-slate-200 font-medium">
-                  <div className="p-2.5 bg-white dark:bg-slate-900 rounded-lg border border-amber-100 dark:border-amber-900/50 shadow-2xs">
-                    <span className="font-bold text-amber-950 dark:text-amber-200">Breakfast Rush Window:</span> 07:30 AM – 09:30 AM (Morning takeaway & breakfast dining surge)
-                  </div>
-                  <div className="p-2.5 bg-white dark:bg-slate-900 rounded-lg border border-amber-100 dark:border-amber-900/50 shadow-2xs">
-                    <span className="font-bold text-amber-900 dark:text-amber-300">Staff Allocation Required:</span> 6 Line Chefs (2 Hoppers/Roti Bay, 2 Beverage Station, 2 Assembly)
-                  </div>
-                  <div className="p-2.5 bg-white dark:bg-slate-900 rounded-lg border border-amber-100 dark:border-amber-900/50 shadow-2xs">
-                    <span className="font-bold text-amber-900 dark:text-amber-300">Menu Demand Focus:</span> String Hoppers, Egg Hoppers, Pol Roti with Lunu Miris, Ceylon Tea & Coffee
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Lunch Rush Period Section */}
-            {showLunchRush && (
-              <div className="p-4 rounded-xl bg-sky-50/80 dark:bg-sky-950/40 border border-sky-200 dark:border-sky-500/30 shadow-sm space-y-3 mt-3">
-                <div className="flex items-center justify-between border-b border-sky-200 dark:border-sky-800/50 pb-2">
-                  <div className="flex items-center gap-2">
-                    <Utensils className="h-4 w-4 text-sky-600 dark:text-sky-400" />
-                    <h4 className="text-xs font-bold uppercase tracking-wider text-sky-900 dark:text-sky-200">Lunch Rush Period Details</h4>
-                  </div>
-                  <span className="text-[11px] font-extrabold text-sky-700 dark:text-sky-300 bg-white dark:bg-slate-900 px-2.5 py-0.5 rounded-full border border-sky-200 dark:border-sky-800">
-                    Peak: 95 Orders/Hr at 13:00
-                  </span>
-                </div>
-                <div className="space-y-2 text-xs text-slate-800 dark:text-slate-200 font-medium">
-                  <div className="p-2.5 bg-white dark:bg-slate-900 rounded-lg border border-sky-100 dark:border-sky-900/50 shadow-2xs">
-                    <span className="font-bold text-sky-950 dark:text-sky-200">Lunch Rush Window:</span> 12:00 PM – 02:00 PM (Highest daily dine-in & corporate rush)
-                  </div>
-                  <div className="p-2.5 bg-white dark:bg-slate-900 rounded-lg border border-sky-100 dark:border-sky-900/50 shadow-2xs">
-                    <span className="font-bold text-sky-900 dark:text-sky-300">Staff Allocation Required:</span> 8 Line Chefs (2 Wok, 2 Curry Bay, 2 Grill, 2 Assembly)
-                  </div>
-                  <div className="p-2.5 bg-white dark:bg-slate-900 rounded-lg border border-sky-100 dark:border-sky-900/50 shadow-2xs">
-                    <span className="font-bold text-sky-900 dark:text-sky-300">Menu Demand Focus:</span> Rice & Curry Express Thali, Wok Fried Rice & Seafood Combos
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Dinner Rush Period Section */}
-            {showDinnerRush && (
-              <div className="p-4 rounded-xl bg-orange-50/80 dark:bg-orange-950/40 border border-orange-200 dark:border-orange-500/30 shadow-sm space-y-3 mt-3">
-                <div className="flex items-center justify-between border-b border-orange-200 dark:border-orange-800/50 pb-2">
-                  <div className="flex items-center gap-2">
-                    <Flame className="h-4 w-4 text-orange-600 dark:text-orange-400" />
-                    <h4 className="text-xs font-bold uppercase tracking-wider text-orange-900 dark:text-orange-200">Dinner Rush Period Details</h4>
-                  </div>
-                  <span className="text-[11px] font-extrabold text-orange-700 dark:text-orange-300 bg-white dark:bg-slate-900 px-2.5 py-0.5 rounded-full border border-orange-200 dark:border-orange-800">
-                    Peak: 115 Orders/Hr at 19:00
-                  </span>
-                </div>
-                <div className="space-y-2 text-xs text-slate-800 dark:text-slate-200 font-medium">
-                  <div className="p-2.5 bg-white dark:bg-slate-900 rounded-lg border border-orange-100 dark:border-orange-900/50 shadow-2xs">
-                    <span className="font-bold text-orange-950 dark:text-orange-200">Dinner Rush Window:</span> 07:00 PM – 08:30 PM (Highest daily revenue & family dining surge)
-                  </div>
-                  <div className="p-2.5 bg-white dark:bg-slate-900 rounded-lg border border-orange-100 dark:border-orange-900/50 shadow-2xs">
-                    <span className="font-bold text-orange-900 dark:text-orange-300">Staff Allocation Required:</span> 9 Line Chefs (3 Hot Kitchen, 2 Grill, 2 Cold Salad, 1 Pizza, 1 Fryer)
-                  </div>
-                  <div className="p-2.5 bg-white dark:bg-slate-900 rounded-lg border border-orange-100 dark:border-orange-900/50 shadow-2xs">
-                    <span className="font-bold text-orange-900 dark:text-orange-300">Menu Demand Focus:</span> Kottu Specials, Grilled Steaks, Fresh Salads, Artisan Pizzas & Crispy Fryer Starters
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Seasonal Rush Periods Section */}
-            {showSeasonalRush && (
-              <div className="p-4 rounded-xl bg-purple-50/80 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-500/30 shadow-sm space-y-3 mt-3">
-                <div className="flex items-center gap-2 border-b border-purple-200 dark:border-purple-800/50 pb-2">
-                  <TrendingUp className="h-4 w-4 text-purple-600 dark:text-purple-400" />
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-purple-900 dark:text-purple-200">Seasonal Rush Periods</h4>
-                </div>
-                <div className="space-y-2 text-xs text-slate-800 dark:text-slate-200 font-medium">
-                  <div className="p-2.5 bg-white dark:bg-slate-900 rounded-lg border border-purple-100 dark:border-purple-900/50 shadow-2xs">
-                    <span className="font-bold text-purple-950 dark:text-purple-200">Festive / Holiday Season:</span> December – Early January (Christmas / New Year rush)
-                  </div>
-                  <div className="p-2.5 bg-white dark:bg-slate-900 rounded-lg border border-purple-100 dark:border-purple-900/50 shadow-2xs">
-                    <span className="font-bold text-amber-900 dark:text-amber-300">New Year / Spring Festival:</span> Mid-April (Sinhala & Tamil New Year season)
-                  </div>
-                  <div className="p-2.5 bg-white dark:bg-slate-900 rounded-lg border border-purple-100 dark:border-purple-900/50 shadow-2xs">
-                    <span className="font-bold text-sky-900 dark:text-sky-300">Summer / Tourist Peak Season:</span> July – August (Travel & vacation rush)
-                  </div>
-                </div>
-              </div>
-            )}
-
-            <div className="h-64 w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={data.hourly_peak_forecast}>
-                  <CartesianGrid strokeDasharray="3 3" stroke={isDarkMode ? "#1e293b" : "#e2e8f0"} />
-                  <XAxis dataKey="hour" stroke={isDarkMode ? "#64748b" : "#475569"} fontSize={11} />
-                  <YAxis stroke={isDarkMode ? "#64748b" : "#475569"} fontSize={11} yAxisId="left" />
-                  <YAxis stroke={isDarkMode ? "#64748b" : "#475569"} fontSize={11} yAxisId="right" orientation="right" domain={[0, 12]} />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: isDarkMode ? '#0f172a' : '#ffffff',
-                      borderColor: isDarkMode ? '#334155' : '#cbd5e1',
-                      borderRadius: '8px',
-                      fontSize: '12px',
-                      color: isDarkMode ? '#f8fafc' : '#0f172a',
-                      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
-                    }}
-                  />
-                  <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '10px' }} />
-
-                  <ReferenceArea
-                    yAxisId="left"
-                    x1="07:00"
-                    x2="09:00"
-                    fill={isDarkMode ? "#d97706" : "#f59e0b"}
-                    fillOpacity={isDarkMode ? 0.2 : 0.12}
-                    stroke="#d97706"
-                    strokeDasharray="3 3"
-                    label={{
-                      value: "Breakfast Rush (07:30 – 09:30)",
-                      fill: isDarkMode ? "#fbbf24" : "#d97706",
-                      fontSize: 11,
-                      fontWeight: "bold",
-                      position: "insideTop"
-                    }}
-                  />
-
-                  <ReferenceArea
-                    yAxisId="left"
-                    x1="12:00"
-                    x2="14:00"
-                    fill={isDarkMode ? "#0284c7" : "#0284c7"}
-                    fillOpacity={isDarkMode ? 0.2 : 0.12}
-                    stroke="#0284c7"
-                    strokeDasharray="3 3"
-                    label={{
-                      value: "Lunch Rush (12:00 – 14:00)",
-                      fill: isDarkMode ? "#38bdf8" : "#0284c7",
-                      fontSize: 11,
-                      fontWeight: "bold",
-                      position: "insideTop"
-                    }}
-                  />
-
-                  <ReferenceArea
-                    yAxisId="left"
-                    x1="18:00"
-                    x2="21:00"
-                    fill={isDarkMode ? "#ea580c" : "#f97316"}
-                    fillOpacity={isDarkMode ? 0.2 : 0.12}
-                    stroke="#f97316"
-                    strokeDasharray="3 3"
-                    label={{
-                      value: "Dinner Rush (19:00 – 20:30)",
-                      fill: isDarkMode ? "#fb923c" : "#ea580c",
-                      fontSize: 11,
-                      fontWeight: "bold",
-                      position: "insideTop"
-                    }}
-                  />
-
-                  <Line yAxisId="left" type="monotone" dataKey="predicted_orders" stroke="#f97316" strokeWidth={3} name="Predicted Orders" dot={{ r: 3 }} />
-                  <Line yAxisId="right" type="stepAfter" dataKey="staff_required" stroke="#10b981" strokeWidth={2.5} name="Chefs Required" />
-                  <Line yAxisId="right" type="stepAfter" dataKey="actual_staff" stroke="#64748b" strokeWidth={2} strokeDasharray="4 4" name="Scheduled Chefs" />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-
           {/* Kitchen Station Workload & Queue Monitors */}
           <div className="glass-panel p-6 rounded-2xl space-y-5">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-4">
@@ -2425,7 +4263,7 @@ export default function KitchenStaffDashboard({
             })()}
 
             {/* High Workload & Queue Alerts Panel */}
-            {stationsList.some(st => st.load_level >= 80) && (
+            {stationsList.some(st => st.load_level >= 80 && !stabilizedStations.has(st.name)) && (
               <div className="p-4 rounded-2xl bg-rose-50/90 dark:bg-rose-950/40 border-2 border-rose-300 dark:border-rose-500/40 shadow-sm space-y-3">
                 <div className="flex items-center gap-2 border-b border-rose-200 dark:border-rose-800/60 pb-2">
                   <AlertTriangle className="h-4 w-4 text-rose-600 dark:text-rose-400 flex-shrink-0 animate-pulse" />
@@ -2433,12 +4271,12 @@ export default function KitchenStaffDashboard({
                     High Workload & Line Queue Alerts
                   </h4>
                   <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-rose-600 text-white ml-auto">
-                    {stationsList.filter(st => st.load_level >= 80).length} Stations Critical
+                    {stationsList.filter(st => st.load_level >= 80 && !stabilizedStations.has(st.name)).length} Stations Critical
                   </span>
                 </div>
 
                 <div className="space-y-2.5">
-                  {stationsList.filter(st => st.load_level >= 80).map((st) => (
+                  {stationsList.filter(st => st.load_level >= 80 && !stabilizedStations.has(st.name)).map((st) => (
                     <div
                       key={st.id}
                       className="p-3.5 bg-white dark:bg-slate-900 rounded-xl border border-rose-200 dark:border-rose-900/60 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-3"
@@ -2601,6 +4439,76 @@ export default function KitchenStaffDashboard({
                           </span>
                         </div>
                       </div>
+
+                      {/* Dynamic Dish Surge Alert for Target Station Card */}
+                      {stationDishAnalysis?.stationStats?.[st.name]?.isOverloaded && !stabilizedStations.has(st.name) && (
+                        <div className="mt-3.5 p-3 rounded-xl bg-rose-50 dark:bg-rose-950/70 border-2 border-rose-500 text-rose-950 dark:text-rose-100 space-y-2 shadow-xs animate-pulse">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] font-black uppercase text-rose-700 dark:text-rose-400 flex items-center gap-1">
+                              <Flame className="h-3.5 w-3.5 text-rose-600 animate-bounce" />
+                              SURGE ALERT ({stationDishAnalysis.stationStats[st.name].pendingDishes} Orders)
+                            </span>
+                            <span className="text-[9px] font-extrabold px-1.5 py-0.5 rounded bg-rose-200 dark:bg-rose-900 text-rose-900 dark:text-rose-100">
+                              Ratio: {stationDishAnalysis.stationStats[st.name].ratio}/cook
+                            </span>
+                          </div>
+                          <p className="text-[11px] font-medium leading-tight text-slate-700 dark:text-slate-300">
+                            Incoming: <span className="font-bold text-slate-900 dark:text-white">{stationDishAnalysis.stationStats[st.name].dishSummary}</span>
+                          </p>
+                          <div className="pt-1.5 border-t border-rose-200 dark:border-rose-900/60">
+                            <span className="text-[10px] font-extrabold uppercase text-slate-500 dark:text-slate-400 block mb-1">
+                              Recommended Skilled Staff:
+                            </span>
+                            <div className="space-y-1.5">
+                              {stationDishAnalysis.stationStats[st.name].recommendedStaff.map((cand, idx) => (
+                                <div key={idx} className="flex items-center justify-between text-[11px] bg-white dark:bg-slate-900 p-1.5 rounded-lg border border-rose-200 dark:border-rose-800 shadow-2xs">
+                                  <div>
+                                    <span className="font-extrabold text-slate-900 dark:text-white">{cand.staffName.split('(')[0].trim()}</span>
+                                    <span className="text-[10px] text-slate-500 dark:text-slate-400 ml-1">
+                                      ({cand.currentStation} • <span className="text-amber-600 dark:text-amber-400 font-bold">{cand.stationSkillScore}★</span>)
+                                    </span>
+                                  </div>
+                                  <button
+                                    onClick={() => handleExecuteStaffReallocation(cand.staffName, cand.currentStation, st.name, `Surge response reallocation to ${st.name}`)}
+                                    className="px-2 py-0.5 rounded bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-[10px] cursor-pointer flex items-center gap-1 shadow-xs"
+                                  >
+                                    <Zap className="h-3 w-3" />
+                                    <span>Reassign</span>
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Active Reassignment Progress Pill for Station Card */}
+                      {stationSurgeFulfillment[st.name]?.active && !stabilizedStations.has(st.name) && (
+                        <div className="mt-3.5 p-3 rounded-xl bg-amber-50 dark:bg-amber-950/60 border border-amber-300 dark:border-amber-700 space-y-2 shadow-2xs">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] font-black uppercase text-amber-800 dark:text-amber-300 flex items-center gap-1.5">
+                              <span className="h-2 w-2 rounded-full bg-amber-500 animate-ping"></span>
+                              <span>Staff Reassigned: {stationSurgeFulfillment[st.name].chefName}</span>
+                            </span>
+                            <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-amber-200 dark:bg-amber-900 text-amber-900 dark:text-amber-100">
+                              {stationSurgeFulfillment[st.name].fulfilledCount}/2 Orders Fulfilled
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between gap-2 pt-1 border-t border-amber-200 dark:border-amber-800">
+                            <span className="text-[10px] text-amber-900 dark:text-amber-200 font-semibold">
+                              Complete 2 orders to normalize
+                            </span>
+                            <button
+                              onClick={() => handleFastFulfillStationOrder(st.name)}
+                              className="px-2 py-0.5 rounded bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-[10px] cursor-pointer flex items-center gap-1 shadow-xs"
+                              title="Advance & fulfill next station order"
+                            >
+                              <CheckCircle2 className="h-3 w-3" />
+                              <span>Fulfill Order ({stationSurgeFulfillment[st.name].fulfilledCount}/2)</span>
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
 
                     {st.load_level > 50 && (
@@ -2623,323 +4531,1049 @@ export default function KitchenStaffDashboard({
         </>
       )}
 
-      {/* ========================================================================= */}
-      {/* STAFF OPTIMIZATION & SKILL DEVELOPMENT VIEW                                */}
-      {/* ========================================================================= */}
-      {(activeKitchenTab === 'staff' || activeKitchenTab === 'all') && (
-        <div className="space-y-6 animate-fade-in">
-
-          {/* Section 1: Staff Skill-Gap Analysis & Progression Paths (Header & Cards Grid matching screenshot) */}
-          <div className="glass-panel p-6 rounded-3xl border border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 shadow-xs space-y-6">
-            
-            {/* Header with Title, Description, and Staff Self-Assessment Button */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-5">
-              <div>
-                <h3 className="text-lg font-black text-slate-900 dark:text-white tracking-tight">
-                  Staff Skill-Gap Analysis & Progression Paths
-                </h3>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 font-medium">
-                  Personalized training recommendations and succession planning for kitchen personnel
-                </p>
-              </div>
-
-              <div className="flex items-center gap-2.5">
-                <button
-                  onClick={() => setShowStaffLoginModal(true)}
-                  className="px-4 py-2.5 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-bold text-xs shadow-md shadow-orange-600/25 transition-all flex items-center gap-2 cursor-pointer shrink-0"
-                >
-                  <LogIn className="h-4 w-4" />
-                  <span>Staff Self-Assessment</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Filter & Search Bar */}
-            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 bg-slate-50 dark:bg-slate-950/60 p-3 rounded-2xl border border-slate-200/80 dark:border-slate-800/80">
-              <div className="flex flex-wrap items-center gap-3 flex-1">
-                {/* Search input */}
-                <div className="relative min-w-[240px] flex-1 max-w-md">
-                  <Search className="h-4 w-4 text-slate-400 absolute left-3.5 top-2.5" />
-                  <input
-                    type="text"
-                    value={staffSearchQuery}
-                    onChange={(e) => setStaffSearchQuery(e.target.value)}
-                    placeholder="Search chef by name, station, skill-gap..."
-                    className="w-full pl-9 pr-9 py-2 rounded-xl text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white font-medium focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
-                  />
-                  {staffSearchQuery && (
-                    <button
-                      onClick={() => setStaffSearchQuery("")}
-                      className="absolute right-2.5 top-2 text-slate-400 hover:text-slate-600 dark:hover:text-white p-0.5 rounded cursor-pointer"
-                    >
-                      <X className="h-3.5 w-3.5" />
-                    </button>
-                  )}
-                </div>
-
-                {/* Station Filter */}
-                <div className="flex items-center gap-1.5">
-                  <Filter className="h-3.5 w-3.5 text-slate-400" />
-                  <select
-                    value={staffStationFilter}
-                    onChange={(e) => setStaffStationFilter(e.target.value)}
-                    className="px-3 py-2 rounded-xl text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white font-semibold focus:ring-2 focus:ring-emerald-500 focus:outline-hidden cursor-pointer"
-                  >
-                    <option value="all">All Kitchen Stations ({data?.staff?.length || 30})</option>
-                    <option value="Hot Kitchen">Hot Kitchen / Saute</option>
-                    <option value="Grill">Grill Station</option>
-                    <option value="Cold Salad">Cold Salad & Garde Manger</option>
-                    <option value="Pizza">Pizza Station</option>
-                    <option value="Fryer">Fryer Station</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* Roster & Peak Shift Action */}
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-bold text-slate-500 dark:text-slate-400 px-2.5 py-1 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
-                  Showing {filteredStaffList.length} of {data?.staff?.length || 30} Staff
-                </span>
-
-                <button
-                  onClick={proactiveScheduleActive ? handleResetProactiveSchedule : handleApplyProactiveSchedule}
-                  className={`px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-                    proactiveScheduleActive
-                      ? 'bg-amber-600 hover:bg-amber-700 text-white shadow-xs'
-                      : 'bg-emerald-700 hover:bg-emerald-800 text-white shadow-xs'
-                  }`}
-                >
-                  <Sparkles className="h-3.5 w-3.5" />
-                  <span>{proactiveScheduleActive ? "Reset to Standard Shifts" : "Apply Proactive Peak Roster"}</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Staff Skill-Gap Cards Grid (3 Columns) */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {filteredStaffList.map((member) => (
-                <div
-                  key={member.id || member.emp_id}
-                  className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-emerald-300 dark:hover:border-emerald-700/60 shadow-xs hover:shadow-md transition-all space-y-3"
-                >
-                  {/* Top Row: Chef Name and Standard/Reallocated Badge */}
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <h4 className="text-xs font-extrabold text-slate-900 dark:text-white leading-tight">
-                        {member.name}
-                      </h4>
-                      <div className="flex items-center gap-1.5 mt-0.5 text-[10px] text-slate-500 dark:text-slate-400 font-medium">
-                        <span>{member.assigned_station}</span>
-                        {member.shift && <span>• {member.shift}</span>}
-                      </div>
-                    </div>
-                    <span
-                      className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold shrink-0 ${
-                        member.isReallocated
-                          ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-300 dark:border-amber-800'
-                          : 'bg-purple-100 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300 border border-purple-200 dark:border-purple-800'
-                      }`}
-                    >
-                      {member.isReallocated ? 'Reallocated' : 'Standard'}
-                    </span>
-                  </div>
-
-                  {/* Efficiency Rating & Skill Gap */}
-                  <div className="space-y-1.5 text-xs">
-                    <div className="flex justify-between items-center text-slate-600 dark:text-slate-300">
-                      <span className="text-slate-500 dark:text-slate-400 font-medium text-[11px]">Efficiency Rating:</span>
-                      <span className="font-extrabold text-emerald-600 dark:text-emerald-400 text-xs">
-                        {member.efficiency_rating ?? 85}%
-                      </span>
-                    </div>
-
-                    <div className="w-full h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                      <div
-                        className={`h-full rounded-full transition-all duration-500 ${
-                          (member.efficiency_rating || 85) >= 80
-                            ? 'bg-emerald-500'
-                            : (member.efficiency_rating || 85) >= 65
-                              ? 'bg-amber-500'
-                              : 'bg-rose-500'
-                        }`}
-                        style={{ width: `${Math.min(100, Math.max(15, member.efficiency_rating || 85))}%` }}
-                      />
-                    </div>
-
-                    <div className="text-[11px] text-slate-500 dark:text-slate-400 pt-0.5 leading-snug">
-                      Identified Skill-Gap: <span className="font-semibold text-amber-700 dark:text-amber-400">{member.skill_gap || 'High-Heat Line Precision'}</span>
-                    </div>
-                  </div>
-
-                  {/* Personalized Training Box (Matching purple box in screenshot) */}
-                  <div className="p-3 rounded-xl bg-purple-50/70 dark:bg-purple-950/30 border border-purple-100 dark:border-purple-900/50 text-xs">
-                    <span className="text-[10px] font-bold text-purple-700 dark:text-purple-300 flex items-center gap-1.5">
-                      <Award className="h-3.5 w-3.5 shrink-0 text-purple-600 dark:text-purple-400" />
-                      Personalized Training:
-                    </span>
-                    <p className="text-slate-700 dark:text-slate-300 text-[11px] mt-1 font-medium leading-relaxed">
-                      {member.training_recommendation || 'Continuous Cross-Station Rotation & Speed Drills'}
-                    </p>
-                  </div>
-
-                  {/* Career Progression & Milestones */}
-                  <div className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1.5 pt-1 border-t border-slate-100 dark:border-slate-800/80">
-                    <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
-                    <span className="truncate">{member.career_progression || 'Executive Station Lead Track'}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Section 2: Staff Skill & Station Allocation Matrix (Roster Table) */}
-          <div className="glass-panel p-6 rounded-3xl border border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 shadow-xs space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200 dark:border-slate-800 pb-3">
-              <div>
-                <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                  <Database className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-                  Staff Skill & Station Allocation Matrix
-                </h3>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                  Complete workforce roster with station skill ratings, shift allocations, and efficiency benchmarks
-                </p>
-              </div>
-            </div>
-
-            <div className="overflow-x-auto rounded-2xl border border-slate-200 dark:border-slate-800">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-slate-50 dark:bg-slate-950/80 text-slate-600 dark:text-slate-400 font-bold border-b border-slate-200 dark:border-slate-800 uppercase text-[10px]">
-                  <tr>
-                    <th className="py-3 px-4">Staff Member</th>
-                    <th className="py-3 px-3">Primary Bay</th>
-                    <th className="py-3 px-3">Shift Hours</th>
-                    <th className="py-3 px-3 text-center">Efficiency</th>
-                    <th className="py-3 px-2 text-center">Hot Kitchen</th>
-                    <th className="py-3 px-2 text-center">Grill</th>
-                    <th className="py-3 px-2 text-center">Cold Salad</th>
-                    <th className="py-3 px-2 text-center">Pizza</th>
-                    <th className="py-3 px-2 text-center">Fryer</th>
-                    <th className="py-3 px-4">Identified Skill-Gap</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800 font-medium">
-                  {filteredStaffList.slice(0, 15).map((m) => (
-                    <tr key={m.id || m.emp_id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors">
-                      <td className="py-3 px-4">
-                        <div className="font-bold text-slate-900 dark:text-white">{m.name}</div>
-                        <div className="text-[10px] text-slate-500 dark:text-slate-400">{m.skill_level}</div>
-                      </td>
-                      <td className="py-3 px-3 text-slate-700 dark:text-slate-300 font-medium">{m.assigned_station}</td>
-                      <td className="py-3 px-3 text-slate-500 dark:text-slate-400 text-[11px]">{m.shift || '10:00 AM - 08:30 PM'}</td>
-                      <td className="py-3 px-3 text-center">
-                        <span className="font-extrabold text-emerald-600 dark:text-emerald-400">{m.efficiency_rating ?? 85}%</span>
-                      </td>
-                      <td className="py-3 px-2 text-center">
-                        <span className="px-2 py-0.5 rounded font-bold bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300">{m.hot_kitchen || 4}★</span>
-                      </td>
-                      <td className="py-3 px-2 text-center">
-                        <span className="px-2 py-0.5 rounded font-bold bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300">{m.grill_station || 4}★</span>
-                      </td>
-                      <td className="py-3 px-2 text-center">
-                        <span className="px-2 py-0.5 rounded font-bold bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300">{m.cold_salad || 4}★</span>
-                      </td>
-                      <td className="py-3 px-2 text-center">
-                        <span className="px-2 py-0.5 rounded font-bold bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300">{m.pizza_station || 4}★</span>
-                      </td>
-                      <td className="py-3 px-2 text-center">
-                        <span className="px-2 py-0.5 rounded font-bold bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300">{m.fryer_station || 4}★</span>
-                      </td>
-                      <td className="py-3 px-4 text-slate-600 dark:text-slate-300 text-[11px]">
-                        {m.skill_gap || 'Foundation Line Pace'}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          {/* Section 3: Dynamic Upskilling & Cross-Training Recommendations Table */}
-          {upskillingData.length > 0 && (
-            <div className="glass-panel p-6 rounded-3xl border border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 shadow-xs space-y-4">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200 dark:border-slate-800 pb-3">
-                <div>
-                  <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                    <Award className="h-4 w-4 text-purple-600 dark:text-purple-400" />
-                    Upskilling & Cross-Training Target Priority Matrix
-                  </h3>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                    ML-prioritized training recommendations to eliminate kitchen bottleneck vulnerabilities
-                  </p>
-                </div>
-                <span className="text-xs font-bold text-purple-700 dark:text-purple-300 px-3 py-1 rounded-full bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800">
-                  {upskillingData.length} Identified Training Pathways
-                </span>
-              </div>
-
-              <div className="overflow-x-auto rounded-2xl border border-slate-200 dark:border-slate-800">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-50 dark:bg-slate-950/80 text-slate-600 dark:text-slate-400 font-bold border-b border-slate-200 dark:border-slate-800 uppercase text-[10px]">
-                    <tr>
-                      <th className="py-3 px-4">Staff Member</th>
-                      <th className="py-3 px-3">Target Station</th>
-                      <th className="py-3 px-3 text-center">Current Score</th>
-                      <th className="py-3 px-3 text-center">Target Score</th>
-                      <th className="py-3 px-3 text-center">Skill Gap</th>
-                      <th className="py-3 px-3">Risk Level</th>
-                      <th className="py-3 px-3">Priority</th>
-                      <th className="py-3 px-4">Recommended Action</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800 font-medium">
-                    {upskillingData.slice(0, 10).map((u, idx) => (
-                      <tr key={idx} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors">
-                        <td className="py-3 px-4">
-                          <span className="font-bold text-slate-900 dark:text-white">{u.Chef_Name}</span>
-                          <span className="text-[10px] text-slate-400 block font-mono">{u.Chef_ID}</span>
-                        </td>
-                        <td className="py-3 px-3 font-semibold text-slate-800 dark:text-slate-200">{u.Target_Station}</td>
-                        <td className="py-3 px-3 text-center text-slate-600 dark:text-slate-400">{u.Current_Skill_Score} / 5</td>
-                        <td className="py-3 px-3 text-center font-bold text-emerald-600 dark:text-emerald-400">{u.Target_Skill_Score} / 5</td>
-                        <td className="py-3 px-3 text-center">
-                          <span className="px-2 py-0.5 rounded font-bold bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300">
-                            +{u.Skill_Gap} pts
-                          </span>
-                        </td>
-                        <td className="py-3 px-3">
-                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                            u.Station_Risk_Level === 'HIGH'
-                              ? 'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300'
-                              : u.Station_Risk_Level === 'MODERATE'
-                                ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
-                                : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
-                          }`}>
-                            {u.Station_Risk_Level}
-                          </span>
-                        </td>
-                        <td className="py-3 px-3">
-                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                            u.Priority === 'HIGH'
-                              ? 'bg-rose-50 text-rose-700 border border-rose-200'
-                              : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
-                          }`}>
-                            {u.Priority}
-                          </span>
-                        </td>
-                        <td className="py-3 px-4 text-slate-600 dark:text-slate-300 text-[11px]">
-                          {u.Recommended_Action}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-
-        </div>
-      )}
-
+      {/* ========================================================================= */}
+      {/* STAFF OPTIMIZATION & SKILL DEVELOPMENT VIEW                                */}
+      {/* ========================================================================= */}
+      {(activeKitchenTab === 'staff' || activeKitchenTab === 'all') && (
+        <div className="space-y-6 animate-fade-in">
+
+          {/* Sub-Tab Navigation Bar inside Staff Optimization & Skill Development */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white dark:bg-slate-900 p-2.5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs">
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setStaffSubTab('directory')}
+                className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+                  staffSubTab === 'directory'
+                    ? 'bg-emerald-700 text-white shadow-md shadow-emerald-700/20'
+                    : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                }`}
+              >
+                <Users className="h-4 w-4" />
+                <span>Staff Directory & Skill Analytics</span>
+                <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
+                  staffSubTab === 'directory' ? 'bg-emerald-900/60 text-emerald-100' : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-400'
+                }`}>
+                  {data?.staff?.length || 30} Staff
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setStaffSubTab('onboard')}
+                className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+                  staffSubTab === 'onboard'
+                    ? 'bg-emerald-700 text-white shadow-md shadow-emerald-700/20'
+                    : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                }`}
+              >
+                <UserPlus className="h-4 w-4" />
+                <span>Add New Staff Member</span>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-orange-600 text-white">
+                  Admin
+                </span>
+              </button>
+            </div>
+
+            <div className="flex items-center gap-2 pr-2 text-xs font-semibold text-slate-500 dark:text-slate-400">
+              <ShieldCheck className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+              <span>Admin Personnel Management & Competency Hub</span>
+            </div>
+          </div>
+
+          {/* SUB-TAB 1: STAFF DIRECTORY & SKILL ANALYTICS */}
+          {staffSubTab === 'directory' && (
+            <>
+              {/* Section 1: Staff Skill-Gap Analysis & Progression Paths (Header & Cards Grid matching screenshot) */}
+              <div className="glass-panel p-6 rounded-3xl border border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 shadow-xs space-y-6">
+                
+                {/* Header with Title, Description, Onboard Button, and Staff Self-Assessment Button */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-5">
+                  <div>
+                    <h3 className="text-lg font-black text-slate-900 dark:text-white tracking-tight">
+                      Staff Skill-Gap Analysis & Progression Paths
+                    </h3>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 font-medium">
+                      Personalized training recommendations and succession planning for kitchen personnel
+                    </p>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2.5">
+                    <button
+                      type="button"
+                      onClick={() => setStaffSubTab('onboard')}
+                      className="px-4 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs shadow-md shadow-emerald-700/20 transition-all flex items-center gap-2 cursor-pointer shrink-0"
+                    >
+                      <UserPlus className="h-4 w-4" />
+                      <span>+ Onboard New Staff</span>
+                    </button>
+                  </div>
+                </div>
+
+            {/* Filter & Search Bar */}
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 bg-slate-50 dark:bg-slate-950/60 p-3 rounded-2xl border border-slate-200/80 dark:border-slate-800/80">
+              <div className="flex flex-wrap items-center gap-3 flex-1">
+                {/* Search input */}
+                <div className="relative min-w-[240px] flex-1 max-w-md">
+                  <Search className="h-4 w-4 text-slate-400 absolute left-3.5 top-2.5" />
+                  <input
+                    type="text"
+                    value={staffSearchQuery}
+                    onChange={(e) => setStaffSearchQuery(e.target.value)}
+                    placeholder="Search chef by name, station, skill-gap..."
+                    className="w-full pl-9 pr-9 py-2 rounded-xl text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white font-medium focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
+                  />
+                  {staffSearchQuery && (
+                    <button
+                      onClick={() => setStaffSearchQuery("")}
+                      className="absolute right-2.5 top-2 text-slate-400 hover:text-slate-600 dark:hover:text-white p-0.5 rounded cursor-pointer"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                </div>
+
+                {/* Station Filter */}
+                <div className="flex items-center gap-1.5">
+                  <Filter className="h-3.5 w-3.5 text-slate-400" />
+                  <select
+                    value={staffStationFilter}
+                    onChange={(e) => setStaffStationFilter(e.target.value)}
+                    className="px-3 py-2 rounded-xl text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white font-semibold focus:ring-2 focus:ring-emerald-500 focus:outline-hidden cursor-pointer"
+                  >
+                    <option value="all">All Kitchen Stations ({data?.staff?.length || 30})</option>
+                    <option value="Hot Kitchen">Hot Kitchen / Saute</option>
+                    <option value="Grill">Grill Station</option>
+                    <option value="Cold Salad">Cold Salad & Garde Manger</option>
+                    <option value="Pizza">Pizza Station</option>
+                    <option value="Fryer">Fryer Station</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Staff Count Badge */}
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-slate-500 dark:text-slate-400 px-2.5 py-1 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+                  Showing {filteredStaffList.length} of {data?.staff?.length || 30} Staff
+                </span>
+              </div>
+            </div>
+
+            {/* Staff Skill-Gap Cards Grid (3 Columns) */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {filteredStaffList.map((member) => (
+                <div
+                  key={member.id || member.emp_id}
+                  className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-emerald-300 dark:hover:border-emerald-700/60 shadow-xs hover:shadow-md transition-all space-y-3"
+                >
+                  {/* Top Row: Chef Name and Standard/Reallocated Badge */}
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <h4 className="text-xs font-extrabold text-slate-900 dark:text-white leading-tight">
+                        {member.name}
+                      </h4>
+                      <div className="flex items-center gap-1.5 mt-0.5 text-[10px] text-slate-500 dark:text-slate-400 font-medium">
+                        <span>{member.assigned_station}</span>
+                        {member.shift && <span>• {member.shift}</span>}
+                      </div>
+                    </div>
+                    <span
+                      className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold shrink-0 ${
+                        member.isReallocated
+                          ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-300 dark:border-amber-800'
+                          : 'bg-purple-100 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300 border border-purple-200 dark:border-purple-800'
+                      }`}
+                    >
+                      {member.isReallocated ? 'Reallocated' : 'Standard'}
+                    </span>
+                  </div>
+
+                  {/* Active Station Surge Directive Notification for Qualified Candidate */}
+                  {(() => {
+                    const directive = stationDishAnalysis?.staffDirectivesMap?.get(member.id) ||
+                                      stationDishAnalysis?.staffDirectivesMap?.get(member.emp_id) ||
+                                      stationDishAnalysis?.staffDirectivesMap?.get(member.name) ||
+                                      stationDishAnalysis?.staffDirectivesMap?.get(member.name?.split('(')[0]?.trim());
+                    if (!directive) return null;
+
+                    const targetSt = directive.station || directive.targetStation || "Pizza";
+                    const fromSt = directive.currentStation || directive.fromStation || member.assigned_station?.split('(')[0]?.trim() || "Prep Station";
+                    const score = directive.stationSkillScore || directive.skillRating || 4;
+
+                    return (
+                      <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/60 border-2 border-amber-500 text-amber-950 dark:text-amber-100 space-y-2 animate-pulse shadow-sm">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] font-black uppercase text-amber-800 dark:text-amber-300 flex items-center gap-1.5">
+                            <AlertTriangle className="h-3.5 w-3.5 text-amber-600" />
+                            SURGE REALLOCATION DIRECTIVE
+                          </span>
+                          <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-amber-200 dark:bg-amber-900 text-amber-900 dark:text-amber-100">
+                            Move to {targetSt}
+                          </span>
+                        </div>
+                        <p className="text-[11px] font-semibold leading-relaxed">
+                          {directive.message || `Surge of ${directive.pendingDishes || 10} incoming orders detected at ${targetSt}! You have a ${score}★ skill rating in ${targetSt}. Reassign now to support the surge.`}
+                        </p>
+                        <div className="pt-1 flex items-center justify-between gap-2">
+                          <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">
+                            From: {fromSt}
+                          </span>
+                          <button
+                            onClick={() => handleExecuteStaffReallocation(member.name, member.assigned_station, targetSt, `Direct surge response to ${targetSt}`)}
+                            className="px-2.5 py-1 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-extrabold text-[10px] shadow-xs cursor-pointer flex items-center gap-1 shrink-0 transition-transform active:scale-95"
+                          >
+                            <Zap className="h-3 w-3" />
+                            <span>Acknowledge & Move</span>
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {member.isReallocated && (
+                    <div className="p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-400 flex items-center justify-between text-[11px]">
+                      <span className="font-bold text-emerald-800 dark:text-emerald-300 flex items-center gap-1">
+                        <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+                        <span>Reallocated to {member.reallocatedTo || member.assigned_station?.replace(" (Reallocated via AI)", "")}</span>
+                      </span>
+                      <button
+                        onClick={() => handleRevertStaffStation(member.name, member.originalStation || member.base_station || "Hot Kitchen")}
+                        className="text-[10px] font-bold text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white underline cursor-pointer"
+                      >
+                        Revert Station
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Efficiency Rating & Skill Gap */}
+                  <div className="space-y-1.5 text-xs">
+                    <div className="flex justify-between items-center text-slate-600 dark:text-slate-300">
+                      <span className="text-slate-500 dark:text-slate-400 font-medium text-[11px]">Efficiency Rating:</span>
+                      <span className="font-extrabold text-emerald-600 dark:text-emerald-400 text-xs">
+                        {member.efficiency_rating ?? 85}%
+                      </span>
+                    </div>
+
+                    <div className="w-full h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all duration-500 ${
+                          (member.efficiency_rating || 85) >= 80
+                            ? 'bg-emerald-500'
+                            : (member.efficiency_rating || 85) >= 65
+                              ? 'bg-amber-500'
+                              : 'bg-rose-500'
+                        }`}
+                        style={{ width: `${Math.min(100, Math.max(15, member.efficiency_rating || 85))}%` }}
+                      />
+                    </div>
+
+                    <div className="text-[11px] text-slate-500 dark:text-slate-400 pt-0.5 leading-snug">
+                      Identified Skill-Gap: <span className="font-semibold text-amber-700 dark:text-amber-400">{member.skill_gap || 'High-Heat Line Precision'}</span>
+                    </div>
+                  </div>
+
+                  {/* Personalized Training Box (Matching purple box in screenshot) */}
+                  <div className="p-3 rounded-xl bg-purple-50/70 dark:bg-purple-950/30 border border-purple-100 dark:border-purple-900/50 text-xs">
+                    <span className="text-[10px] font-bold text-purple-700 dark:text-purple-300 flex items-center gap-1.5">
+                      <Award className="h-3.5 w-3.5 shrink-0 text-purple-600 dark:text-purple-400" />
+                      Personalized Training:
+                    </span>
+                    <p className="text-slate-700 dark:text-slate-300 text-[11px] mt-1 font-medium leading-relaxed">
+                      {member.training_recommendation || 'Continuous Cross-Station Rotation & Speed Drills'}
+                    </p>
+                  </div>
+
+                  {/* Career Progression & Milestones */}
+                  <div className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1.5 pt-1 border-t border-slate-100 dark:border-slate-800/80">
+                    <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                    <span className="truncate">{member.career_progression || 'Executive Station Lead Track'}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Section 2: Staff Skill & Station Allocation Matrix (Roster Table) */}
+          <div className="glass-panel p-6 rounded-3xl border border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 shadow-xs space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200 dark:border-slate-800 pb-3">
+              <div>
+                <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                  <Database className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                  Staff Skill & Station Allocation Matrix
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                  Complete workforce roster with station skill ratings, shift allocations, and efficiency benchmarks
+                </p>
+              </div>
+            </div>
+
+            <div className="overflow-x-auto rounded-2xl border border-slate-200 dark:border-slate-800">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-50 dark:bg-slate-950/80 text-slate-600 dark:text-slate-400 font-bold border-b border-slate-200 dark:border-slate-800 uppercase text-[10px]">
+                  <tr>
+                    <th className="py-3 px-4">Staff Member</th>
+                    <th className="py-3 px-3">Primary Bay</th>
+                    <th className="py-3 px-3">Shift Hours</th>
+                    <th className="py-3 px-3 text-center">Efficiency</th>
+                    <th className="py-3 px-2 text-center">Hot Kitchen</th>
+                    <th className="py-3 px-2 text-center">Grill</th>
+                    <th className="py-3 px-2 text-center">Cold Salad</th>
+                    <th className="py-3 px-2 text-center">Pizza</th>
+                    <th className="py-3 px-2 text-center">Fryer</th>
+                    <th className="py-3 px-4">Identified Skill-Gap</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800 font-medium">
+                  {filteredStaffList.slice(0, 15).map((m) => (
+                    <tr key={m.id || m.emp_id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors">
+                      <td className="py-3 px-4">
+                        <div className="font-bold text-slate-900 dark:text-white">{m.name}</div>
+                        <div className="text-[10px] text-slate-500 dark:text-slate-400">{m.skill_level}</div>
+                      </td>
+                      <td className="py-3 px-3 text-slate-700 dark:text-slate-300 font-medium">{m.assigned_station}</td>
+                      <td className="py-3 px-3 text-slate-500 dark:text-slate-400 text-[11px]">{m.shift || '10:00 AM - 08:30 PM'}</td>
+                      <td className="py-3 px-3 text-center">
+                        <span className="font-extrabold text-emerald-600 dark:text-emerald-400">{m.efficiency_rating ?? 85}%</span>
+                      </td>
+                      <td className="py-3 px-2 text-center">
+                        <span className="px-2 py-0.5 rounded font-bold bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300">{m.hot_kitchen || 4}★</span>
+                      </td>
+                      <td className="py-3 px-2 text-center">
+                        <span className="px-2 py-0.5 rounded font-bold bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300">{m.grill_station || 4}★</span>
+                      </td>
+                      <td className="py-3 px-2 text-center">
+                        <span className="px-2 py-0.5 rounded font-bold bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300">{m.cold_salad || 4}★</span>
+                      </td>
+                      <td className="py-3 px-2 text-center">
+                        <span className="px-2 py-0.5 rounded font-bold bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300">{m.pizza_station || 4}★</span>
+                      </td>
+                      <td className="py-3 px-2 text-center">
+                        <span className="px-2 py-0.5 rounded font-bold bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300">{m.fryer_station || 4}★</span>
+                      </td>
+                      <td className="py-3 px-4 text-slate-600 dark:text-slate-300 text-[11px]">
+                        {m.skill_gap || 'Foundation Line Pace'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Section 3: Dynamic Upskilling & Cross-Training Recommendations Table */}
+          {upskillingData.length > 0 && (
+            <div className="glass-panel p-6 rounded-3xl border border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 shadow-xs space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200 dark:border-slate-800 pb-3">
+                <div>
+                  <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                    <Award className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                    Upskilling & Cross-Training Target Priority Matrix
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                    ML-prioritized training recommendations to eliminate kitchen bottleneck vulnerabilities
+                  </p>
+                </div>
+                <span className="text-xs font-bold text-purple-700 dark:text-purple-300 px-3 py-1 rounded-full bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800">
+                  {upskillingData.length} Identified Training Pathways
+                </span>
+              </div>
+
+              <div className="overflow-x-auto rounded-2xl border border-slate-200 dark:border-slate-800">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-50 dark:bg-slate-950/80 text-slate-600 dark:text-slate-400 font-bold border-b border-slate-200 dark:border-slate-800 uppercase text-[10px]">
+                    <tr>
+                      <th className="py-3 px-4">Staff Member</th>
+                      <th className="py-3 px-3">Target Station</th>
+                      <th className="py-3 px-3 text-center">Current Score</th>
+                      <th className="py-3 px-3 text-center">Target Score</th>
+                      <th className="py-3 px-3 text-center">Skill Gap</th>
+                      <th className="py-3 px-3">Risk Level</th>
+                      <th className="py-3 px-3">Priority</th>
+                      <th className="py-3 px-4">Recommended Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800 font-medium">
+                    {upskillingData.slice(0, 10).map((u, idx) => (
+                      <tr key={idx} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors">
+                        <td className="py-3 px-4">
+                          <span className="font-bold text-slate-900 dark:text-white">{u.Chef_Name}</span>
+                          <span className="text-[10px] text-slate-400 block font-mono">{u.Chef_ID}</span>
+                        </td>
+                        <td className="py-3 px-3 font-semibold text-slate-800 dark:text-slate-200">{u.Target_Station}</td>
+                        <td className="py-3 px-3 text-center text-slate-600 dark:text-slate-400">{u.Current_Skill_Score} / 5</td>
+                        <td className="py-3 px-3 text-center font-bold text-emerald-600 dark:text-emerald-400">{u.Target_Skill_Score} / 5</td>
+                        <td className="py-3 px-3 text-center">
+                          <span className="px-2 py-0.5 rounded font-bold bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300">
+                            +{u.Skill_Gap} pts
+                          </span>
+                        </td>
+                        <td className="py-3 px-3">
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                            u.Station_Risk_Level === 'HIGH'
+                              ? 'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300'
+                              : u.Station_Risk_Level === 'MODERATE'
+                                ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
+                                : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
+                          }`}>
+                            {u.Station_Risk_Level}
+                          </span>
+                        </td>
+                        <td className="py-3 px-3">
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                            u.Priority === 'HIGH'
+                              ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                              : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
+                          }`}>
+                            {u.Priority}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-slate-600 dark:text-slate-300 text-[11px]">
+                          {u.Recommended_Action}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+          </>
+          )}
+
+          {/* ========================================================================= */}
+          {/* SUB-TAB 2: ADD NEW STAFF MEMBER (ADMIN ONBOARDING VIEW)                    */}
+          {/* ========================================================================= */}
+          {staffSubTab === 'onboard' && (
+            <div className="space-y-6 animate-fade-in">
+              {/* Header Banner */}
+              <div className="glass-panel p-6 rounded-3xl border border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 shadow-xs">
+                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                  <div className="flex items-start gap-4">
+                    <div className="p-3.5 rounded-2xl bg-gradient-to-br from-emerald-600 to-teal-700 text-white shadow-lg shadow-emerald-700/25 shrink-0">
+                      <UserPlus className="h-6 w-6" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-orange-100 text-orange-800 dark:bg-orange-950 dark:text-orange-300 border border-orange-200 dark:border-orange-800">
+                          Admin Portal
+                        </span>
+                        <span className="text-xs text-slate-400">• New Culinary Personnel Onboarding</span>
+                      </div>
+                      <h3 className="text-xl font-black text-slate-900 dark:text-white tracking-tight mt-1">
+                        Register & Assess New Kitchen Staff Member
+                      </h3>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-2xl font-medium">
+                        Add newly joined culinary staff, assign baseline station & shift schedules, evaluate multi-station competencies (1–5★), and configure AI-guided succession milestones.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => handlePrefillSampleStaff()}
+                      className="px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs shadow-md shadow-amber-500/20 transition-all flex items-center gap-2 cursor-pointer"
+                    >
+                      <Sparkles className="h-4 w-4" />
+                      <span>⚡ Pre-fill Sample Chef</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setStaffSubTab('directory')}
+                      className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold text-xs transition-all flex items-center gap-2 cursor-pointer"
+                    >
+                      <Users className="h-4 w-4" />
+                      <span>View Directory ({data?.staff?.length || 30})</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Banner when a staff member was just added */}
+                {lastAddedStaff && (
+                  <div className="mt-5 p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-fade-in">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-xl bg-emerald-600 text-white shrink-0">
+                        <CheckCheck className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <div className="text-xs font-black text-emerald-900 dark:text-emerald-200">
+                          {lastAddedStaff.name} ({lastAddedStaff.emp_id}) was successfully registered!
+                        </div>
+                        <div className="text-[11px] text-emerald-700 dark:text-emerald-400">
+                          Assigned to <span className="font-bold">{lastAddedStaff.assigned_station}</span> • Shift: {lastAddedStaff.shift} • Efficiency: {lastAddedStaff.efficiency_rating}%
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setStaffSubTab('directory')}
+                        className="px-3 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold transition-all cursor-pointer"
+                      >
+                        View in Directory →
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setLastAddedStaff(null)}
+                        className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Form & Live Preview Grid */}
+              <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
+                
+                {/* LEFT: Onboarding Form (7 Columns) */}
+                <form onSubmit={handleRegisterStaff} className="xl:col-span-7 space-y-6">
+                  
+                  {/* Card 1: Staff Identification & Role */}
+                  <div className="glass-panel p-6 rounded-3xl border border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 shadow-xs space-y-4">
+                    <div className="flex items-center gap-2.5 border-b border-slate-200 dark:border-slate-800 pb-3">
+                      <ChefHat className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                      <h4 className="text-sm font-extrabold text-slate-900 dark:text-white uppercase tracking-wider">
+                        1. Staff Identification & Culinary Role
+                      </h4>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {/* Full Name */}
+                      <div className="sm:col-span-2">
+                        <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                          Chef / Staff Full Name <span className="text-rose-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={newStaffForm.name}
+                          onChange={(e) => setNewStaffForm(prev => ({ ...prev, name: e.target.value }))}
+                          placeholder="e.g. Chef Nuwan Bandara"
+                          className="w-full px-3.5 py-2.5 rounded-xl text-xs bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white font-medium focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
+                        />
+                      </div>
+
+                      {/* Employee ID */}
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                            Employee ID
+                          </label>
+                          <span className="text-[10px] text-slate-400">Auto-assigned</span>
+                        </div>
+                        <input
+                          type="text"
+                          value={newStaffForm.emp_id}
+                          onChange={(e) => setNewStaffForm(prev => ({ ...prev, emp_id: e.target.value }))}
+                          placeholder={`EMP${(data?.staff?.length || 30) + 1}`}
+                          className="w-full px-3.5 py-2.5 rounded-xl text-xs bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white font-mono font-bold focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
+                        />
+                      </div>
+
+                      {/* Role / Designation */}
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                          Kitchen Role / Designation
+                        </label>
+                        <select
+                          value={newStaffForm.role}
+                          onChange={(e) => {
+                            const newRole = e.target.value;
+                            setNewStaffForm(prev => {
+                              const derived = computeDerivedStaffMetrics(prev, newRole, prev.base_station);
+                              return {
+                                ...prev,
+                                role: newRole,
+                                career_progression: derived.derivedProgression
+                              };
+                            });
+                          }}
+                          className="w-full px-3.5 py-2.5 rounded-xl text-xs bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white font-semibold focus:ring-2 focus:ring-emerald-500 focus:outline-hidden cursor-pointer"
+                        >
+                          <option value="Executive Chef (Level 5)">Executive Chef (Level 5)</option>
+                          <option value="Executive Sous Chef (Level 4)">Executive Sous Chef (Level 4)</option>
+                          <option value="Chef de Partie (Level 3)">Chef de Partie - CDP (Level 3)</option>
+                          <option value="Demi Chef de Partie (Level 3)">Demi Chef de Partie (Level 3)</option>
+                          <option value="Station Line Specialist (Level 3)">Station Line Specialist (Level 3)</option>
+                          <option value="Commis I (Level 2)">Commis I (Level 2)</option>
+                          <option value="Commis II (Level 2)">Commis II (Level 2)</option>
+                          <option value="Kitchen Trainee (Level 1)">Kitchen Trainee / Apprentice (Level 1)</option>
+                        </select>
+                      </div>
+
+                      {/* Phone Contact */}
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                          Contact / Mobile Number
+                        </label>
+                        <input
+                          type="text"
+                          value={newStaffForm.contact_phone}
+                          onChange={(e) => setNewStaffForm(prev => ({ ...prev, contact_phone: e.target.value }))}
+                          placeholder="+94 77 123 4567"
+                          className="w-full px-3.5 py-2.5 rounded-xl text-xs bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white font-medium focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
+                        />
+                      </div>
+
+                      {/* Joining Date */}
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                          Joining / Effective Date
+                        </label>
+                        <input
+                          type="date"
+                          value={newStaffForm.join_date}
+                          onChange={(e) => setNewStaffForm(prev => ({ ...prev, join_date: e.target.value }))}
+                          className="w-full px-3.5 py-2.5 rounded-xl text-xs bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white font-medium focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Card 2: Primary Station & Shift Assignment */}
+                  <div className="glass-panel p-6 rounded-3xl border border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 shadow-xs space-y-4">
+                    <div className="flex items-center gap-2.5 border-b border-slate-200 dark:border-slate-800 pb-3">
+                      <Flame className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+                      <h4 className="text-sm font-extrabold text-slate-900 dark:text-white uppercase tracking-wider">
+                        2. Station Assignment & Shift Schedule
+                      </h4>
+                    </div>
+
+                    {/* Primary Station Tiles */}
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-2">
+                        Primary Base Station
+                      </label>
+                      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
+                        {[
+                          { key: 'Hot Kitchen', label: 'Hot Kitchen', sub: 'Saute & Wok', icon: Flame, color: 'text-amber-500' },
+                          { key: 'Grill', label: 'Grill Station', sub: 'Sear & Steaks', icon: Award, color: 'text-rose-500' },
+                          { key: 'Cold Salad', label: 'Cold Salad', sub: 'Pantry & Prep', icon: Coffee, color: 'text-emerald-500' },
+                          { key: 'Pizza', label: 'Pizza Station', sub: 'Deck Oven', icon: Pizza, color: 'text-purple-500' },
+                          { key: 'Fryer', label: 'Fryer Station', sub: 'Crispy Line', icon: Zap, color: 'text-yellow-500' }
+                        ].map((st) => {
+                          const isSelected = newStaffForm.base_station.toLowerCase().includes(st.key.toLowerCase());
+                          const StIcon = st.icon;
+                          return (
+                            <button
+                              key={st.key}
+                              type="button"
+                              onClick={() => setNewStaffForm(prev => ({ ...prev, base_station: st.key }))}
+                              className={`p-3 rounded-2xl border text-center transition-all flex flex-col items-center gap-1.5 cursor-pointer ${
+                                isSelected
+                                  ? 'bg-emerald-50 dark:bg-emerald-950/60 border-emerald-500 dark:border-emerald-500 shadow-xs ring-2 ring-emerald-500/20'
+                                  : 'bg-slate-50/60 dark:bg-slate-950/40 border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
+                              }`}
+                            >
+                              <StIcon className={`h-4 w-4 ${isSelected ? 'text-emerald-600 dark:text-emerald-400' : st.color}`} />
+                              <div className="text-[11px] font-bold text-slate-900 dark:text-white leading-tight">
+                                {st.label}
+                              </div>
+                              <span className="text-[9px] text-slate-400">{st.sub}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Shift Hours */}
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                        Work Shift Schedule
+                      </label>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {[
+                          { shift: "07:00 AM - 04:00 PM", label: "Morning Prep Shift (07:00 – 16:00)" },
+                          { shift: "10:00 AM - 07:00 PM", label: "Mid-Day Peak Shift (10:00 – 19:00)" },
+                          { shift: "11:00 AM - 09:30 PM", label: "Lunch & Dinner Split (11:00 – 21:30)" },
+                          { shift: "01:00 PM - 10:00 PM", label: "Afternoon & Dinner (13:00 – 22:00)" },
+                          { shift: "03:00 PM - 11:00 PM", label: "Late Night Closing (15:00 – 23:00)" }
+                        ].map((s) => (
+                          <button
+                            key={s.shift}
+                            type="button"
+                            onClick={() => setNewStaffForm(prev => ({ ...prev, shift: s.shift }))}
+                            className={`px-3 py-2 rounded-xl text-left text-xs transition-all flex items-center justify-between border cursor-pointer ${
+                              newStaffForm.shift === s.shift
+                                ? 'bg-emerald-50 dark:bg-emerald-950/60 border-emerald-500 text-emerald-900 dark:text-emerald-200 font-bold ring-1 ring-emerald-500'
+                                : 'bg-slate-50/60 dark:bg-slate-950/40 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 font-medium hover:border-slate-300'
+                            }`}
+                          >
+                            <span>{s.label}</span>
+                            {newStaffForm.shift === s.shift && <Check className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Card 3: Station Competency Star Ratings (1-5★) */}
+                  <div className="glass-panel p-6 rounded-3xl border border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 shadow-xs space-y-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200 dark:border-slate-800 pb-3">
+                      <div className="flex items-center gap-2.5">
+                        <Star className="h-4 w-4 text-amber-500 fill-amber-500" />
+                        <div>
+                          <h4 className="text-sm font-extrabold text-slate-900 dark:text-white uppercase tracking-wider">
+                            3. Station Competency Star Ratings (1 – 5 Stars ★)
+                          </h4>
+                          <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                            Click stars to evaluate chef's skill proficiency across all 5 kitchen stations
+                          </p>
+                        </div>
+                      </div>
+                      <span className="text-[10px] text-slate-400 bg-slate-100 dark:bg-slate-800 px-2.5 py-1 rounded-full font-bold">
+                        1=Novice • 3=Competent • 5=Master
+                      </span>
+                    </div>
+
+                    <div className="space-y-3.5">
+                      {[
+                        { key: 'hot_kitchen', label: 'Hot Kitchen / Saute', icon: Flame, color: 'text-amber-500', desc: 'Saute, curries, fast wok stir-fry and high-heat pacing' },
+                        { key: 'grill_station', label: 'Grill Station', icon: Award, color: 'text-rose-500', desc: 'Steak doneness, seafood charbroil and HACCP core temps' },
+                        { key: 'cold_salad', label: 'Cold Salad & Garde Manger', icon: Coffee, color: 'text-emerald-500', desc: 'Salad prep, fresh bowls, pantry dressing emulsions' },
+                        { key: 'pizza_station', label: 'Pizza Station', icon: Pizza, color: 'text-purple-500', desc: 'Deck oven proofing, dough stretching and woodfire bake' },
+                        { key: 'fryer_station', label: 'Fryer Station', icon: Zap, color: 'text-yellow-500', desc: 'Deep fryer oil temperature recovery and appetizer batches' }
+                      ].map((station) => {
+                        const score = Number(newStaffForm[station.key]) || 3;
+                        const ratingLabels = ["", "1★ Novice", "2★ Developing", "3★ Competent", "4★ Advanced Lead", "5★ Master Specialist"];
+                        const badgeColors = [
+                          "",
+                          "bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300",
+                          "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300",
+                          "bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300",
+                          "bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300",
+                          "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
+                        ];
+
+                        return (
+                          <div
+                            key={station.key}
+                            className="p-3.5 rounded-2xl bg-slate-50/70 dark:bg-slate-950/50 border border-slate-200/80 dark:border-slate-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                          >
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2">
+                                <station.icon className={`h-4 w-4 ${station.color}`} />
+                                <span className="text-xs font-bold text-slate-900 dark:text-white">
+                                  {station.label}
+                                </span>
+                                <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-md ${badgeColors[score]}`}>
+                                  {ratingLabels[score]}
+                                </span>
+                              </div>
+                              <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5 truncate">
+                                {station.desc}
+                              </p>
+                            </div>
+
+                            {/* Clickable 5 Stars */}
+                            <div className="flex items-center gap-1.5 shrink-0 bg-white dark:bg-slate-900 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-800">
+                              {[1, 2, 3, 4, 5].map((starNum) => (
+                                <button
+                                  key={starNum}
+                                  type="button"
+                                  onClick={() => handleStaffRatingChange(station.key, starNum)}
+                                  className="p-1 hover:scale-125 transition-transform cursor-pointer"
+                                  title={`Rate ${starNum} Stars for ${station.label}`}
+                                >
+                                  <Star
+                                    className={`h-4 w-4 transition-colors ${
+                                      starNum <= score
+                                        ? 'text-amber-400 fill-amber-400 drop-shadow-xs'
+                                        : 'text-slate-200 dark:text-slate-700 hover:text-amber-200'
+                                    }`}
+                                  />
+                                </button>
+                              ))}
+                              <span className="text-xs font-black text-slate-700 dark:text-slate-300 ml-1">
+                                {score} / 5
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Card 4: AI Skill-Gap & Succession Planning */}
+                  <div className="glass-panel p-6 rounded-3xl border border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 shadow-xs space-y-4">
+                    <div className="flex items-center gap-2.5 border-b border-slate-200 dark:border-slate-800 pb-3">
+                      <Target className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                      <h4 className="text-sm font-extrabold text-slate-900 dark:text-white uppercase tracking-wider">
+                        4. Performance Benchmarks & Succession Planning
+                      </h4>
+                    </div>
+
+                    <div className="space-y-4">
+                      {/* Efficiency Rating Slider */}
+                      <div>
+                        <div className="flex items-center justify-between mb-1.5">
+                          <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                            Baseline Efficiency Benchmark
+                          </label>
+                          <span className="text-xs font-extrabold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded-lg border border-emerald-200 dark:border-emerald-800">
+                            {newStaffForm.efficiency_rating}%
+                          </span>
+                        </div>
+                        <input
+                          type="range"
+                          min="50"
+                          max="98"
+                          value={newStaffForm.efficiency_rating}
+                          onChange={(e) => setNewStaffForm(prev => ({ ...prev, efficiency_rating: Number(e.target.value) }))}
+                          className="w-full h-2 bg-slate-200 dark:bg-slate-800 rounded-lg appearance-none cursor-pointer accent-emerald-600"
+                        />
+                        <div className="flex justify-between text-[10px] text-slate-400 mt-1">
+                          <span>50% (Trainee Entry)</span>
+                          <span>75% (Standard Line)</span>
+                          <span>98% (Master Specialist)</span>
+                        </div>
+                      </div>
+
+                      {/* Identified Skill-Gap */}
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                          Identified Skill-Gap (Auto-Derived from Lowest Bay)
+                        </label>
+                        <input
+                          type="text"
+                          value={newStaffForm.skill_gap}
+                          onChange={(e) => setNewStaffForm(prev => ({ ...prev, skill_gap: e.target.value }))}
+                          placeholder="e.g. Cold Salad Presentation & Fast Dressing Emulsions"
+                          className="w-full px-3.5 py-2.5 rounded-xl text-xs bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white font-medium focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
+                        />
+                      </div>
+
+                      {/* Training Recommendation */}
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                          Personalized Training Recommendation
+                        </label>
+                        <input
+                          type="text"
+                          value={newStaffForm.training_recommendation}
+                          onChange={(e) => setNewStaffForm(prev => ({ ...prev, training_recommendation: e.target.value }))}
+                          placeholder="e.g. Enrolled in High-Volume Stir-Fry Optimization Module"
+                          className="w-full px-3.5 py-2.5 rounded-xl text-xs bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white font-medium focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
+                        />
+                      </div>
+
+                      {/* Career Progression */}
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                          Career Progression Pathway
+                        </label>
+                        <input
+                          type="text"
+                          value={newStaffForm.career_progression}
+                          onChange={(e) => setNewStaffForm(prev => ({ ...prev, career_progression: e.target.value }))}
+                          placeholder="e.g. Target: Line Specialist Track (72% Milestones Complete)"
+                          className="w-full px-3.5 py-2.5 rounded-xl text-xs bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white font-medium focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Submit Actions Bar */}
+                  <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+                    <button
+                      type="button"
+                      onClick={handleResetStaffForm}
+                      className="px-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-bold text-xs hover:bg-slate-100 dark:hover:bg-slate-800 transition-all flex items-center gap-1.5 cursor-pointer w-full sm:w-auto justify-center"
+                    >
+                      <RefreshCw className="h-4 w-4" />
+                      <span>Reset Form</span>
+                    </button>
+
+                    <button
+                      type="submit"
+                      disabled={isSubmittingStaff}
+                      className="px-6 py-3 rounded-xl bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-white font-bold text-xs shadow-lg shadow-emerald-700/25 transition-all flex items-center gap-2 cursor-pointer w-full sm:w-auto justify-center"
+                    >
+                      {isSubmittingStaff ? (
+                        <>
+                          <RefreshCw className="h-4 w-4 animate-spin" />
+                          <span>Registering Staff Member...</span>
+                        </>
+                      ) : (
+                        <>
+                          <UserPlus className="h-4 w-4" />
+                          <span>Register & Onboard Staff Member</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </form>
+
+                {/* RIGHT: Live Profile Preview (5 Columns) */}
+                <div className="xl:col-span-5 space-y-4">
+                  <div className="sticky top-20 space-y-4">
+                    
+                    {/* Preview Card Header */}
+                    <div className="glass-panel p-5 rounded-3xl border border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 shadow-xs space-y-4">
+                      <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
+                        <div className="flex items-center gap-2">
+                          <BadgeCheck className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                          <h4 className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-wider">
+                            Real-Time Profile Preview
+                          </h4>
+                        </div>
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800 flex items-center gap-1">
+                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-ping"></span> Live Card
+                        </span>
+                      </div>
+
+                      {/* Mirror of the Staff Directory Card */}
+                      <div className="p-5 rounded-2xl bg-white dark:bg-slate-950 border-2 border-emerald-500/40 shadow-md space-y-4">
+                        {/* Top: Name & Badges */}
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex items-center gap-3">
+                            <div className="h-11 w-11 rounded-2xl bg-gradient-to-br from-emerald-600 to-teal-700 text-white flex items-center justify-center font-black text-base shadow-sm shrink-0">
+                              {(newStaffForm.name || "Chef").split(" ").map(w => w[0]).slice(0, 2).join("")}
+                            </div>
+                            <div>
+                              <h4 className="text-sm font-black text-slate-900 dark:text-white leading-tight">
+                                {newStaffForm.name || "Chef Full Name"}
+                              </h4>
+                              <div className="flex flex-wrap items-center gap-1.5 mt-1 text-[10px] text-slate-500 dark:text-slate-400 font-medium">
+                                <span className="font-bold text-slate-700 dark:text-slate-300">{newStaffForm.role}</span>
+                                <span>•</span>
+                                <span>{newStaffForm.base_station}</span>
+                              </div>
+                            </div>
+                          </div>
+                          
+                          <span className="px-2.5 py-1 rounded-full text-[10px] font-mono font-black bg-purple-100 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300 border border-purple-200 dark:border-purple-800 shrink-0">
+                            {newStaffForm.emp_id || `EMP${(data?.staff?.length || 30) + 1}`}
+                          </span>
+                        </div>
+
+                        {/* Shift and Assigned Station */}
+                        <div className="flex items-center justify-between text-[11px] p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 font-semibold">
+                          <span className="text-slate-500 dark:text-slate-400">Assigned Shift:</span>
+                          <span className="text-slate-800 dark:text-slate-200 font-bold">{newStaffForm.shift}</span>
+                        </div>
+
+                        {/* Efficiency & Speed Benchmark */}
+                        <div className="grid grid-cols-2 gap-3 pt-1">
+                          <div className="p-3 rounded-xl bg-emerald-50/60 dark:bg-emerald-950/30 border border-emerald-200/80 dark:border-emerald-800/80">
+                            <span className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400 block">
+                              Efficiency Rating
+                            </span>
+                            <div className="text-lg font-black text-emerald-600 dark:text-emerald-400 mt-0.5">
+                              {newStaffForm.efficiency_rating}%
+                            </div>
+                            <span className="text-[9px] text-emerald-700 dark:text-emerald-300 font-medium">
+                              Optimal Line Performance
+                            </span>
+                          </div>
+
+                          <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+                            <span className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400 block">
+                              Speed Score
+                            </span>
+                            <div className="text-lg font-black text-slate-900 dark:text-white mt-0.5">
+                              {((Number(newStaffForm.hot_kitchen || 3) + Number(newStaffForm.grill_station || 3) + Number(newStaffForm.cold_salad || 3) + Number(newStaffForm.pizza_station || 3) + Number(newStaffForm.fryer_station || 3)) / 5.0 * 0.85 + 0.65).toFixed(1)} / 5.0
+                            </div>
+                            <span className="text-[9px] text-slate-400 font-medium">
+                              5-Bay Mean Index
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Station Competencies (5 Bars) */}
+                        <div className="space-y-2 pt-1">
+                          <span className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400 block">
+                            Evaluated Station Competencies
+                          </span>
+                          <div className="space-y-1.5">
+                            {[
+                              { label: 'Hot Kitchen', val: newStaffForm.hot_kitchen, color: 'bg-amber-500' },
+                              { label: 'Grill Station', val: newStaffForm.grill_station, color: 'bg-rose-500' },
+                              { label: 'Cold Salad', val: newStaffForm.cold_salad, color: 'bg-emerald-500' },
+                              { label: 'Pizza Station', val: newStaffForm.pizza_station, color: 'bg-purple-500' },
+                              { label: 'Fryer Station', val: newStaffForm.fryer_station, color: 'bg-yellow-500' }
+                            ].map(s => (
+                              <div key={s.label} className="flex items-center justify-between text-[10px] font-bold">
+                                <span className="text-slate-600 dark:text-slate-400">{s.label}</span>
+                                <div className="flex items-center gap-2">
+                                  <div className="w-24 h-1.5 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
+                                    <div
+                                      className={`h-full ${s.color} rounded-full`}
+                                      style={{ width: `${(Number(s.val || 3) / 5) * 100}%` }}
+                                    ></div>
+                                  </div>
+                                  <span className="w-6 text-right font-mono text-slate-900 dark:text-white">
+                                    {s.val}★
+                                  </span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Identified Skill Gap & Training Alert */}
+                        <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/60 space-y-1">
+                          <span className="text-[10px] font-black uppercase text-amber-800 dark:text-amber-400 flex items-center gap-1">
+                            <AlertTriangle className="h-3.5 w-3.5" /> Identified Skill Gap:
+                          </span>
+                          <p className="text-xs text-slate-900 dark:text-white font-bold leading-tight">
+                            {newStaffForm.skill_gap || "General Line Speed & Temperature Recovery"}
+                          </p>
+                        </div>
+
+                        {/* Training Recommendation */}
+                        <div className="text-[11px] text-slate-600 dark:text-slate-400 space-y-1">
+                          <span className="font-extrabold text-slate-900 dark:text-white block">
+                            Recommended Training:
+                          </span>
+                          <p className="italic leading-tight">
+                            "{newStaffForm.training_recommendation || "Cross-station training module"}"
+                          </p>
+                        </div>
+
+                        {/* Career Progression */}
+                        <div className="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1.5 pt-2 border-t border-slate-100 dark:border-slate-800">
+                          <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                          <span className="truncate">{newStaffForm.career_progression}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Admin Onboarding Checklist Info */}
+                    <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 space-y-2 text-xs">
+                      <div className="font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                        <ShieldCheck className="h-4 w-4 text-emerald-600" />
+                        Admin Auto-Provisioning Checklist:
+                      </div>
+                      <ul className="space-y-1.5 text-slate-500 dark:text-slate-400 text-[11px]">
+                        <li className="flex items-center gap-1.5">
+                          <Check className="h-3 w-3 text-emerald-500" /> Automatically records into workforce CSV database.
+                        </li>
+                        <li className="flex items-center gap-1.5">
+                          <Check className="h-3 w-3 text-emerald-500" /> Enters Roster Matrix & Station Skill Balance.
+                        </li>
+                        <li className="flex items-center gap-1.5">
+                          <Check className="h-3 w-3 text-emerald-500" /> Logs mandatory cross-training if any station is ≤ 2★.
+                        </li>
+                        <li className="flex items-center gap-1.5">
+                          <Check className="h-3 w-3 text-emerald-500" /> Enables dynamic AI surge reallocation recommendations.
+                        </li>
+                      </ul>
+                    </div>
+
+                  </div>
+                </div>
+
+              </div>
+            </div>
+          )}
+
+        </div>
+      )}
+
       {/* Waiter Mobile Order Entry Modal */}
       {showOrderSimulatorModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/75 backdrop-blur-xs animate-fadeIn">
@@ -3285,6 +5919,51 @@ export default function KitchenStaffDashboard({
               </div>
             ) : (
               <form onSubmit={handleAssessmentSubmit} className="space-y-4 text-xs">
+
+                {/* Staff Member Active Surge Reallocation Directive Banner */}
+                {(() => {
+                  const staffDir = stationDishAnalysis?.staffDirectivesMap?.get(formData.staffId) ||
+                                   stationDishAnalysis?.staffDirectivesMap?.get(formData.name) ||
+                                   stationDishAnalysis?.staffDirectivesMap?.get(formData.name?.split('(')[0]?.trim());
+                  if (!staffDir) return null;
+                  const targetSt = staffDir.station || staffDir.targetStation || "Pizza";
+                  const fromSt = staffDir.currentStation || staffDir.fromStation || formData.assigned_station || "Prep Station";
+                  const score = staffDir.stationSkillScore || staffDir.skillRating || 4;
+
+                  return (
+                    <div className="p-3.5 rounded-2xl bg-amber-50 dark:bg-amber-950/70 border-2 border-amber-500 text-amber-950 dark:text-amber-100 space-y-2.5 animate-pulse shadow-sm">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-black uppercase text-amber-800 dark:text-amber-300 flex items-center gap-1.5">
+                          <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0" />
+                          ACTIVE STATION SURGE DIRECTIVE
+                        </span>
+                        <span className="text-[10px] font-black px-2 py-0.5 rounded bg-amber-200 dark:bg-amber-900 text-amber-900 dark:text-amber-100">
+                          Target: {targetSt} Station
+                        </span>
+                      </div>
+                      <p className="text-xs font-semibold leading-relaxed">
+                        {staffDir.message || `Surge of ${staffDir.pendingDishes || 10} orders detected at ${targetSt}. Move from ${fromSt} to ${targetSt}. Qualified skill: ${score}★.`}
+                      </p>
+                      <div className="pt-1 flex items-center justify-between gap-2">
+                        <span className="text-[11px] text-slate-500 dark:text-slate-400 font-bold">
+                          Assigned: {fromSt} → {targetSt}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            handleExecuteStaffReallocation(formData.name, formData.assigned_station, targetSt, `Direct profile transfer to ${targetSt}`);
+                            setShowSelfAssessmentModal(false);
+                          }}
+                          className="px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs shadow-xs cursor-pointer flex items-center gap-1.5 transition-transform active:scale-95"
+                        >
+                          <Zap className="h-3.5 w-3.5" />
+                          <span>Acknowledge & Transfer to {targetSt}</span>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })()}
+
                 <div>
                   <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
                     Select Staff Member
@@ -3419,6 +6098,179 @@ export default function KitchenStaffDashboard({
                 </div>
               </form>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* 🚨 DYNAMIC POP-UP ALERT MODAL: Triggers automatically for ANY station experiencing a high volume of orders */}
+      {showSurgeModal && stationDishAnalysis?.surgeAlerts?.length > 0 && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-slate-900 border-2 border-rose-500 rounded-2xl shadow-2xl max-w-2xl w-full p-6 space-y-5 animate-in zoom-in-95 duration-200">
+            {/* Modal Header */}
+            <div className="flex items-start justify-between gap-3 border-b border-rose-100 dark:border-rose-950 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="p-3 rounded-2xl bg-rose-600 text-white shadow-lg shadow-rose-600/30 animate-bounce">
+                  <Flame className="h-6 w-6" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300 border border-rose-300 dark:border-rose-800">
+                      🚨 Real-Time High Volume Alert
+                    </span>
+                    <span className="text-xs text-slate-400">• Dynamic Station Monitoring</span>
+                  </div>
+                  <h3 className="text-base font-black text-slate-900 dark:text-white mt-1">
+                    Station Overload Surge Detected
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    A large volume of orders has arrived. Skilled staff members from less busy stations are recommended below for immediate reallocation.
+                  </p>
+                </div>
+              </div>
+
+              <button
+                onClick={handleDismissSurgeModal}
+                className="p-1.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors cursor-pointer"
+                title="Acknowledge and close alert pop-up"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Overloaded Stations & Staff Recommendations List */}
+            <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-1">
+              {stationDishAnalysis.surgeAlerts
+                .filter(alert => {
+                  const targetStation = alert.station || alert.stationName || "Pizza";
+                  return !stabilizedStations.has(targetStation) && !dismissedSurgeStations.has(targetStation);
+                })
+                .map((alert, alertIdx) => {
+                const targetStation = alert.station || alert.stationName || "Pizza";
+                const stationIcon = targetStation === "Pizza" ? "🍕"
+                  : targetStation === "Hot Kitchen" ? "🍳"
+                  : targetStation === "Grill" ? "🥩"
+                  : targetStation === "Cold Salad" ? "🥗"
+                  : "🍤";
+
+                return (
+                  <div
+                    key={targetStation || alertIdx}
+                    className="p-4 rounded-xl bg-gradient-to-r from-rose-50/80 via-amber-50/50 to-rose-50/80 dark:from-rose-950/60 dark:via-amber-950/40 dark:to-rose-950/60 border-2 border-rose-500 shadow-md space-y-3.5"
+                  >
+                    {/* Station Alert Summary Banner */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-rose-200 dark:border-rose-900/60 pb-3">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xl">{stationIcon}</span>
+                          <h4 className="text-sm font-black text-rose-900 dark:text-rose-100 uppercase tracking-wide">
+                            {targetStation} Station Overloaded ({alert.pendingDishes || 0} Incoming Orders)
+                          </h4>
+                          <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-rose-600 text-white shadow-xs">
+                            Load Ratio: {alert.ratio} dishes/cook
+                          </span>
+                        </div>
+                        <p className="text-xs text-rose-800 dark:text-rose-300 font-semibold mt-1">
+                          Incoming dish queue: <span className="font-extrabold">{alert.dishSummary}</span>
+                        </p>
+                        <p className="text-[11px] text-slate-600 dark:text-slate-400 mt-0.5">
+                          Currently staffed: <span className="font-bold">{alert.currentCooks} cook(s)</span> • Target capacity needed: <span className="font-bold text-rose-700 dark:text-rose-400">+{alert.neededStaffCount || 1} skilled cook(s)</span>
+                        </p>
+                      </div>
+
+                      {alert.recommendedStaff?.length > 1 && (
+                        <button
+                          onClick={async () => {
+                            for (const cand of alert.recommendedStaff) {
+                              await handleExecuteStaffReallocation(
+                                cand.staffName,
+                                cand.currentStation || cand.fromStation || "Prep Station",
+                                targetStation,
+                                `Surge emergency multi-reallocation to ${targetStation}`
+                              );
+                            }
+                            setDismissedSurgeStations(prev => new Set([...prev, targetStation]));
+                          }}
+                          className="px-3.5 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-black text-xs shadow-md cursor-pointer flex items-center gap-1.5 self-start sm:self-auto shrink-0 transition-all hover:scale-105 active:scale-95"
+                        >
+                          <Zap className="h-4 w-4" />
+                          <span>Reassign All ({alert.recommendedStaff.length})</span>
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Skill-Based Candidates */}
+                    <div>
+                      <span className="text-[11px] font-black uppercase text-slate-700 dark:text-slate-300 block mb-2 flex items-center gap-1.5">
+                        <Sparkles className="h-3.5 w-3.5 text-amber-500" />
+                        Qualified Experienced Staff Recommended For Immediate Reassignment:
+                      </span>
+
+                      <div className="space-y-2">
+                        {alert.recommendedStaff?.map((cand, idx) => {
+                          const candName = (cand.staffName || "Chef").split('(')[0].trim();
+                          const candFrom = cand.currentStation || cand.fromStation || "Prep Station";
+                          const candScore = cand.stationSkillScore || cand.skillRating || 4;
+
+                          return (
+                            <div
+                              key={cand.staffId || idx}
+                              className="p-3 bg-white dark:bg-slate-900 rounded-xl border border-rose-200 dark:border-rose-900 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                            >
+                              <div className="space-y-0.5">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs font-black text-slate-900 dark:text-white">
+                                    {candName}
+                                  </span>
+                                  <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-300 border border-amber-300 dark:border-amber-700">
+                                    {candScore}★ {targetStation} Skill
+                                  </span>
+                                  <span className="text-[10px] text-slate-500 dark:text-slate-400">
+                                    • {cand.efficiency || 85}% Efficiency
+                                  </span>
+                                </div>
+                                <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
+                                  Currently assigned to: <span className="font-semibold text-slate-700 dark:text-slate-300">{candFrom}</span> (Low pending queue)
+                                </p>
+                              </div>
+
+                              <button
+                                onClick={async () => {
+                                  await handleExecuteStaffReallocation(
+                                    cand.staffName,
+                                    candFrom,
+                                    targetStation,
+                                    `Direct surge reallocation to ${targetStation}`
+                                  );
+                                  setDismissedSurgeStations(prev => new Set([...prev, targetStation]));
+                                }}
+                                className="px-3.5 py-1.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs shadow-xs cursor-pointer flex items-center justify-center gap-1.5 shrink-0 transition-transform active:scale-95"
+                                title={`Reassign ${candName} from ${candFrom} to ${targetStation}`}
+                              >
+                                <Zap className="h-3.5 w-3.5" />
+                                <span>Acknowledge & Transfer to {targetStation}</span>
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="flex items-center justify-between gap-3 pt-3 border-t border-slate-200 dark:border-slate-800">
+              <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
+                💡 Reassignments also display on staff profiles & station cards in real-time.
+              </span>
+              <button
+                onClick={handleDismissSurgeModal}
+                className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 font-bold text-xs cursor-pointer transition-colors"
+              >
+                Dismiss Alert Pop-Up
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -112,6 +112,30 @@ def get_recommendations():
                     "timestamp": datetime.now().strftime("%H:%M:%S")
                 })
 
+    # Augment with dynamic kitchen station surge alerts
+    try:
+        from .kitchen import analyze_incoming_dish_types_and_recommend_staff
+        surge_info = analyze_incoming_dish_types_and_recommend_staff()
+        for alert in surge_info.get("surge_alerts", []):
+            st_name = alert["station_name"]
+            st_id = f"dyn-surge-{st_name.lower().replace(' ', '-')}"
+            if not any(a["id"] == st_id for a in alerts_db):
+                alerts_db.insert(0, {
+                    "id": st_id,
+                    "type": "STAFF_SURGE_REALLOCATION",
+                    "category": "Kitchen",
+                    "severity": alert.get("severity", "critical"),
+                    "title": f"Incoming Dish Surge: {alert['incoming_dishes']}x {st_name} Orders",
+                    "item_name": f"{st_name} Station",
+                    "zone": "Kitchen Operations",
+                    "message": alert["alert_description"],
+                    "suggested_action": f"Dynamically reallocate qualified staff to {st_name} to handle the incoming rush.",
+                    "status": "active",
+                    "timestamp": datetime.now().strftime("%H:%M:%S")
+                })
+    except Exception:
+        pass
+
     active_alerts = [a for a in alerts_db if a["status"] != "resolved"]
     resolved_alerts = [a for a in alerts_db if a["status"] == "resolved"]
 
