@@ -777,13 +777,295 @@ def get_kitchen_metrics():
         "surge_analysis": surge_analysis
     }
 
+UPSKILLING_STATIONS_CONFIG = {
+    "hot_kitchen": {
+        "display": "Hot Kitchen / Saute",
+        "icon": "🍳",
+        "apprenticeship": (
+            "3-Month Supervised Apprenticeship: High-Heat Saute & Saucier Mastery",
+            "3 Months (Supervised)",
+            "Executive Chef Kamal (Level 5)",
+            "Intensive 12-week supervised rotation at Hot Kitchen line mastering wok handling, high-heat temperature control, and ticket pass pacing under Executive Chef mentorship."
+        ),
+        "course": (
+            "Targeted Course: Saucier Temperature Control & High-Volume Saute Academy (4 Weeks)",
+            "4 Weeks (Targeted Course)",
+            "Chef Kasun (CDP - Hot Line)",
+            "Structured culinary course focused on sauce reduction precision, deglazing timing, and pan-to-pass synchronization."
+        ),
+        "cross_train": (
+            "14-Day Cross-Station Immersion: Hot Kitchen Saute Line Fast-Track",
+            "14 Days (Cross-Training)",
+            "Chef Ruwan (Float Specialist)",
+            "Hands-on rotational immersion pairing cook side-by-side with line specialists for dinner rush saute relief."
+        )
+    },
+    "grill_station": {
+        "display": "Grill Station",
+        "icon": "🥩",
+        "apprenticeship": (
+            "3-Month Supervised Apprenticeship: Grill Master & Core Protein Precision",
+            "3 Months (Supervised)",
+            "Senior Sous Chef Nimal (Level 4)",
+            "Comprehensive multi-month apprenticeship mastering HACCP internal temperature monitoring, steak sear grading, and seafood timing."
+        ),
+        "course": (
+            "Targeted Course: HACCP Core Seafood & Meat Temperature Certification (6 Weeks)",
+            "6 Weeks (Targeted Course)",
+            "Chef Samantha (Lead Grill Master)",
+            "Professional food safety and temperature control course covering meat resting science, probe calibration, and charbroil pacing."
+        ),
+        "cross_train": (
+            "21-Day Accelerated Cross-Training: Grill Line Prep & Protein Searing",
+            "21 Days (Cross-Training)",
+            "Chef Dilshan (CDP - Grill)",
+            "Accelerated station rotation focusing on quick-sear steak techniques, burger assembly sequencing, and grill line timing."
+        )
+    },
+    "cold_salad": {
+        "display": "Cold & Salad Station",
+        "icon": "🥗",
+        "apprenticeship": (
+            "2-Month Supervised Apprenticeship: Garde Manger & Cold Chain Operations",
+            "2 Months (Supervised)",
+            "Chef Priyantha (Pantry In-Charge)",
+            "8-week supervised immersion in cold pantry management, dressing emulsion stability, and cold-table speed plating."
+        ),
+        "course": (
+            "Targeted Course: Fast Dressing Emulsions & Food Safety Hygiene Masterclass (3 Weeks)",
+            "3 Weeks (Targeted Course)",
+            "Chef Anura (Salad Specialist)",
+            "Specialized culinary course on emulsion physics, fresh vinaigrette balancing, and allergen sanitation protocols."
+        ),
+        "cross_train": (
+            "10-Day Rotational Cross-Training: Fast Pantry & Garde Manger Line",
+            "10 Days (Cross-Training)",
+            "Chef Danushka (Commis I)",
+            "Fast-paced rotation training cook on synchronized salad tosses, cold appetizer prep, and ticket dispatch pacing."
+        )
+    },
+    "pizza_station": {
+        "display": "Pizza Station",
+        "icon": "🍕",
+        "apprenticeship": (
+            "3-Month Supervised Apprenticeship: Wood-Fired Deck Oven & Dough Proofing",
+            "3 Months (Supervised)",
+            "Chef Amara (Italian Lead)",
+            "12-week artisan pizza apprenticeship mastering sourdough fermentation stages, peel maneuvers, and high-temp deck baking."
+        ),
+        "course": (
+            "Targeted Course: Wood-Fired Pizza Deck Oven Management & Crust Proofing (4 Weeks)",
+            "4 Weeks (Targeted Course)",
+            "Chef Nuwan (Pizza Baker)",
+            "Targeted technical masterclass covering crust proofing hydration, sauce dispersal pacing, and deck hot-spot rotation."
+        ),
+        "cross_train": (
+            "14-Day Cross-Station Rotation: Artisan Pizza Stretching & Deck Pacing",
+            "14 Days (Cross-Training)",
+            "Chef Dinesh (Float - Senior)",
+            "Rotational training developing sub-45 second dough stretching, peel landing accuracy, and pizza station line pacing."
+        )
+    },
+    "fryer_station": {
+        "display": "Fryer Station",
+        "icon": "🍤",
+        "apprenticeship": (
+            "2-Month Supervised Apprenticeship: Continuous Deep Fryer Safety & Batch Pacing",
+            "2 Months (Supervised)",
+            "Chef Sunil (Fast Food Lead)",
+            "8-week supervised training on high-capacity fryer safety, continuous oil filtering cycles, and crispness retention."
+        ),
+        "course": (
+            "Targeted Course: Commercial Deep Fryer Safety & Oil Quality Optimization (3 Weeks)",
+            "3 Weeks (Targeted Course)",
+            "Chef Kelum (Fryer Tech)",
+            "Accredited coursework on oil polar compound monitoring, recovery time management, and basket load timing."
+        ),
+        "cross_train": (
+            "14-Day Cross-Station Rotation: Fast Food Line & Appetizer Batch Timing",
+            "14 Days (Cross-Training)",
+            "Chef Tharindu (Commis II)",
+            "Hands-on cross-training on dual-vat appetizer batching, cuttlefish portioning, and fryer pass coordination."
+        )
+    }
+}
+
+enrolled_upskilling_programs: Dict[str, Dict[str, Any]] = {}
+
+def generate_personalized_ai_upskilling_recommendations() -> List[Dict[str, Any]]:
+    df = load_csv_data("staff_database.csv")
+    if df is None or df.empty:
+        return []
+
+    station_cols = ["hot_kitchen", "grill_station", "cold_salad", "pizza_station", "fryer_station"]
+    now_str = datetime.now().strftime("%Y-%m-%d %I:%M:%S %p")
+    records = []
+
+    for idx, r in df.iterrows():
+        emp_id = str(r["emp_id"])
+        name = str(r["name"])
+        base_st = str(r.get("base_station", "Hot Kitchen"))
+        
+        custom = CUSTOM_STAFF_METADATA.get(emp_id, {})
+        scores = {c: int(r[c]) for c in station_cols}
+        avg_score = sum(scores.values()) / float(len(scores))
+        eff_rating = custom.get("efficiency_rating", min(98, max(55, int(round(avg_score * 17.5 + 11.0)))))
+
+        # Check if staff member's overall efficiency drops below 50%
+        if eff_rating < 50:
+            rec_id = f"{emp_id}-EFF-LOW"
+            is_enrolled = rec_id in enrolled_upskilling_programs
+            records.append({
+                "Timestamp": now_str,
+                "Chef_ID": emp_id,
+                "Chef_Name": name,
+                "Target_Station": f"{base_st} (Efficiency Recovery)",
+                "Current_Skill_Score": round(eff_rating / 20.0, 1),
+                "Target_Skill_Score": 4.5,
+                "Skill_Gap": round(4.5 - (eff_rating / 20.0), 1),
+                "Station_Risk_Level": "CRITICAL",
+                "Priority": "CRITICAL",
+                "Recommended_Action": f"3-Month Supervised Comprehensive Line Apprenticeship: Urgent pacing & line speed intervention to recover kitchen efficiency from {eff_rating}% to > 85% under Executive Chef Kamal.",
+                "Program_Type": "Supervised Apprenticeship",
+                "Program_Title": "3-Month Supervised Apprenticeship: Kitchen Speed & Line Efficiency Recovery",
+                "Duration": "3 Months (Supervised)",
+                "Mentor": "Executive Chef Kamal (Level 5)",
+                "Proficiency_Pct": f"{eff_rating}%",
+                "Trigger_Reason": f"Efficiency Level ({eff_rating}%) < 50% Threshold Alert",
+                "Enrollment_Status": "Enrolled & In Progress" if is_enrolled else "Recommended",
+                "Enrollment_Id": rec_id
+            })
+
+        # Check station proficiency (< 50% threshold, i.e. score <= 2 out of 5)
+        for col in station_cols:
+            score = scores[col]
+            if score <= 2:
+                st_cfg = UPSKILLING_STATIONS_CONFIG[col]
+                disp = st_cfg["display"]
+                gap = 4 - score
+                prof_pct = f"{score * 20}%"
+                rec_id = f"{emp_id}-{col}"
+                is_enrolled = rec_id in enrolled_upskilling_programs
+
+                if score == 1:
+                    # Critical proficiency gap (20% < 50%) -> Multi-Month Supervised Apprenticeship
+                    risk = "CRITICAL"
+                    priority = "CRITICAL"
+                    prog_type = "Supervised Apprenticeship"
+                    prog_title, duration, mentor, desc = st_cfg["apprenticeship"]
+                    rec_action = f"{prog_title} (Mentor: {mentor})"
+                else:
+                    # Moderate gap (score 2 = 40% < 50%) -> Alternate between Targeted Course and Cross-Station Training
+                    risk = "HIGH"
+                    priority = "HIGH"
+                    if idx % 2 == 0:
+                        prog_type = "Targeted Culinary Course"
+                        prog_title, duration, mentor, desc = st_cfg["course"]
+                        rec_action = f"{prog_title} (Mentor: {mentor})"
+                    else:
+                        prog_type = "Cross-Station Training"
+                        prog_title, duration, mentor, desc = st_cfg["cross_train"]
+                        rec_action = f"{prog_title} (Mentor: {mentor})"
+
+                records.append({
+                    "Timestamp": now_str,
+                    "Chef_ID": emp_id,
+                    "Chef_Name": name,
+                    "Target_Station": disp,
+                    "Current_Skill_Score": score,
+                    "Target_Skill_Score": 4,
+                    "Skill_Gap": gap,
+                    "Station_Risk_Level": risk,
+                    "Priority": priority,
+                    "Recommended_Action": rec_action,
+                    "Program_Type": prog_type,
+                    "Program_Title": prog_title,
+                    "Duration": duration,
+                    "Mentor": mentor,
+                    "Proficiency_Pct": prof_pct,
+                    "Trigger_Reason": f"Proficiency ({prof_pct}) < 50% Threshold",
+                    "Enrollment_Status": "Enrolled & In Progress" if is_enrolled else "Recommended",
+                    "Enrollment_Id": rec_id
+                })
+
+    records.sort(key=lambda x: (x["Current_Skill_Score"], x["Chef_ID"]))
+
+    # Update CSV cache
+    upskill_path = os.path.join(BACKEND_DIR, "data", "upskilling_recommendations.csv")
+    try:
+        if records:
+            keys = list(records[0].keys())
+            with open(upskill_path, mode="w", newline="", encoding="utf-8") as f:
+                writer = csv.DictWriter(f, fieldnames=keys)
+                writer.writeheader()
+                writer.writerows(records)
+    except Exception as e:
+        print(f"Warning: could not write to {upskill_path}: {e}")
+
+    return records
+
 @router.get("/upskilling-recommendations")
 def get_upskilling_recommendations():
-    """Reads live recommendations from upskilling_recommendations.csv"""
+    """Reads live recommendations from upskilling_recommendations.csv or generates them dynamically"""
     df = load_csv_data("upskilling_recommendations.csv")
-    if df is not None and not df.empty:
-        return df.fillna("").to_dict(orient="records")
-    return []
+    if df is not None and not df.empty and "Program_Type" in df.columns:
+        records = df.fillna("").to_dict(orient="records")
+        for r in records:
+            e_id = r.get("Enrollment_Id") or f"{r.get('Chef_ID')}-{r.get('Target_Station')}"
+            if e_id in enrolled_upskilling_programs:
+                r["Enrollment_Status"] = "Enrolled & In Progress"
+        return records
+    return generate_personalized_ai_upskilling_recommendations()
+
+@router.post("/upskilling/enroll")
+def enroll_upskilling(payload: Dict[str, Any]):
+    """Enrolls a chef/trainee in a personalized upskilling program"""
+    emp_id = str(payload.get("chef_id") or payload.get("Chef_ID", "EMP01"))
+    enrollment_id = str(payload.get("enrollment_id") or f"{emp_id}-{payload.get('target_station', '')}")
+    enrolled_upskilling_programs[enrollment_id] = {
+        "enrolled_at": datetime.now().strftime("%Y-%m-%d %I:%M:%S %p"),
+        "chef_id": emp_id,
+        "program_title": payload.get("program_title", "Personalized Upskilling Program"),
+        "status": "Enrolled & In Progress"
+    }
+    return {
+        "success": True,
+        "message": f"Successfully enrolled {payload.get('chef_name', emp_id)} into {payload.get('program_title', 'Upskilling Program')}!",
+        "enrollment_id": enrollment_id
+    }
+
+@router.post("/simulate-low-efficiency")
+def simulate_low_efficiency(payload: Optional[Dict[str, Any]] = None):
+    """Simulates an efficiency drop below 50% for a trainee/chef to trigger automated AI upskilling suggestions"""
+    target_id = (payload or {}).get("emp_id", "EMP30") # Trainee Kaveen by default
+    target_eff = int((payload or {}).get("efficiency_rating", 44)) # 44% (< 50%)
+    
+    if target_id not in CUSTOM_STAFF_METADATA:
+        CUSTOM_STAFF_METADATA[target_id] = {}
+    CUSTOM_STAFF_METADATA[target_id]["efficiency_rating"] = target_eff
+    
+    # Re-run recommendation generator to immediately trigger the emergency apprenticeship recommendation
+    recs = generate_personalized_ai_upskilling_recommendations()
+    emergency_rec = next((r for r in recs if r["Chef_ID"] == target_id and "EFF-LOW" in r.get("Enrollment_Id", "")), None)
+    
+    return {
+        "success": True,
+        "message": f"Efficiency drop alert triggered: {target_id} dropped to {target_eff}% (< 50% Threshold). Emergency AI Apprenticeship Prescribed!",
+        "emergency_recommendation": emergency_rec,
+        "all_recommendations": recs
+    }
+
+@router.post("/reset-simulated-efficiency")
+def reset_simulated_efficiency(payload: Optional[Dict[str, Any]] = None):
+    """Resets any simulated low efficiency overrides"""
+    target_id = (payload or {}).get("emp_id")
+    if target_id and target_id in CUSTOM_STAFF_METADATA:
+        CUSTOM_STAFF_METADATA[target_id].pop("efficiency_rating", None)
+    else:
+        for k in list(CUSTOM_STAFF_METADATA.keys()):
+            CUSTOM_STAFF_METADATA[k].pop("efficiency_rating", None)
+    recs = generate_personalized_ai_upskilling_recommendations()
+    return {"success": True, "message": "Efficiency levels reset to baseline standards.", "all_recommendations": recs}
 
 @router.get("/reallocation-logs")
 def get_reallocation_logs():
