@@ -203,7 +203,7 @@ class FoodQualityVisionEngine:
         # --- Produce-Specific Calibrations ---
         # 1. Avocado: Retains green chlorophyll while ripening into dark peel.
         # High browning (15-35%) with green pulp retention is Overripe (Stage 3), not Spoiled!
-        if produce_name == "Avocado":
+        if "Avocado" in produce_name:
             if mould_detected or mould >= 3.0 or browning >= 38.0 or visual_score >= 82.0:
                 ripeness_stage = "Spoiled / Rotten (Grade F)"
                 risk_level = "Critical"
@@ -226,7 +226,7 @@ class FoodQualityVisionEngine:
             return ripeness_stage, ripeness_percent, round(visual_score, 1), risk_level
 
         # 2. Peach: Sunken necrotic lesion / brown rot (Monilinia fructicola) or wrinkling
-        if produce_name == "Peach":
+        if "Peach" in produce_name:
             if mould_detected or mould >= 2.5 or browning >= 24.0 or visual_score >= 78.0:
                 ripeness_stage = "Spoiled / Rotten (Grade F)"
                 risk_level = "Critical"
@@ -250,7 +250,7 @@ class FoodQualityVisionEngine:
             return ripeness_stage, ripeness_percent, round(visual_score, 1), risk_level
 
         # 3. Banana: Sugar freckling is Overripe, blackening/mould is Spoiled
-        if produce_name == "Banana":
+        if "Banana" in produce_name:
             if mould_detected or mould >= 2.5 or browning >= 45.0 or visual_score >= 82.0:
                 ripeness_stage = "Spoiled / Rotten (Grade F)"
                 risk_level = "Critical"
@@ -270,6 +270,52 @@ class FoodQualityVisionEngine:
                 risk_level = "Low"
                 ripeness_percent = 95.0
                 visual_score = min(18.0, max(5.0, visual_score))
+            return ripeness_stage, ripeness_percent, round(visual_score, 1), risk_level
+
+        # 4. Apple, Tomato, Strawberry: High cuticle gloss & natural fruit sheen
+        if any(k in produce_name for k in ["Apple", "Tomato", "Strawberry"]):
+            if mould_detected or mould >= 2.5 or browning >= 40.0 or visual_score >= 78.0:
+                ripeness_stage = "Spoiled / Rotten (Grade F)"
+                risk_level = "Critical"
+                ripeness_percent = max(5.0, round(100.0 - visual_score, 1))
+            elif browning >= 12.0 or visual_score >= 48.0 or pred_stage_idx == 2:
+                ripeness_stage = "Overripe / Softening (Use Today)"
+                risk_level = "High"
+                ripeness_percent = max(25.0, round(100.0 - visual_score, 1))
+                visual_score = min(74.0, max(55.0, visual_score))
+            elif browning >= 4.0 or visual_score >= 22.0 or pred_stage_idx == 1:
+                ripeness_stage = "Optimal Ripe (Grade B)"
+                risk_level = "Medium" if visual_score >= 38.0 else "Low"
+                ripeness_percent = max(65.0, round(100.0 - visual_score, 1))
+                visual_score = min(48.0, max(22.0, visual_score))
+            else:
+                ripeness_stage = "Fresh / Firm (Grade A)"
+                risk_level = "Low"
+                ripeness_percent = 95.0
+                visual_score = min(15.0, max(5.0, visual_score))
+            return ripeness_stage, ripeness_percent, round(visual_score, 1), risk_level
+
+        # 5. Leafy Greens & Lettuce (High Chlorophyll, crisp white rib anatomy)
+        if any(k in produce_name for k in ["Lettuce", "Spinach", "Gotukola", "Kankun", "Mukunuwenna"]):
+            if mould_detected or (mould >= 2.5 and browning >= 10.0) or browning >= 30.0 or visual_score >= 80.0:
+                ripeness_stage = "Spoiled / Rotten (Grade F)"
+                risk_level = "Critical"
+                ripeness_percent = max(5.0, round(100.0 - visual_score, 1))
+            elif green_ratio >= 60.0 and browning < 5.0 and not mould_detected:
+                ripeness_stage = "Fresh / Firm (Grade A)"
+                risk_level = "Low"
+                ripeness_percent = 96.0
+                visual_score = min(12.0, max(4.0, visual_score))
+            elif browning >= 10.0 or texture >= 45.0 or visual_score >= 48.0 or pred_stage_idx == 2:
+                ripeness_stage = "Overripe / Softening (Use Today)"
+                risk_level = "High"
+                ripeness_percent = max(25.0, round(100.0 - visual_score, 1))
+                visual_score = min(72.0, max(58.0, visual_score))
+            else:
+                ripeness_stage = "Optimal Ripe (Grade B)"
+                risk_level = "Low"
+                ripeness_percent = max(65.0, round(100.0 - visual_score, 1))
+                visual_score = min(45.0, max(20.0, visual_score))
             return ripeness_stage, ripeness_percent, round(visual_score, 1), risk_level
 
         # Standard Generic Produce Evaluation

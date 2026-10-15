@@ -1,135 +1,135 @@
 {
   "dataset_summary": {
-    "total_samples": 4695,
-    "train_samples": 3756,
-    "test_samples": 939,
-    "num_features": 20,
+    "total_samples": 20657,
+    "train_samples": 16525,
+    "test_samples": 4132,
+    "num_features": 55,
     "numeric_feature_count": 8,
-    "produce_categories_count": 12
+    "produce_categories_count": 47
   },
   "regression_benchmarks": {
     "RSL_RandomForestRegressor": {
-      "r2_score": 0.9825,
-      "rmse_hours": 9.061,
-      "mae_hours": 4.086
+      "r2_score": 0.9873,
+      "rmse_hours": 24.938,
+      "mae_hours": 10.481
     },
     "RSL_XGBoostRegressor": {
-      "r2_score": 0.9878,
-      "rmse_hours": 7.553,
-      "mae_hours": 3.643
+      "r2_score": 0.9904,
+      "rmse_hours": 21.692,
+      "mae_hours": 10.278
     },
     "RSL_GradientBoostingRegressor": {
-      "r2_score": 0.9865,
-      "rmse_hours": 7.95,
-      "mae_hours": 4.025
+      "r2_score": 0.9885,
+      "rmse_hours": 23.756,
+      "mae_hours": 11.995
     },
     "Prob_RandomForestRegressor": {
-      "r2_score": 0.9988,
-      "rmse_pct": 1.328,
-      "mae_pct": 0.81
+      "r2_score": 0.9982,
+      "rmse_pct": 1.643,
+      "mae_pct": 1.013
     },
     "Prob_XGBoostRegressor": {
-      "r2_score": 0.9986,
-      "rmse_pct": 1.421,
-      "mae_pct": 0.884
+      "r2_score": 0.9982,
+      "rmse_pct": 1.634,
+      "mae_pct": 1.043
     },
     "Prob_GradientBoostingRegressor": {
-      "r2_score": 0.9983,
-      "rmse_pct": 1.548,
-      "mae_pct": 0.967
+      "r2_score": 0.9977,
+      "rmse_pct": 1.858,
+      "mae_pct": 1.215
     }
   },
   "classification_benchmarks": {
     "Risk_RandomForestClassifier": {
-      "accuracy": 0.9894,
-      "f1_macro": 0.9842,
-      "f1_weighted": 0.9893,
+      "accuracy": 0.9758,
+      "f1_macro": 0.9596,
+      "f1_weighted": 0.9756,
       "confusion_matrix": [
         [
-          496,
-          1,
+          2081,
+          11,
           0,
           0
         ],
         [
-          3,
-          123,
-          0,
+          11,
+          523,
+          15,
           0
         ],
         [
           0,
-          1,
-          109,
-          2
+          18,
+          422,
+          38
         ],
         [
           0,
           0,
-          3,
-          201
+          7,
+          1006
         ]
       ]
     },
     "Risk_XGBoostClassifier": {
-      "accuracy": 0.9851,
-      "f1_macro": 0.9764,
-      "f1_weighted": 0.9851,
+      "accuracy": 0.9823,
+      "f1_macro": 0.9702,
+      "f1_weighted": 0.9823,
       "confusion_matrix": [
         [
-          495,
-          2,
+          2082,
+          10,
           0,
           0
         ],
         [
-          3,
-          119,
+          7,
+          525,
+          17,
+          0
+        ],
+        [
+          0,
+          13,
+          443,
+          22
+        ],
+        [
+          0,
+          0,
           4,
-          0
-        ],
-        [
-          0,
-          1,
-          110,
-          1
-        ],
-        [
-          0,
-          0,
-          3,
-          201
+          1009
         ]
       ]
     },
     "Risk_GradientBoostingClassifier": {
-      "accuracy": 0.9851,
-      "f1_macro": 0.9759,
-      "f1_weighted": 0.9851,
+      "accuracy": 0.9818,
+      "f1_macro": 0.9705,
+      "f1_weighted": 0.9818,
       "confusion_matrix": [
         [
-          496,
-          1,
+          2084,
+          8,
           0,
           0
         ],
         [
-          3,
-          119,
-          4,
+          15,
+          519,
+          15,
           0
         ],
         [
           0,
-          1,
-          109,
-          2
+          11,
+          448,
+          19
         ],
         [
           0,
           0,
-          3,
-          201
+          7,
+          1006
         ]
       ]
     }
