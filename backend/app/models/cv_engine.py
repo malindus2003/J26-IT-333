@@ -16,7 +16,7 @@ class FoodQualityVisionEngine:
     3. Automated Contour Defect Segmentation & Bounding Box Generation for UI Overlays.
     """
 
-    CATEGORIES = ["Fruits", "Vegetables", "Dairy", "Fish", "Meat"]
+    CATEGORIES = ["Fruits", "Vegetables"]
     CLASS_LABELS = {0: "Fresh (Grade A)", 1: "Ripe / Good (Grade B)", 2: "Spoiled / Rotten (Grade F)"}
 
     def __init__(self):

@@ -40,8 +40,8 @@ export default function AlertNotificationCenter({
     category: "Spoilage",
     severity: "critical",
     type: "THERMAL_ABUSE",
-    item_name: "Walk-In Meat Chiller",
-    zone: "Zone 4 (Meat)",
+    item_name: "Tropical Fruit Ripening Vault",
+    zone: "Zone 1 (Tropical Fruits)",
     message: "Thermostat temperature climbed to 11.8°C with high microbial growth risk.",
     suggested_action: "Calibrate compressor thermostat cooling by -3.0°C immediately."
   });

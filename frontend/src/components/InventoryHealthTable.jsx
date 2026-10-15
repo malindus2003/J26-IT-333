@@ -12,9 +12,6 @@ import {
   XCircle, 
   Apple, 
   Carrot, 
-  Milk, 
-  Fish, 
-  Beef, 
   X, 
   Truck, 
   Layers, 
@@ -31,31 +28,17 @@ const getItemThumbnail = (name = "", category = "") => {
   if (n.includes("apple")) return "/images/specimens/apple_fresh.jpg";
   if (n.includes("lettuce") || n.includes("salad")) return "/images/specimens/lettuce_crisp.jpg";
   if (n.includes("tomato")) return "/images/specimens/tomato_overripe.jpg";
-  if (n.includes("spinach")) return "/images/specimens/spinach_wilted.jpg";
-  if (n.includes("milk")) return "/images/specimens/milk_fresh.jpg";
-  if (n.includes("cheese") || n.includes("mozzarella")) return "/images/specimens/cheese_mouldy.jpg";
-  if (n.includes("yogurt") || n.includes("cream")) return "/images/specimens/yogurt_curdled.jpg";
-  if (n.includes("tuna")) return "/images/specimens/tuna_oxidized.jpg";
-  if (n.includes("salmon")) return "/images/specimens/salmon_fresh.jpg";
-  if (n.includes("prawn") || n.includes("shrimp")) return "/images/specimens/prawns_fresh.jpg";
-  if (n.includes("chicken") || n.includes("poultry")) return "/images/specimens/chicken_fresh.jpg";
-  if (n.includes("beef") || n.includes("steak") || n.includes("meat")) return "/images/specimens/beef_fresh.jpg";
+  if (n.includes("spinach") || n.includes("kankun") || n.includes("gotukola")) return "/images/specimens/spinach_wilted.jpg";
 
   if (category === "Fruits") return "/images/specimens/apple_fresh.jpg";
-  if (category === "Vegetables") return "/images/specimens/lettuce_crisp.jpg";
-  if (category === "Dairy") return "/images/specimens/milk_fresh.jpg";
-  if (category === "Fish") return "/images/specimens/salmon_fresh.jpg";
-  return "/images/specimens/beef_fresh.jpg";
+  return "/images/specimens/lettuce_crisp.jpg";
 };
 
 const getCategoryEmoji = (category = "") => {
   switch (category) {
     case "Fruits": return "🍎";
     case "Vegetables": return "🥬";
-    case "Dairy": return "🥛";
-    case "Fish": return "🐟";
-    case "Meat": return "🥩";
-    default: return "📦";
+    default: return "🥗";
   }
 };
 
@@ -186,14 +169,8 @@ export default function InventoryHealthTable({ items = [], zones = [], onRefresh
       case "Fruits":
         return <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-800 dark:text-emerald-400"><Apple className="h-3.5 w-3.5 text-emerald-700 dark:text-emerald-400" /> Fruits</span>;
       case "Vegetables":
-        return <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-800 dark:text-emerald-400"><Carrot className="h-3.5 w-3.5 text-emerald-700 dark:text-emerald-400" /> Vegetables</span>;
-      case "Dairy":
-        return <span className="inline-flex items-center gap-1 text-xs font-bold text-sky-800 dark:text-sky-400"><Milk className="h-3.5 w-3.5 text-sky-700 dark:text-sky-400" /> Dairy</span>;
-      case "Fish":
-        return <span className="inline-flex items-center gap-1 text-xs font-bold text-teal-800 dark:text-teal-400"><Fish className="h-3.5 w-3.5 text-teal-700 dark:text-teal-400" /> Fish & Seafood</span>;
-      case "Meat":
       default:
-        return <span className="inline-flex items-center gap-1 text-xs font-bold text-rose-800 dark:text-rose-400"><Beef className="h-3.5 w-3.5 text-rose-700 dark:text-rose-400" /> Meat & Poultry</span>;
+        return <span className="inline-flex items-center gap-1 text-xs font-bold text-teal-800 dark:text-teal-400"><Carrot className="h-3.5 w-3.5 text-teal-700 dark:text-teal-400" /> Vegetables</span>;
     }
   };
 
@@ -251,7 +228,7 @@ export default function InventoryHealthTable({ items = [], zones = [], onRefresh
           <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-500 dark:text-slate-400" />
           <input
             type="text"
-            placeholder="Search fruit, veg, meat or batch code..."
+            placeholder="Search fruit, vegetable or batch code..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full bg-white dark:bg-slate-900 border border-[#c6d7cd] dark:border-slate-700 rounded-xl pl-9 pr-3 py-2 text-xs text-slate-900 dark:text-white font-medium placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-emerald-600 shadow-sm"
@@ -260,7 +237,7 @@ export default function InventoryHealthTable({ items = [], zones = [], onRefresh
 
         {/* Category Quick Filter */}
         <div className="sm:col-span-5 flex items-center gap-1.5 overflow-x-auto">
-          {["all", "fruits", "vegetables", "dairy", "fish", "meat"].map(cat => (
+          {["all", "fruits", "vegetables"].map(cat => (
             <button
               key={cat}
               onClick={() => setSelectedCategory(cat)}
@@ -440,9 +417,6 @@ export default function InventoryHealthTable({ items = [], zones = [], onRefresh
                   >
                     <option value="Fruits">Fruits</option>
                     <option value="Vegetables">Vegetables</option>
-                    <option value="Dairy">Dairy</option>
-                    <option value="Fish">Fish & Seafood</option>
-                    <option value="Meat">Meat & Poultry</option>
                   </select>
                 </div>
 
@@ -540,9 +514,6 @@ export default function InventoryHealthTable({ items = [], zones = [], onRefresh
                   >
                     <option value="Fruits">Fruits</option>
                     <option value="Vegetables">Vegetables</option>
-                    <option value="Dairy">Dairy</option>
-                    <option value="Fish">Fish & Seafood</option>
-                    <option value="Meat">Meat & Poultry</option>
                   </select>
                 </div>
 

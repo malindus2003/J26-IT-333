@@ -11,9 +11,6 @@ import {
   Sparkles, 
   Apple, 
   Carrot, 
-  Milk, 
-  Fish, 
-  Beef,
   Clock,
   Hourglass,
   TrendingDown
@@ -23,11 +20,11 @@ import axios from 'axios';
 const QUICK_PRESETS = [
   { name: "Fresh Strawberries", category: "Fruits", temp: 9.5, humidity: 91, nh3: 0.04, co2: 1050, voc: 0.52, hours: 80, dis: 20, mould: false },
   { name: "Cavendish Bananas", category: "Fruits", temp: 9.0, humidity: 88, nh3: 0.03, co2: 980, voc: 0.48, hours: 90, dis: 25, mould: false },
+  { name: "Karthakolomban Mango", category: "Fruits", temp: 11.5, humidity: 89, nh3: 0.02, co2: 820, voc: 0.75, hours: 60, dis: 10, mould: false },
   { name: "Romaine Lettuce", category: "Vegetables", temp: 5.0, humidity: 90, nh3: 0.04, co2: 600, voc: 0.20, hours: 40, dis: 5, mould: false },
   { name: "Baby Spinach Leaves", category: "Vegetables", temp: 5.8, humidity: 92, nh3: 0.06, co2: 740, voc: 0.35, hours: 75, dis: 22, mould: false },
-  { name: "Pasteurized Milk", category: "Dairy", temp: 3.2, humidity: 66, nh3: 0.04, co2: 420, voc: 0.10, hours: 48, dis: 2, mould: false },
-  { name: "Fresh Chicken Breast", category: "Meat", temp: 4.1, humidity: 79, nh3: 0.32, co2: 580, voc: 0.38, hours: 64, dis: 15, mould: false },
-  { name: "Yellowfin Tuna", category: "Fish", temp: 1.1, humidity: 86, nh3: 0.08, co2: 440, voc: 0.14, hours: 18, dis: 4, mould: false }
+  { name: "Nuwara Eliya Carrots", category: "Vegetables", temp: 3.6, humidity: 92, nh3: 0.01, co2: 430, voc: 0.12, hours: 120, dis: 2, mould: false },
+  { name: "Local Vine Tomatoes", category: "Vegetables", temp: 12.0, humidity: 85, nh3: 0.05, co2: 1100, voc: 1.20, hours: 55, dis: 18, mould: false }
 ];
 
 export default function MultiModalAssessor({ currentVisionFeatures, selectedZone }) {
@@ -148,7 +145,7 @@ export default function MultiModalAssessor({ currentVisionFeatures, selectedZone
             </span>
           </div>
           <p className="text-[11px] sm:text-xs text-slate-600 dark:text-slate-400 mt-0.5 font-medium">
-            Merges physical gas & climate sensors with visual CV indicators across Fruits, Veg, Dairy, Fish & Meat
+            Merges physical gas & climate sensors with visual CV indicators across Tropical Fruits & Vegetables
           </p>
         </div>
       </div>
@@ -219,11 +216,8 @@ export default function MultiModalAssessor({ currentVisionFeatures, selectedZone
                 onChange={(e) => setCategory(e.target.value)}
                 className="w-full bg-white dark:bg-slate-900 border border-[#c6d7cd] dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white font-bold focus:outline-none focus:border-emerald-600 shadow-sm"
               >
-                <option value="Fruits">Fruits (Bananas, Strawberries, Apples...)</option>
-                <option value="Vegetables">Vegetables (Lettuce, Spinach, Tomatoes...)</option>
-                <option value="Dairy">Dairy (Milk, Cheese, Yogurt...)</option>
-                <option value="Fish">Fish & Seafood (Tuna, Salmon, Prawns...)</option>
-                <option value="Meat">Meat & Poultry (Chicken, Beef, Pork...)</option>
+                <option value="Fruits">Fruits (Mango, Banana, Papaya, Avocado, Pineapple...)</option>
+                <option value="Vegetables">Vegetables (Carrots, Tomatoes, Beans, Spinach, Gotukola...)</option>
               </select>
             </div>
           </div>

@@ -15,9 +15,6 @@ import {
   ShieldAlert, 
   Apple, 
   Carrot, 
-  Milk, 
-  Fish, 
-  Beef,
   Clock,
   Hourglass,
   Calendar,
@@ -35,14 +32,11 @@ import {
 } from 'lucide-react';
 import axios from 'axios';
 
-// Comprehensive high-resolution photographic presets across ALL 5 food categories
+// High-resolution photographic presets for Fruit and Vegetable quality inspection
 // Automatic SVG fallback generator for offline / broken image handling
 const getFallbackSvg = (name, category, icon) => {
-  const bg = category === 'Fruits' ? '%23059669' :
-             category === 'Vegetables' ? '%2310b981' :
-             category === 'Dairy' ? '%230284c7' :
-             category === 'Fish' ? '%230d9488' : '%23e11d48';
-  return `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300" viewBox="0 0 400 300"><rect width="100%" height="100%" fill="${bg}" fill-opacity="0.14"/><text x="50%" y="42%" dominant-baseline="middle" text-anchor="middle" font-size="56">${encodeURIComponent(icon || '🍎')}</text><text x="50%" y="68%" dominant-baseline="middle" text-anchor="middle" font-family="sans-serif" font-size="16" font-weight="bold" fill="%23334155">${encodeURIComponent(name || 'Food Specimen')}</text><text x="50%" y="82%" dominant-baseline="middle" text-anchor="middle" font-family="sans-serif" font-size="12" font-weight="600" fill="%2364748b">${encodeURIComponent(category || 'Perishable')}</text></svg>`;
+  const bg = category === 'Fruits' ? '%23059669' : '%2310b981';
+  return `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300" viewBox="0 0 400 300"><rect width="100%" height="100%" fill="${bg}" fill-opacity="0.14"/><text x="50%" y="42%" dominant-baseline="middle" text-anchor="middle" font-size="56">${encodeURIComponent(icon || '🍎')}</text><text x="50%" y="68%" dominant-baseline="middle" text-anchor="middle" font-family="sans-serif" font-size="16" font-weight="bold" fill="%23334155">${encodeURIComponent(name || 'Food Specimen')}</text><text x="50%" y="82%" dominant-baseline="middle" text-anchor="middle" font-family="sans-serif" font-size="12" font-weight="600" fill="%2364748b">${encodeURIComponent(category || 'Produce')}</text></svg>`;
 };
 
 const SAMPLE_PRESETS = [
@@ -228,232 +222,6 @@ const SAMPLE_PRESETS = [
     ],
     bounding_boxes: [
       { label: "SOFTENING TISSUE", type: "overripe", x: 28, y: 25, width: 48, height: 50, color: "#f59e0b" }
-    ]
-  },
-
-  // 3. Dairy (3 presets: Mouldy Cheese, Fresh Milk, Curdled Sour Cream)
-  {
-    id: "cheese_mouldy",
-    name: "Mouldy Aged Cheese",
-    category: "Dairy",
-    icon: "🧀",
-    container: "Container #C-302 (Dairy Fridge)",
-    imageUrl: "/images/specimens/cheese_mouldy.jpg",
-    remoteFallbackUrl: "https://images.unsplash.com/photo-1452195100486-9cc805987862?w=600&auto=format&fit=crop&q=80",
-    ripeness_stage: "Spoiled / Sour",
-    ripeness_percent: 95,
-    visual_spoilage_score: 88,
-    risk_level: "Critical",
-    discoloration_score: 30,
-    mould_detected: true,
-    mould_coverage: 16.0,
-    texture_degradation: 45,
-    baseline_shelf_life_hours: 168.0,
-    remaining_shelf_life_hours: 0.0,
-    detected_defects: [
-      "Uncontrolled surface fungal mycelium",
-      "Yellow curd acidification"
-    ],
-    bounding_boxes: [
-      { label: "FUNGAL MYCELIUM PATCH", type: "spoilage", x: 30, y: 30, width: 42, height: 40, color: "#ef4444" }
-    ]
-  },
-  {
-    id: "milk_fresh",
-    name: "Fresh Whole Milk",
-    category: "Dairy",
-    icon: "🥛",
-    container: "Container #C-301 (Dairy Fridge)",
-    imageUrl: "/images/specimens/milk_fresh.jpg",
-    remoteFallbackUrl: "https://images.unsplash.com/photo-1550583724-b2692b85b150?w=600&auto=format&fit=crop&q=80",
-    ripeness_stage: "Optimal Fresh",
-    ripeness_percent: 25,
-    visual_spoilage_score: 6,
-    risk_level: "Low",
-    discoloration_score: 1,
-    mould_detected: false,
-    mould_coverage: 0.0,
-    texture_degradation: 2,
-    baseline_shelf_life_hours: 168.0,
-    remaining_shelf_life_hours: 142.0,
-    detected_defects: [],
-    bounding_boxes: [
-      { label: "STABLE LACTIC HOMOGENEITY", type: "fresh", x: 20, y: 20, width: 60, height: 60, color: "#10b981" }
-    ]
-  },
-  {
-    id: "yogurt_curdled",
-    name: "Curdled Sour Cream / Milk",
-    category: "Dairy",
-    icon: "🥣",
-    container: "Container #C-304 (Dairy Fridge)",
-    imageUrl: "/images/specimens/yogurt_curdled.jpg",
-    remoteFallbackUrl: "https://images.unsplash.com/photo-1488477181946-6428a0291777?w=600&auto=format&fit=crop&q=80",
-    ripeness_stage: "Curdled / Sour Spoilage",
-    ripeness_percent: 92,
-    visual_spoilage_score: 84,
-    risk_level: "Critical",
-    discoloration_score: 28,
-    mould_detected: false,
-    mould_coverage: 0.0,
-    texture_degradation: 60,
-    baseline_shelf_life_hours: 96.0,
-    remaining_shelf_life_hours: 0.0,
-    detected_defects: [
-      "Severe whey syneresis & casein curd separation",
-      "Lactic acidification coagulum breakdown"
-    ],
-    bounding_boxes: [
-      { label: "CASEIN CURDLING SEPARATION", type: "spoilage", x: 25, y: 30, width: 50, height: 45, color: "#ef4444" }
-    ]
-  },
-
-  // 4. Fish & Seafood (3 presets: Fresh Salmon, Spoiled Tuna, Fresh Prawns)
-  {
-    id: "salmon_fresh",
-    name: "Fresh Atlantic Salmon",
-    category: "Fish",
-    icon: "🐟",
-    container: "Container #C-501 (Seafood Ice)",
-    imageUrl: "/images/specimens/salmon_fresh.jpg",
-    remoteFallbackUrl: "https://images.unsplash.com/photo-1519708227418-c8fd9a32b7a2?w=600&auto=format&fit=crop&q=80",
-    ripeness_stage: "Prime Sea-Fresh",
-    ripeness_percent: 30,
-    visual_spoilage_score: 12,
-    risk_level: "Low",
-    discoloration_score: 4,
-    mould_detected: false,
-    mould_coverage: 0.0,
-    texture_degradation: 8,
-    baseline_shelf_life_hours: 48.0,
-    remaining_shelf_life_hours: 38.0,
-    detected_defects: [],
-    bounding_boxes: [
-      { label: "OPTIMAL ASTAXANTHIN TRANSLUCENCY", type: "fresh", x: 22, y: 20, width: 56, height: 60, color: "#10b981" }
-    ]
-  },
-  {
-    id: "tuna_oxidized",
-    name: "Oxidized Grey Tuna Steak",
-    category: "Fish",
-    icon: "🐟",
-    container: "Container #C-503 (Seafood Ice)",
-    imageUrl: "/images/specimens/tuna_oxidized.jpg",
-    remoteFallbackUrl: "https://images.unsplash.com/photo-1534422298391-e4f8c172dddb?w=600&auto=format&fit=crop&q=80",
-    ripeness_stage: "Oxidized / Bacterial Spoilage",
-    ripeness_percent: 94,
-    visual_spoilage_score: 88,
-    risk_level: "Critical",
-    discoloration_score: 46,
-    mould_detected: false,
-    mould_coverage: 0.0,
-    texture_degradation: 68,
-    baseline_shelf_life_hours: 48.0,
-    remaining_shelf_life_hours: 0.0,
-    detected_defects: [
-      "Deep myoglobin oxidation (grey-brown coloration)",
-      "Volatile amine off-odour breakdown",
-      "Muscle tissue softening & slime formation"
-    ],
-    bounding_boxes: [
-      { label: "TMA DECOMPOSITION SPOT", type: "spoilage", x: 26, y: 30, width: 48, height: 42, color: "#ef4444" }
-    ]
-  },
-  {
-    id: "prawns_fresh",
-    name: "Fresh Sea King Prawns",
-    category: "Fish",
-    icon: "🦐",
-    container: "Container #C-502 (Seafood Ice)",
-    imageUrl: "/images/specimens/prawns_fresh.jpg",
-    remoteFallbackUrl: "https://images.unsplash.com/photo-1565680018434-b513d5e5fd47?w=600&auto=format&fit=crop&q=80",
-    ripeness_stage: "Prime Sea-Fresh",
-    ripeness_percent: 28,
-    visual_spoilage_score: 10,
-    risk_level: "Low",
-    discoloration_score: 2,
-    mould_detected: false,
-    mould_coverage: 0.0,
-    texture_degradation: 5,
-    baseline_shelf_life_hours: 48.0,
-    remaining_shelf_life_hours: 40.0,
-    detected_defects: [],
-    bounding_boxes: [
-      { label: "FIRM TRANSLUCENT EXOSKELETON", type: "fresh", x: 20, y: 22, width: 60, height: 56, color: "#10b981" }
-    ]
-  },
-
-  // 5. Meat & Poultry (3 presets: Prime Beef, Fresh Chicken, Oxidized Meat)
-  {
-    id: "beef_fresh",
-    name: "Fresh Beef Sirloin",
-    category: "Meat",
-    icon: "🥩",
-    container: "Container #C-401 (Meat Chiller)",
-    imageUrl: "/images/specimens/beef_fresh.jpg",
-    remoteFallbackUrl: "https://images.unsplash.com/photo-1603048588665-791ca8aea617?w=600&auto=format&fit=crop&q=80",
-    ripeness_stage: "Fresh Cut (Optimal)",
-    ripeness_percent: 35,
-    visual_spoilage_score: 14,
-    risk_level: "Low",
-    discoloration_score: 5,
-    mould_detected: false,
-    mould_coverage: 0.0,
-    texture_degradation: 10,
-    baseline_shelf_life_hours: 96.0,
-    remaining_shelf_life_hours: 76.0,
-    detected_defects: [],
-    bounding_boxes: [
-      { label: "HEALTHY OXYMYOGLOBIN RED", type: "fresh", x: 25, y: 25, width: 50, height: 50, color: "#10b981" }
-    ]
-  },
-  {
-    id: "chicken_fresh",
-    name: "Raw Fresh Chicken Breast",
-    category: "Meat",
-    icon: "🍗",
-    container: "Container #C-402 (Meat Chiller)",
-    imageUrl: "/images/specimens/chicken_fresh.jpg",
-    remoteFallbackUrl: "https://images.unsplash.com/photo-1604503468506-a8da13d82791?w=600&auto=format&fit=crop&q=80",
-    ripeness_stage: "Prime Fresh Cut",
-    ripeness_percent: 30,
-    visual_spoilage_score: 12,
-    risk_level: "Low",
-    discoloration_score: 3,
-    mould_detected: false,
-    mould_coverage: 0.0,
-    texture_degradation: 6,
-    baseline_shelf_life_hours: 72.0,
-    remaining_shelf_life_hours: 58.0,
-    detected_defects: [],
-    bounding_boxes: [
-      { label: "HEALTHY PINK FLESH TURGOR", type: "fresh", x: 22, y: 20, width: 56, height: 60, color: "#10b981" }
-    ]
-  },
-  {
-    id: "meat_oxidized",
-    name: "Oxidized Discolored Meat",
-    category: "Meat",
-    icon: "🍖",
-    container: "Container #C-403 (Meat Chiller)",
-    imageUrl: "/images/specimens/meat_oxidized.jpg",
-    remoteFallbackUrl: "https://images.unsplash.com/photo-1544025162-d76694265947?w=600&auto=format&fit=crop&q=80",
-    ripeness_stage: "Oxidized / High Spoilage Risk",
-    ripeness_percent: 90,
-    visual_spoilage_score: 80,
-    risk_level: "High",
-    discoloration_score: 44,
-    mould_detected: false,
-    mould_coverage: 0.0,
-    texture_degradation: 55,
-    baseline_shelf_life_hours: 96.0,
-    remaining_shelf_life_hours: 8.5,
-    detected_defects: [
-      "Metmyoglobin surface discoloration (dull grey/brown)",
-      "Aerobic bacterial slime degradation"
-    ],
-    bounding_boxes: [
-      { label: "OXIDATIVE BROWNING", type: "spoilage", x: 24, y: 28, width: 55, height: 48, color: "#ef4444" }
     ]
   }
 ];
@@ -641,10 +409,7 @@ export default function VisionInspector({ onInspectionComplete }) {
   const computeRemainingShelfLife = (val, category, isMould) => {
     const baselines = {
       "Fruits": 120.0,
-      "Vegetables": 96.0,
-      "Meat": 96.0,
-      "Fish": 48.0,
-      "Dairy": 168.0
+      "Vegetables": 96.0
     };
     const baseline = baselines[category] || 120.0;
 
@@ -785,7 +550,7 @@ export default function VisionInspector({ onInspectionComplete }) {
         <div>
           <h2 className="text-lg font-extrabold text-slate-900 dark:text-white">Container Optical Scanner & Ripeness Assessor</h2>
           <p className="text-xs text-slate-600 dark:text-slate-400 mt-1 font-semibold">
-            Photographic inspection across Fruits, Vegetables, Dairy, Fish & Meat with Remaining Shelf-Life Prediction
+            Photographic inspection across Fruits & Vegetables with Remaining Shelf-Life Prediction
           </p>
         </div>
 
@@ -902,7 +667,7 @@ export default function VisionInspector({ onInspectionComplete }) {
               {specimenDropdownOpen && (
                 <div className="absolute right-0 mt-2 w-72 sm:w-84 max-h-96 overflow-y-auto rounded-2xl bg-white/98 dark:bg-slate-900/98 backdrop-blur-2xl border border-slate-200 dark:border-slate-800 shadow-2xl p-2 z-50 space-y-1 animate-fade-in no-scrollbar">
                   <div className="px-3 py-1.5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
-                    <span className="text-[10px] uppercase font-black text-slate-400 tracking-wider">All 15 Food Presets</span>
+                    <span className="text-[10px] uppercase font-black text-slate-400 tracking-wider">Fruit & Vegetable Specimens</span>
                     <span className="text-[10px] text-emerald-700 dark:text-emerald-400 font-bold">Organized by Category</span>
                   </div>
                   {SAMPLE_PRESETS.map((preset) => {
@@ -979,7 +744,7 @@ export default function VisionInspector({ onInspectionComplete }) {
                 type="text"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Search food item (e.g. banana, salmon, spinach, milk)..."
+                placeholder="Search produce item (e.g. banana, spinach, mango, tomato)..."
                 className="w-full pl-8.5 pr-8 py-1.5 sm:py-2 text-xs rounded-xl bg-white dark:bg-slate-900 border border-[#c6d7cd] dark:border-slate-700 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-emerald-600 shadow-2xs font-medium"
               />
               {searchTerm && (
@@ -1018,15 +783,12 @@ export default function VisionInspector({ onInspectionComplete }) {
             </div>
           </div>
 
-          {/* 5-Category Filter Tabs */}
+          {/* Category Filter Tabs (Fruits & Vegetables Only) */}
           <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
             {[
-              { id: "all", label: "All Categories (15)", icon: null },
-              { id: "fruits", label: "Fruits (3)", icon: <Apple className="h-3 w-3" /> },
+              { id: "all", label: "All Produce (7)", icon: null },
+              { id: "fruits", label: "Fruits (4)", icon: <Apple className="h-3 w-3" /> },
               { id: "vegetables", label: "Vegetables (3)", icon: <Carrot className="h-3 w-3" /> },
-              { id: "dairy", label: "Dairy (3)", icon: <Milk className="h-3 w-3" /> },
-              { id: "fish", label: "Fish & Seafood (3)", icon: <Fish className="h-3 w-3" /> },
-              { id: "meat", label: "Meat & Poultry (3)", icon: <Beef className="h-3 w-3" /> },
             ].map((cat) => (
               <button
                 key={cat.id}

@@ -8,7 +8,7 @@ router = APIRouter(prefix="/api/vision", tags=["Computer Vision Inspection"])
 @router.post("/inspect")
 async def inspect_food_image(
     file: Optional[UploadFile] = File(None),
-    category: str = Form("Meat"),
+    category: str = Form("Fruits"),
     image_base64: Optional[str] = Form(None)
 ):
     """

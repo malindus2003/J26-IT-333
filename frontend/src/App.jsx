@@ -44,9 +44,9 @@ const SPOILAGE_SUBPARTS = [
     id: 'sensors',
     title: 'Storage Zone IoT Telemetry',
     shortTitle: 'Chamber IoT Telemetry',
-    description: 'Real-time NH3, CO2, VOC, humidity and temperature monitoring across 5 storage chambers',
+    description: 'Real-time NH3, CO2, VOC, humidity and temperature monitoring across 4 fruit & vegetable chambers',
     icon: Activity,
-    badge: '5 Storage Chambers',
+    badge: '4 Storage Chambers',
     badgeColor: 'bg-teal-100 dark:bg-teal-950/60 text-teal-900 dark:text-teal-300 border-teal-300 dark:border-teal-700'
   },
   {
@@ -299,7 +299,7 @@ export default function App() {
                     Perishable Inventory & Stock Valuation Matrix
                   </h2>
                   <p className="text-xs text-slate-600 dark:text-slate-300 mt-1 font-medium max-w-2xl leading-relaxed">
-                    Continuous monitoring of perishable food batches across 5 temperature-controlled chambers (Fruits, Veg, Dairy, Fish, Meat) with automated Smart FIFO consumption for orders.
+                    Continuous monitoring of perishable produce batches across 4 climate-controlled chambers (Fruits & Vegetables) with automated Smart FIFO consumption for orders.
                   </p>
                 </div>
               </div>
@@ -309,7 +309,7 @@ export default function App() {
                 <div className="p-3.5 rounded-xl bg-[#f8faf9] dark:bg-slate-800/80 border border-[#d1ded5] dark:border-slate-700">
                   <span className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400 block">Total Active Batches</span>
                   <div className="text-2xl font-black text-slate-900 dark:text-white mt-0.5">{inventoryItems.length}</div>
-                  <span className="text-[10px] text-emerald-700 dark:text-emerald-400 font-bold">Monitored 24/7 across 5 chambers</span>
+                  <span className="text-[10px] text-emerald-700 dark:text-emerald-400 font-bold">Monitored 24/7 across 4 chambers</span>
                 </div>
 
                 <div className="p-3.5 rounded-xl bg-[#f8faf9] dark:bg-slate-800/80 border border-[#d1ded5] dark:border-slate-700">

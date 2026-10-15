@@ -13,7 +13,7 @@ export default function ESP32Simulator({ zones, onTelemetrySent, isDarkMode }) {
   const [sending, setSending] = useState(false);
   const [packetLogs, setPacketLogs] = useState([
     { id: 1, time: "10:14:22", zone: "Zone 1 (Fruits)", payload: "T:9.2°C, H:91%, CO2:980ppm", status: "200 OK" },
-    { id: 2, time: "10:14:32", zone: "Zone 4 (Meat)", payload: "T:3.8°C, H:78%, NH3:0.28ppm", status: "200 OK" },
+    { id: 2, time: "10:14:32", zone: "Zone 2 (Vegetables)", payload: "T:4.8°C, H:88%, CO2:720ppm", status: "200 OK" },
   ]);
 
   const handleSendTelemetry = async (customPayload = null) => {

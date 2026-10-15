@@ -58,20 +58,6 @@ STORAGE_ZONES = [
         "voc": 1.45,
         "status": "warning",
         "description": "Tropical kitchen ambient rack for daily kitchen prep crates (High thermal respiration)"
-    },
-    {
-        "id": "zone-meat",
-        "name": "Zone 5: Walk-In Poultry & Meat Chiller (1.5\u00b0C)",
-        "category": "Meat",
-        "target_temp": 1.5,
-        "current_temp": 2.1,
-        "target_humidity": 75.0,
-        "current_humidity": 76.5,
-        "nh3": 0.12,
-        "co2": 480.0,
-        "voc": 0.22,
-        "status": "optimal",
-        "description": "Chilled storage for fresh broiler chicken cuts and local beef"
     }
 ]
 
@@ -334,54 +320,6 @@ INITIAL_INVENTORY: List[Dict[str, Any]] = [
         "stock_valuation_lkr": 3750.0,
         "is_smart_fifo_target": False,
         "recommendation": "Spicy capsaicin retention and deep green gloss intact."
-    },
-    {
-        "id": "inv-sl-012",
-        "name": "Pasteurized Fresh Buffalo Curd & Milk",
-        "category": "Dairy",
-        "storage_zone": "Zone 3: Root & Solid Vegetable Vault (3.5\u00b0C)",
-        "batch_number": "SL-DY-CRD-301",
-        "quantity": "25.0 L",
-        "stored_at": "2026-10-12 06:53",
-        "storage_duration_hours": 30.0,
-        "current_temp": 3.4,
-        "current_humidity": 70.0,
-        "current_nh3": 0.018,
-        "current_co2": 410.0,
-        "voc": 0.1,
-        "current_voc": 0.1,
-        "spoilage_prob": 10.0,
-        "remaining_shelf_life_hours": 120.0,
-        "risk_level": "Low",
-        "status": "Fresh",
-        "origin_region": "Polonnaruwa / Meemure, Sri Lanka",
-        "stock_valuation_lkr": 16250.0,
-        "is_smart_fifo_target": False,
-        "recommendation": "Thick curd clot structure intact. Serve with Kithul treacle."
-    },
-    {
-        "id": "inv-sl-013",
-        "name": "Fresh Broiler Chicken Breast Cuts",
-        "category": "Meat",
-        "storage_zone": "Zone 5: Walk-In Poultry & Meat Chiller (1.5\u00b0C)",
-        "batch_number": "SL-MT-CHK-401",
-        "quantity": "30.0 kg",
-        "stored_at": "2026-10-12 12:53",
-        "storage_duration_hours": 24.0,
-        "current_temp": 1.8,
-        "current_humidity": 76.0,
-        "current_nh3": 0.08,
-        "current_co2": 460.0,
-        "voc": 0.18,
-        "current_voc": 0.18,
-        "spoilage_prob": 12.0,
-        "remaining_shelf_life_hours": 68.0,
-        "risk_level": "Low",
-        "status": "Fresh",
-        "origin_region": "Ceylon Agricoop / Kurunegala",
-        "stock_valuation_lkr": 55500.0,
-        "is_smart_fifo_target": False,
-        "recommendation": "Pink flesh tone & firm muscle elasticity. Ideal for grill and curries."
     }
 ]
 
