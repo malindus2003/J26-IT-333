@@ -167,9 +167,8 @@ export default function LoginScreen({ onLoginSuccess, isDarkMode, onToggleTheme 
             
             {/* Email Field */}
             <div className="space-y-1.5">
-              <label className="text-xs font-extrabold uppercase tracking-wider text-slate-600 dark:text-slate-300 flex items-center justify-between">
-                <span>Email Address</span>
-                <span className="text-[10px] text-slate-400 lowercase font-medium">e.g. admin@gmail.com</span>
+              <label className="text-xs font-extrabold uppercase tracking-wider text-slate-600 dark:text-slate-300 block">
+                Email Address
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
@@ -179,7 +178,7 @@ export default function LoginScreen({ onLoginSuccess, isDarkMode, onToggleTheme 
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="Enter authorized email"
+                  placeholder="Enter your email"
                   required
                   className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all placeholder:text-slate-400"
                 />
@@ -188,9 +187,8 @@ export default function LoginScreen({ onLoginSuccess, isDarkMode, onToggleTheme 
 
             {/* Password Field */}
             <div className="space-y-1.5">
-              <label className="text-xs font-extrabold uppercase tracking-wider text-slate-600 dark:text-slate-300 flex items-center justify-between">
-                <span>Password</span>
-                <span className="text-[10px] text-slate-400 lowercase font-medium">e.g. admin@123</span>
+              <label className="text-xs font-extrabold uppercase tracking-wider text-slate-600 dark:text-slate-300 block">
+                Password
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
