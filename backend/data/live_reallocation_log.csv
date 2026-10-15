@@ -43,3 +43,4 @@ Timestamp,Event_Phase,Station,Queue_Length,Action_Taken,Chef_Involved,Previous_S
 2026-10-15 04:53:03 PM,T. Silva,Prep Station,Grill,🥩 GRILL & PROTEIN LINE SYNC: Station 2 (Grill) requires +1 Prep Cook for forecasted dinner protein orders (18.2 load).,SUCCESS
 2026-10-15 08:21:22 PM,Chef Samantha,Off-Duty (Morning Shift),Grill,Night workload surge on-call relief for Grill (5★ skill),SUCCESS
 2026-10-15 08:24:42 PM,Chef Dinesh (Float - Senior),Off-Duty (Morning Shift),Hot Kitchen,Night workload surge on-call relief for Hot Kitchen (4★ skill),SUCCESS
+2026-10-15 09:54:27 PM,Chef Ruwan (Float Specialist),Prep Station,Pizza,Test surge reallocation,SUCCESS

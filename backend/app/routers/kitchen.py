@@ -500,11 +500,15 @@ def get_workload_forecast() -> List[Dict[str, Any]]:
         {"hour": "21:00", "predicted_orders": 52, "staff_required": 5, "actual_staff": 6}
     ]
 
+# In-memory tracking of reallocation counts to ensure fair round-robin rotation across all 30 staff members
+staff_reallocation_history_counts: Dict[str, int] = {}
+
 def analyze_incoming_dish_types_and_recommend_staff() -> Dict[str, Any]:
     """
     Analyzes active incoming order items in the KDS, maps dishes to stations,
     detects station load surges (e.g. 10 pizza orders at Pizza station with 3 cooks),
-    and recommends qualified staff members based on their station skill ratings.
+    and recommends qualified staff members dynamically from the full staff roster
+    with fair-share rotation, role prioritization, and executive chef protection.
     """
     from .orders import orders_db
     
@@ -561,6 +565,7 @@ def analyze_incoming_dish_types_and_recommend_staff() -> Dict[str, Any]:
     
     surge_alerts = []
     recommended_reallocations = []
+    claimed_staff_in_cycle = set()
     
     for st_name, counts in station_dish_counts.items():
         curr_cooks = max(1, default_cooks_map[st_name] + station_cook_adjustments.get(st_name, 0))
@@ -577,33 +582,80 @@ def analyze_incoming_dish_types_and_recommend_staff() -> Dict[str, Any]:
             
             candidates = []
             for s in all_staff:
+                s_id = s.get("id") or s.get("emp_id")
+                staff_name = s.get("name", "")
                 curr_assigned = s.get("assigned_station", "")
+                
+                # 1. Never reallocate staff already assigned to this station
                 if st_name.lower() in curr_assigned.lower():
                     continue
-                if s.get("isReallocated") and s.get("reallocatedTo") == st_name:
+                # 2. Never reallocate staff who are already actively reallocated
+                if s.get("isReallocated"):
+                    continue
+                # 3. Never double-assign a staff member who was already recommended for another station in this surge cycle
+                if s_id in claimed_staff_in_cycle or staff_name in claimed_staff_in_cycle:
                     continue
                 
-                skill_score = int(s.get(skill_col, 3))
+                skill_score = int(s.get(skill_col, 0))
                 if skill_score >= 3:
-                    source_st = "Cold Salad"
+                    source_st = "Grill"
                     for sn in default_cooks_map.keys():
                         if sn.lower() in curr_assigned.lower():
                             source_st = sn
                             break
                     source_workload = station_dish_counts.get(source_st, {}).get("pending", 0)
+                    # If source station is heavily overloaded, don't strip cooks from it
+                    if station_dish_counts.get(source_st, {}).get("pending", 0) >= 4:
+                        continue
+                    
+                    is_float = "float" in staff_name.lower() or "float" in str(s.get("role", "")).lower()
+                    is_exec = any(k in staff_name.lower() for k in ["head chef", "senior sous chef", "executive"])
+                    clean_name = staff_name.split('(')[0].strip()
+                    prev_allocs = staff_reallocation_history_counts.get(staff_name, 0) + \
+                                  staff_reallocation_history_counts.get(clean_name, 0) + \
+                                  staff_reallocation_history_counts.get(s_id, 0)
+                    
+                    # Dynamic Suitability Formula:
+                    # 1. Base skill (weight: 20 per star)
+                    # 2. Float specialist boost (+18) -> Designated line-balancing floaters
+                    # 3. Efficiency boost (eff / 10)
+                    # 4. Source workload penalty (-8 per order)
+                    # 5. Fair rotation penalty (-30 per previous reallocation) -> automatically cycles through the 30 staff members!
+                    # 6. Executive protection penalty (-45) -> Prevents Head Chef Kamal & Senior Sous Chef Nimal from being constantly assigned when line chefs are available
+                    suitability = (skill_score * 20) \
+                                + (18 if is_float else 0) \
+                                + (int(s.get("efficiency_rating", 75)) / 10.0) \
+                                - (source_workload * 8) \
+                                - (prev_allocs * 30) \
+                                - (45 if is_exec else 0)
                     
                     candidates.append({
                         "staff": s,
                         "source_station": source_st,
                         "source_workload": source_workload,
                         "skill_score": skill_score,
-                        "efficiency": int(s.get("efficiency_rating", 80))
+                        "efficiency": int(s.get("efficiency_rating", 80)),
+                        "suitability": suitability,
+                        "is_float": is_float,
+                        "is_exec": is_exec
                     })
             
-            candidates.sort(key=lambda c: (-c["skill_score"], c["source_workload"], -c["efficiency"]))
-            selected_candidates = candidates[:needed_cooks]
-            staff_recs_for_st = []
+            candidates.sort(key=lambda c: -c["suitability"])
             
+            # Offer up to 3 distinct qualified candidates from the real staff dataset
+            display_count = max(needed_cooks, min(3, len(candidates)))
+            selected_candidates = candidates[:display_count]
+            
+            # Claim the top needed_cooks so other stations get DIFFERENT staff!
+            for cand in selected_candidates[:needed_cooks]:
+                s_obj = cand["staff"]
+                if s_obj.get("id") or s_obj.get("emp_id"):
+                    claimed_staff_in_cycle.add(s_obj.get("id") or s_obj.get("emp_id"))
+                if s_obj.get("name"):
+                    claimed_staff_in_cycle.add(s_obj.get("name"))
+                    claimed_staff_in_cycle.add(s_obj.get("name").split('(')[0].strip())
+            
+            staff_recs_for_st = []
             for cand in selected_candidates:
                 s_obj = cand["staff"]
                 staff_name = s_obj.get("name")
@@ -1136,6 +1188,11 @@ def execute_reallocation(payload: ReallocationRequest):
         "reason": payload.reason,
         "timestamp": timestamp
     }
+    
+    # Record rotation history count to ensure continuous rotation across all 30 staff members
+    staff_reallocation_history_counts[target_staff] = staff_reallocation_history_counts.get(target_staff, 0) + 1
+    clean_target = target_staff.split('(')[0].strip()
+    staff_reallocation_history_counts[clean_target] = staff_reallocation_history_counts.get(clean_target, 0) + 1
     
     # Locate live_reallocation_log.csv path
     log_path = os.path.join(BACKEND_DIR, "data", "live_reallocation_log.csv")

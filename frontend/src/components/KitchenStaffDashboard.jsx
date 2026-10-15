@@ -61,6 +61,16 @@ export default function KitchenStaffDashboard({
   const [simulatedStaffEmpId, setSimulatedStaffEmpId] = useState('EMP30'); // Trainee Kaveen
   const [staffSearchQuery, setStaffSearchQuery] = useState("");
   const [staffStationFilter, setStaffStationFilter] = useState("all");
+  // --- Dynamic Staff Reallocation Rotation & Fair-Share Pool State ---
+  const [staffReallocationHistory, setStaffReallocationHistory] = useState(() => {
+    try {
+      const saved = localStorage.getItem('kds_staff_reallocation_history');
+      return saved ? JSON.parse(saved) : {};
+    } catch (e) {
+      return {};
+    }
+  });
+  const [candidateRotationOffsets, setCandidateRotationOffsets] = useState({});
   const [proactiveScheduleActive, setProactiveScheduleActive] = useState(false);
   const [proactiveRosterList, setProactiveRosterList] = useState([]);
   const [simulatingSurge, setSimulatingSurge] = useState(false);
@@ -1313,6 +1323,7 @@ export default function KitchenStaffDashboard({
     const allStaff = data?.staff || [];
     const staffDirectivesMap = new Map();
     const surgeAlertsList = [];
+    const claimedStaffInCycle = new Set();
 
     stationNames.forEach(st => {
       if (stabilizedStations.has(st)) {
@@ -1342,13 +1353,20 @@ export default function KitchenStaffDashboard({
 
         const candidates = [];
         allStaff.forEach(s => {
+          const sId = s.id || s.emp_id;
+          const sName = s.name || "";
           const assigned = (s.assigned_station || "").toLowerCase();
-          if (assigned.includes(st.toLowerCase())) return;
-          if (s.isReallocated && (s.reallocatedTo || "").toLowerCase().includes(st.toLowerCase())) return;
 
-          const skillScore = Number(s[skillCol]) || 3;
+          // 1. Never reallocate staff already assigned to this station
+          if (assigned.includes(st.toLowerCase())) return;
+          // 2. Never reallocate staff who are already actively reallocated to another station
+          if (s.isReallocated) return;
+          // 3. Never double-assign a staff member who was already recommended for another station in this surge cycle
+          if (claimedStaffInCycle.has(sId) || claimedStaffInCycle.has(sName) || claimedStaffInCycle.has(sName.split('(')[0].trim())) return;
+
+          const skillScore = Number(s[skillCol]) || 0;
           if (skillScore >= 3) {
-            let fromSt = "Cold Salad";
+            let fromSt = "Grill";
             for (const sn of stationNames) {
               if (assigned.includes(sn.toLowerCase())) {
                 fromSt = sn;
@@ -1356,24 +1374,63 @@ export default function KitchenStaffDashboard({
               }
             }
             const sourcePending = stats[fromSt]?.pendingDishes || 0;
+            // If the source station is heavily overloaded, do not strip cooks from it
+            if (stats[fromSt]?.isOverloaded && sourcePending >= 4) return;
+
+            const isFloat = sName.toLowerCase().includes("float") || (s.role || "").toLowerCase().includes("float");
+            const isExecutive = sName.toLowerCase().includes("head chef") || sName.toLowerCase().includes("senior sous chef") || (s.role || "").toLowerCase().includes("executive");
+            const cleanName = sName.split('(')[0].trim();
+            const prevAllocs = Number(staffReallocationHistory[sId] || staffReallocationHistory[sName] || staffReallocationHistory[cleanName] || 0);
+
+            // Dynamic Suitability Score:
+            // 1. Base skill (weight: 20 per star)
+            // 2. Float specialist boost (+18) -> Designated line-balancing floaters
+            // 3. Efficiency bonus (efficiency / 10)
+            // 4. Source workload penalty (-8 per order)
+            // 5. Fair rotation penalty (-30 per previous reallocation) -> automatically cycles through the 30 staff members!
+            // 6. Executive protection penalty (-45) -> Prevents Head Chef Kamal & Senior Sous Chef Nimal from being constantly assigned when line chefs are available
+            const suitabilityScore = (skillScore * 20)
+              + (isFloat ? 18 : 0)
+              + ((Number(s.efficiency_rating) || 75) / 10)
+              - (sourcePending * 8)
+              - (prevAllocs * 30)
+              - (isExecutive ? 45 : 0);
 
             candidates.push({
               staff: s,
               skillScore,
               fromStation: fromSt,
               sourceWorkload: sourcePending,
-              efficiency: Number(s.efficiency_rating) || 80
+              efficiency: Number(s.efficiency_rating) || 80,
+              isFloat,
+              isExecutive,
+              suitabilityScore
             });
           }
         });
 
-        candidates.sort((a, b) => {
-          if (b.skillScore !== a.skillScore) return b.skillScore - a.skillScore;
-          if (a.sourceWorkload !== b.sourceWorkload) return a.sourceWorkload - b.sourceWorkload;
-          return b.efficiency - a.efficiency;
+        candidates.sort((a, b) => b.suitabilityScore - a.suitabilityScore);
+
+        // Apply rotation offset if manager clicked [Rotate Candidate]
+        const rotOffset = (candidateRotationOffsets[st] || 0) % Math.max(1, candidates.length);
+        const rotatedCandidates = candidates.length > 0
+          ? [...candidates.slice(rotOffset), ...candidates.slice(0, rotOffset)]
+          : [];
+
+        // Offer up to 2-3 distinct qualified candidates from the real staff dataset
+        const displayCount = Math.max(neededCooks, Math.min(3, rotatedCandidates.length));
+        const selected = rotatedCandidates.slice(0, displayCount);
+
+        // Claim the primary assigned cooks so other stations in this cycle get DIFFERENT staff!
+        selected.slice(0, neededCooks).forEach(c => {
+          const sObj = c.staff;
+          if (sObj.id || sObj.emp_id) claimedStaffInCycle.add(sObj.id || sObj.emp_id);
+          if (sObj.name) {
+            claimedStaffInCycle.add(sObj.name);
+            claimedStaffInCycle.add(sObj.name.split('(')[0].trim());
+          }
         });
 
-        const selected = candidates.slice(0, neededCooks);
         const dishSummary = Object.entries(stats[st].dishMap)
           .map(([name, count]) => `${count}x ${name}`)
           .join(', ') || `${pendingCount}x incoming dishes`;
@@ -1396,7 +1453,7 @@ export default function KitchenStaffDashboard({
             stationSkillScore: c.skillScore,
             skillRating: c.skillScore,
             skillStars: `${c.skillScore}★`,
-            skillLevel: staffObj.skill_level || "Experienced Specialist",
+            skillLevel: staffObj.skill_level || (c.isFloat ? "Float Specialist" : "Station Chef"),
             efficiency: c.efficiency,
             pendingDishes: pendingCount,
             currentCooks,
@@ -1440,7 +1497,7 @@ export default function KitchenStaffDashboard({
       surgeAlerts: surgeAlertsList,
       staffDirectivesMap
     };
-  }, [liveOrders, dynamicStations, data?.staff, stabilizedStations]);
+  }, [liveOrders, dynamicStations, data?.staff, stabilizedStations, staffReallocationHistory, candidateRotationOffsets]);
 
   // Dynamic AI Staff Allocation Directives Engine: updates in real-time based on station queues & load surges
   const generateDynamicDirectives = (currentStations = [], currentStaff = [], customSurges = [], resolvedSet = new Set(), dishSurgeAlerts = [], stabilizedSet = new Set()) => {
@@ -2006,6 +2063,19 @@ export default function KitchenStaffDashboard({
       return { ...prev, staff: updatedStaff, stations: updatedStations };
     });
 
+    // Update dynamic reallocation fair-share history so candidate automatically rotates to next staff
+    setStaffReallocationHistory(prev => {
+      const updated = {
+        ...prev,
+        [cleanStaffName]: (prev[cleanStaffName] || 0) + 1,
+        [targetStaffName]: (prev[targetStaffName] || 0) + 1
+      };
+      try {
+        localStorage.setItem('kds_staff_reallocation_history', JSON.stringify(updated));
+      } catch (e) { }
+      return updated;
+    });
+
     setDismissedToast(`⚡ Staff Reallocation Executed: ${cleanStaffName} reassigned to ${cleanTo} station! Staff Matrix updated.`);
     setTimeout(() => setDismissedToast(""), 4500);
 
@@ -2014,6 +2084,15 @@ export default function KitchenStaffDashboard({
       fetchKitchenData();
       fetchLiveOrders();
     }, 600);
+  };
+
+  const handleRotateCandidate = (stationName) => {
+    setCandidateRotationOffsets(prev => ({
+      ...prev,
+      [stationName]: (prev[stationName] || 0) + 1
+    }));
+    setDismissedToast(`🔄 Rotated candidate pool for ${stationName}. Displaying next qualified staff from roster.`);
+    setTimeout(() => setDismissedToast(""), 3000);
   };
 
   const handleRevertStaffStation = async (targetStaffName, originalStation) => {
@@ -3170,38 +3249,59 @@ export default function KitchenStaffDashboard({
 
                     {/* Qualified Candidates Recommendation Cards */}
                     <div>
-                      <span className="text-[11px] font-black uppercase text-slate-700 dark:text-slate-300 block mb-2 flex items-center gap-1.5">
-                        <Sparkles className="h-3.5 w-3.5 text-amber-600" />
-                        Qualified Experienced Staff Recommended for Immediate Transfer:
-                      </span>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2.5">
+                        <span className="text-[11px] font-black uppercase text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                          <Sparkles className="h-3.5 w-3.5 text-amber-600" />
+                          Qualified Staff Recommended for Immediate Transfer ({alert.recommendedStaff?.length || 0} Options):
+                        </span>
+                        <button
+                          onClick={() => handleRotateCandidate(targetStation)}
+                          className="px-3 py-1 rounded-xl bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-[11px] font-extrabold text-purple-700 dark:text-purple-300 hover:bg-purple-50 dark:hover:bg-purple-950/40 cursor-pointer flex items-center gap-1.5 shadow-2xs transition-all active:scale-95 self-start sm:self-auto"
+                          title="Rotate through other qualified candidates from our real staff dataset"
+                        >
+                          <RefreshCw className="h-3 w-3 text-purple-600" />
+                          <span>Rotate Candidate Pool</span>
+                        </button>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5">
                         {alert.recommendedStaff?.map((cand, idx) => {
                           const candName = (cand.staffName || "Chef").split('(')[0].trim();
                           const candFrom = cand.currentStation || cand.fromStation || "Prep Station";
                           const candScore = cand.stationSkillScore || cand.skillRating || 4;
+                          const isFloat = (cand.staffName || "").toLowerCase().includes("float") || (cand.skillLevel || "").toLowerCase().includes("float");
 
                           return (
                             <div
                               key={cand.staffId || idx}
-                              className="p-3 bg-white dark:bg-slate-900 rounded-xl border border-rose-200 dark:border-rose-900/80 shadow-2xs flex items-center justify-between gap-3"
+                              className="p-3 bg-white dark:bg-slate-900 rounded-xl border border-rose-200 dark:border-rose-900/80 shadow-2xs flex flex-col justify-between gap-2.5 hover:border-purple-300 transition-colors"
                             >
-                              <div className="space-y-0.5">
-                                <div className="flex items-center gap-1.5">
-                                  <span className="text-xs font-black text-slate-900 dark:text-white">
-                                    {candName}
-                                  </span>
-                                  <span className="text-[10px] font-black px-1.5 py-0.5 rounded bg-amber-100 text-amber-900 dark:bg-amber-950/80 dark:text-amber-300 border border-amber-300 dark:border-amber-700">
-                                    {candScore}★ {targetStation} Skill
+                              <div className="space-y-1">
+                                <div className="flex items-center justify-between gap-1">
+                                  <div className="flex items-center gap-1.5">
+                                    <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-black ${
+                                      isFloat ? 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200' : 'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-200'
+                                    }`}>
+                                      {isFloat ? 'FL' : 'CH'}
+                                    </div>
+                                    <span className="text-xs font-black text-slate-900 dark:text-white">
+                                      {candName}
+                                    </span>
+                                  </div>
+                                  <span className="text-[10px] font-black px-1.5 py-0.5 rounded bg-amber-100 text-amber-900 dark:bg-amber-950/80 dark:text-amber-300 border border-amber-300 dark:border-amber-700 shrink-0">
+                                    {candScore}★ {targetStation}
                                   </span>
                                 </div>
-                                <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
-                                  Currently at: <span className="font-semibold text-slate-700 dark:text-slate-300">{candFrom}</span> • Recommendation: <span className="text-rose-700 dark:text-rose-400 font-bold">{cand.reason}</span>
+                                <div className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">
+                                  Base: <span className="font-semibold text-slate-700 dark:text-slate-300">{candFrom}</span> • <span className="text-emerald-700 dark:text-emerald-400 font-bold">{cand.efficiency || 80}% Eff</span>
+                                </div>
+                                <p className="text-[10px] text-rose-700 dark:text-rose-400 font-semibold line-clamp-2 leading-tight">
+                                  {cand.reason}
                                 </p>
                               </div>
 
                               <button
                                 onClick={() => handleExecuteStaffReallocation(cand.staffName, candFrom, targetStation, `Direct surge reallocation to ${targetStation}`)}
-                                className="px-3 py-1.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs shadow-xs cursor-pointer flex items-center gap-1 shrink-0 transition-transform active:scale-95"
+                                className="w-full px-3 py-1.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 active:scale-95 text-white font-bold text-xs shadow-xs cursor-pointer flex items-center justify-center gap-1 transition-transform"
                                 title={`Reassign ${candName} from ${candFrom} to ${targetStation}`}
                               >
                                 <Zap className="h-3.5 w-3.5" />
@@ -7406,37 +7506,57 @@ export default function KitchenStaffDashboard({
 
                     {/* Skill-Based Candidates */}
                     <div>
-                      <span className="text-[11px] font-black uppercase text-slate-700 dark:text-slate-300 block mb-2 flex items-center gap-1.5">
-                        <Sparkles className="h-3.5 w-3.5 text-amber-500" />
-                        Qualified Experienced Staff Recommended For Immediate Reassignment:
-                      </span>
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2.5">
+                        <span className="text-[11px] font-black uppercase text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                          <Sparkles className="h-3.5 w-3.5 text-amber-500" />
+                          Qualified Staff Recommended For Immediate Reassignment ({alert.recommendedStaff?.length || 0} Options):
+                        </span>
+                        <button
+                          onClick={() => handleRotateCandidate(targetStation)}
+                          className="px-2.5 py-1 rounded-xl bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-[11px] font-extrabold text-purple-700 dark:text-purple-300 hover:bg-purple-50 dark:hover:bg-purple-950/40 cursor-pointer flex items-center gap-1.5 shadow-2xs transition-all active:scale-95 self-start sm:self-auto"
+                          title="Rotate through other qualified candidates from our real staff dataset"
+                        >
+                          <RefreshCw className="h-3 w-3 text-purple-600" />
+                          <span>Rotate Candidate Pool</span>
+                        </button>
+                      </div>
 
-                      <div className="space-y-2">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
                         {alert.recommendedStaff?.map((cand, idx) => {
                           const candName = (cand.staffName || "Chef").split('(')[0].trim();
                           const candFrom = cand.currentStation || cand.fromStation || "Prep Station";
                           const candScore = cand.stationSkillScore || cand.skillRating || 4;
+                          const isFloat = (cand.staffName || "").toLowerCase().includes("float") || (cand.skillLevel || "").toLowerCase().includes("float");
 
                           return (
                             <div
                               key={cand.staffId || idx}
-                              className="p-3 bg-white dark:bg-slate-900 rounded-xl border border-rose-200 dark:border-rose-900 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                              className="p-3 bg-white dark:bg-slate-900 rounded-xl border border-rose-200 dark:border-rose-900 shadow-xs flex flex-col justify-between gap-2.5 hover:border-purple-300 transition-colors"
                             >
-                              <div className="space-y-0.5">
-                                <div className="flex items-center gap-2">
-                                  <span className="text-xs font-black text-slate-900 dark:text-white">
-                                    {candName}
-                                  </span>
-                                  <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-300 border border-amber-300 dark:border-amber-700">
+                              <div className="space-y-1">
+                                <div className="flex items-center justify-between gap-1">
+                                  <div className="flex items-center gap-1.5">
+                                    <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-black ${
+                                      isFloat ? 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200' : 'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-200'
+                                    }`}>
+                                      {isFloat ? 'FL' : 'CH'}
+                                    </div>
+                                    <span className="text-xs font-black text-slate-900 dark:text-white">
+                                      {candName}
+                                    </span>
+                                  </div>
+                                  <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-300 border border-amber-300 dark:border-amber-700 shrink-0">
                                     {candScore}★ {targetStation} Skill
                                   </span>
-                                  <span className="text-[10px] text-slate-500 dark:text-slate-400">
-                                    • {cand.efficiency || 85}% Efficiency
-                                  </span>
                                 </div>
-                                <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
-                                  Currently assigned to: <span className="font-semibold text-slate-700 dark:text-slate-300">{candFrom}</span> (Low pending queue)
-                                </p>
+                                <div className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
+                                  Currently at: <span className="font-semibold text-slate-700 dark:text-slate-300">{candFrom}</span> • <span className="text-emerald-700 dark:text-emerald-400 font-bold">{cand.efficiency || 85}% Eff</span>
+                                </div>
+                                {cand.reason && (
+                                  <p className="text-[10px] text-rose-700 dark:text-rose-400 font-semibold line-clamp-2 leading-tight">
+                                    {cand.reason}
+                                  </p>
+                                )}
                               </div>
 
                               <button
@@ -7449,7 +7569,7 @@ export default function KitchenStaffDashboard({
                                   );
                                   setDismissedSurgeStations(prev => new Set([...prev, targetStation]));
                                 }}
-                                className="px-3.5 py-1.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs shadow-xs cursor-pointer flex items-center justify-center gap-1.5 shrink-0 transition-transform active:scale-95"
+                                className="w-full px-3.5 py-1.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs shadow-xs cursor-pointer flex items-center justify-center gap-1.5 shrink-0 transition-transform active:scale-95"
                                 title={`Reassign ${candName} from ${candFrom} to ${targetStation}`}
                               >
                                 <Zap className="h-3.5 w-3.5" />
