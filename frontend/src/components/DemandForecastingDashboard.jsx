@@ -540,7 +540,14 @@ export default function DemandForecastingDashboard({ isDarkMode, currentRole = '
             <CloudRain className="h-5 w-5" />
           </div>
           <div className="min-w-0 flex-1">
-            <span className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400">Weather Intelligence</span>
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400">Weather Intelligence</span>
+              {data.contextual_factors?.weather_live && (
+                <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300">
+                  Live Open-Meteo
+                </span>
+              )}
+            </div>
             <div className="text-xs font-extrabold text-slate-900 dark:text-white truncate">{data.contextual_factors.weather_condition}</div>
             <div className="text-[11px] text-sky-700 dark:text-sky-400 font-bold truncate">{data.contextual_factors.weather_impact}</div>
           </div>
@@ -564,9 +571,16 @@ export default function DemandForecastingDashboard({ isDarkMode, currentRole = '
             <Award className="h-5 w-5" />
           </div>
           <div className="min-w-0 flex-1">
-            <span className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400">Local Event Radar</span>
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400">Local Event Radar</span>
+              {data.contextual_factors?.calendar_live && (
+                <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300">
+                  Live Calendar
+                </span>
+              )}
+            </div>
             <div className="text-xs font-extrabold text-slate-900 dark:text-white truncate">{data.contextual_factors.local_events}</div>
-            <div className="text-[11px] text-purple-700 dark:text-purple-400 font-bold truncate">+22% evening takeaway surge</div>
+            <div className="text-[11px] text-purple-700 dark:text-purple-400 font-bold truncate">{data.contextual_factors.event_impact || "+22% evening takeaway surge"}</div>
           </div>
         </div>
 

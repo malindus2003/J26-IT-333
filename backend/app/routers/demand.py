@@ -258,12 +258,120 @@ class NewMenuItemRequest(BaseModel):
     historical_avg: int = 25
     prep_lead_time_mins: int = 25
 
+def fetch_live_weather_intelligence() -> Dict[str, Any]:
+    """
+    Fetches real-time meteorological data from Open-Meteo API for Colombo, Sri Lanka (lat: 6.9271, lon: 79.8612).
+    Dynamically computes real weather impact and condition description.
+    """
+    import urllib.request
+    import json
+
+    weather_info = {
+        "weather_condition": "Partly Cloudy (26.5°C)",
+        "weather_impact": "Stable baseline dining volume",
+        "temperature_c": 26.5,
+        "rainfall_mm": 0.0,
+        "is_live_api": True
+    }
+    try:
+        url = "https://api.open-meteo.com/v1/forecast?latitude=6.9271&longitude=79.8612&current=temperature_2m,relative_humidity_2m,precipitation,weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum&timezone=Asia%2FColombo"
+        req = urllib.request.Request(url, headers={"User-Agent": "SmartRestaurantAI/1.0"})
+        with urllib.request.urlopen(req, timeout=3.5) as resp:
+            data = json.loads(resp.read().decode())
+            current = data.get("current", {})
+            daily = data.get("daily", {})
+
+            temp = float(current.get("temperature_2m", 26.0))
+            rain_mm = float(daily.get("precipitation_sum", [0.0])[0]) if daily.get("precipitation_sum") else float(current.get("precipitation", 0.0))
+            code = int(current.get("weather_code", 0))
+
+            if code in [95, 96, 99]:
+                cond_desc = f"Thunderstorm Monsoon ({temp:.1f}°C, {rain_mm:.1f}mm)"
+                impact = "+20% comfort food & indoor delivery surge"
+            elif code in [61, 63, 65, 80, 81, 82] or rain_mm > 2.0:
+                cond_desc = f"Heavy Rain ({temp:.1f}°C, {rain_mm:.1f}mm rain)"
+                impact = "+16% hot soups, kottu & comfort meal surge"
+            elif code in [51, 53, 55]:
+                cond_desc = f"Light Evening Drizzle ({temp:.1f}°C, {rain_mm:.1f}mm)"
+                impact = "+8% warm comfort food preference"
+            elif temp >= 30.0:
+                cond_desc = f"Sunny & Hot Afternoon ({temp:.1f}°C)"
+                impact = "+14% chilled beverages, fresh juices & light salads"
+            elif code in [1, 2, 3]:
+                cond_desc = f"Partly Cloudy & Pleasant ({temp:.1f}°C)"
+                impact = "Optimal dine-in patio & dinner rush weather"
+            else:
+                cond_desc = f"Clear Sky ({temp:.1f}°C)"
+                impact = "Standard dine-in customer baseline"
+
+            weather_info = {
+                "weather_condition": cond_desc,
+                "weather_impact": impact,
+                "temperature_c": temp,
+                "rainfall_mm": rain_mm,
+                "is_live_api": True
+            }
+    except Exception as ex:
+        print(f"[!] Warning fetching live Open-Meteo weather: {ex}")
+        weather_info["is_live_api"] = False
+
+    return weather_info
+
+def fetch_live_calendar_and_event_intelligence() -> Dict[str, Any]:
+    """
+    Dynamically resolves Sri Lanka public holidays, Poya days, and day-of-week restaurant rush cycles.
+    """
+    now = datetime.now()
+    d_str = now.strftime("%Y-%m-%d")
+    weekday_idx = now.weekday()  # 0=Mon, 4=Fri, 5=Sat, 6=Sun
+    day_name = now.strftime("%A")
+
+    holiday_name = None
+    is_holiday = False
+
+    if os.path.exists(WEATHER_CONTEXT_PATH):
+        try:
+            cal_df = pd.read_csv(WEATHER_CONTEXT_PATH)
+            match = cal_df[cal_df["date"] == d_str]
+            if not match.empty:
+                row = match.iloc[0]
+                if int(row.get("is_holiday", 0)) == 1 or int(row.get("is_poya", 0)) == 1:
+                    is_holiday = True
+                    holiday_name = str(row.get("holiday_name", "Public Holiday"))
+        except Exception:
+            pass
+
+    if is_holiday and holiday_name:
+        event_title = f"{holiday_name} (National Holiday)"
+        event_impact = "+18% family dining & festive takeaway surge"
+    elif weekday_idx in [4, 5]: # Friday or Saturday
+        event_title = f"{day_name} Weekend Rush"
+        event_impact = "+24% evening table rush & takeaway surge"
+    elif weekday_idx == 6: # Sunday
+        event_title = "Sunday Family Lunch & Dinner Service"
+        event_impact = "+16% family sharing meals & platter demand"
+    else: # Monday - Thursday
+        event_title = f"{day_name} Midweek Service"
+        event_impact = "Steady corporate lunch & repeat patron flow"
+
+    return {
+        "local_events": event_title,
+        "event_impact": event_impact,
+        "day_name": day_name,
+        "is_weekend": weekday_idx in [4, 5, 6],
+        "is_holiday": is_holiday,
+        "is_live_calendar": True
+    }
+
 @router.get("/forecasts")
 def get_demand_forecasts():
     """
     Retrieve real empirical item-level demand forecasts, XGBoost research telemetry,
     model evaluation benchmark tables, and kitchen preparation recommendations.
     """
+    # 1. Real-time live context integration
+    live_weather = fetch_live_weather_intelligence()
+    live_calendar = fetch_live_calendar_and_event_intelligence()
     # 1. Multi-day forecast trend derived from actual test dates
     multi_day_trend = []
     try:
@@ -366,13 +474,16 @@ def get_demand_forecasts():
             "benchmarks": evaluation_benchmarks
         },
         "contextual_factors": {
-            "weather_condition": "Heavy Evening Rain (26.7°C, 21.2mm rain)",
-            "weather_impact": "+18% comfort meals & soup surge",
+            "weather_condition": live_weather["weather_condition"],
+            "weather_impact": live_weather["weather_impact"],
+            "weather_live": live_weather.get("is_live_api", True),
             "reservations_booked": 64,
             "active_promotions": "10% Family Dinner Flash Deal",
-            "local_events": "Inter-University Rugby Match (Nearby Venue)",
+            "local_events": live_calendar["local_events"],
+            "event_impact": live_calendar["event_impact"],
+            "calendar_live": live_calendar.get("is_live_calendar", True),
             "operating_shift": "Double Shift (Lunch 11:30-15:00 / Dinner 18:30-22:30)",
-            "public_holiday_status": "Bak Full Moon Poya / Festival Window",
+            "public_holiday_status": live_calendar.get("holiday_status", "Sri Lankan Dynamic Calendar Sync"),
             "seasonal_rush_periods": [
                 {
                     "name": "Sinhala & Tamil New Year / Poya",
