@@ -79,3 +79,8 @@ def get_dashboard_summary():
         "total_revenue_lkr": total_revenue_lkr,
         "system_health": "Optimal Operational Flow"
     }
+
+@app.get("/api/status")
+def get_system_status():
+    return {"status": "online", "message": "Smart Restaurant API Operational"}
+
