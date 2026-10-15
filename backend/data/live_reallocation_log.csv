@@ -6,3 +6,5 @@ Timestamp,Event_Phase,Station,Queue_Length,Action_Taken,Chef_Involved,Previous_S
 04:07:16 PM,Phase 4: Rush Shifts to Grill Station,All Stations,59,MONITOR_BALANCED,None,N/A,N/A,N/A,OPTIMAL
 2026-10-13 09:27:17 PM,string,string,string,High order queue surge mitigation,SUCCESS
 2026-10-13 09:28:56 PM,string,string,string,High order queue surge mitigation,SUCCESS
+2026-10-14 08:04:49 PM,S. Fernando,Cold Salad,Hot Kitchen,Queue mitigation test,SUCCESS
+2026-10-14 08:07:05 PM,S. Fernando,Cold Salad,Hot Kitchen,🚨 REAL-TIME QUEUE SURGE (08:07 PM): Ticket queue at Hot Kitchen surged to 18 tickets!,SUCCESS

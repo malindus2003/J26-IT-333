@@ -216,7 +216,73 @@ def get_stations_data() -> List[Dict[str, Any]]:
 def get_staff_data() -> List[Dict[str, Any]]:
     df = load_csv_data("staff_database.csv")
     if not df.empty:
-        return df.to_dict(orient="records")
+        records = []
+        station_cols = ["hot_kitchen", "grill_station", "cold_salad", "pizza_station", "fryer_station"]
+        gap_training_map = {
+            "hot_kitchen": ("High-Heat Saute & Fast Wok Stir-Fry Control", "High-Volume Stir-Fry Optimization & Saucier Temperature Control", "Target: Line Specialist Track"),
+            "grill_station": ("HACCP Core Seafood & Meat Temperature Monitoring", "Seafood Freshness Grading & Quick-Sear Precision Techniques", "Target: Grill Master Track"),
+            "cold_salad": ("Cold Salad Presentation & Fast Dressing Emulsions", "Cold Chain Hygiene & Fast Garde Manger Dressing Emulsions", "Target: Pantry Operations Specialist"),
+            "pizza_station": ("Wood-Fired Pizza Deck Oven Proofing & Stretch Pacing", "Wood-Fired Pizza Deck Oven Management & Crust Proofing", "Target: Head of Pizza Track"),
+            "fryer_station": ("Deep Fryer Temperature Recovery & Oil Filtration", "Foundation Deep Fryer Safety & Continuous Oil Filtering", "Target: Fryer Line Lead Track")
+        }
+
+        for _, row in df.iterrows():
+            emp_id = str(row.get("emp_id", f"EMP{len(records)+1:02d}"))
+            name = str(row.get("name", "Kitchen Chef"))
+            base_st = str(row.get("base_station", "Hot Kitchen"))
+            
+            scores = {col: int(row.get(col, 3)) for col in station_cols}
+            avg_score = sum(scores.values()) / float(len(scores))
+            eff_rating = min(98, max(55, int(round(avg_score * 17.5 + 11.0))))
+            speed_score = f"{min(5.0, round(avg_score * 0.85 + 0.65, 1))} / 5.0"
+            
+            min_col = min(scores, key=scores.get)
+            skill_gap, training_rec, prog_prefix = gap_training_map.get(min_col, ("Advanced Pastry & Bakery", "Executive Kitchen Leadership & Precision Control", "Line Master Track"))
+
+            if "Head Chef" in name or avg_score >= 4.4:
+                skill_lvl = "Executive Chef (Level 5)"
+                progression = "Executive Chef Certification (92% Milestones Complete)"
+                shift = "10:00 AM - 08:30 PM"
+            elif "Sous Chef" in name or avg_score >= 4.0:
+                skill_lvl = "Executive Sous Chef (Level 4)"
+                progression = "Ready for Head Chef Promotion (86% Milestones Complete)"
+                shift = "11:00 AM - 09:30 PM"
+            elif "Lead" in name or "Specialist" in name or avg_score >= 3.6:
+                skill_lvl = "Station Specialist (Level 3)"
+                progression = f"{prog_prefix} (80% Milestones Complete)"
+                shift = "07:00 AM - 04:00 PM"
+            elif "CDP" in name or avg_score >= 3.2:
+                skill_lvl = "Chef de Partie (Level 3)"
+                progression = f"{prog_prefix} (72% Milestones Complete)"
+                shift = "01:00 PM - 10:00 PM"
+            elif "Commis" in name or avg_score >= 2.4:
+                skill_lvl = "Commis Chef (Level 2)"
+                progression = f"{prog_prefix} (60% Milestones Complete)"
+                shift = "03:00 PM - 11:00 PM"
+            else:
+                skill_lvl = "Kitchen Trainee (Level 1)"
+                progression = "Apprentice Onboarding & Basics (35% Completed)"
+                shift = "08:00 AM - 05:00 PM"
+
+            records.append({
+                "id": emp_id,
+                "emp_id": emp_id,
+                "name": name,
+                "assigned_station": base_st,
+                "shift": shift,
+                "efficiency_rating": eff_rating,
+                "skill_level": skill_lvl,
+                "speed_score": speed_score,
+                "skill_gap": skill_gap,
+                "training_recommendation": training_rec,
+                "career_progression": progression,
+                "hot_kitchen": scores["hot_kitchen"],
+                "grill_station": scores["grill_station"],
+                "cold_salad": scores["cold_salad"],
+                "pizza_station": scores["pizza_station"],
+                "fryer_station": scores["fryer_station"]
+            })
+        return records
     return [
         {
             "id": "staff-1",
@@ -368,6 +434,44 @@ def get_kitchen_metrics():
         dynamic_prep = f"{round(13.1 + (queue_len - 15) * 0.7, 1)} mins"
         dynamic_eff = f"{max(38.0, round(65.5 - (queue_len - 15) * 2.8, 1))}%"
 
+    # Dynamic AI staff allocation suggestions generated from real-time station metrics & peak forecast
+    ai_suggestions = []
+    staff_action_map = {
+        "Hot Kitchen": {"staff": "S. Fernando", "from": "Cold Salad"},
+        "Grill": {"staff": "T. Silva", "from": "Prep Station"},
+        "Pizza": {"staff": "A. Jayasinghe", "from": "Line Assembly"},
+        "Fryer": {"staff": "M. Wickramasinghe", "from": "Apprentice Pool"},
+        "Cold Salad": {"staff": "S. Fernando", "from": "Pantry Line"},
+    }
+
+    sorted_busy = sorted(stations, key=lambda s: (s.get("queue_length", 0), s.get("actual_load", 0)), reverse=True)
+    for st in sorted_busy:
+        q = st.get("queue_length", 0)
+        load = st.get("actual_load", 0)
+        load_pct = st.get("load_level", 0)
+        st_name = st.get("name", "Hot Kitchen")
+        mapping = staff_action_map.get(st_name, staff_action_map["Hot Kitchen"])
+
+        if q >= 3 or load_pct >= 75:
+            ai_suggestions.append(f"QUEUE SURGE ALERT: Station ({st_name}) has {q} active tickets ({st.get('avg_prep_time_mins', 8.0)}m avg prep). Reallocate {mapping['staff']} from {mapping['from']} to clear delay risk.")
+        elif q > 0:
+            ai_suggestions.append(f"ACTIVE TICKET FLOW: Station ({st_name}) has {q} active orders queued ({load} orders shift load). Deploy {mapping['staff']} to maintain line pacing.")
+
+    if len(ai_suggestions) < 3 and any(s.get("queue_length", 0) > 0 for s in stations):
+        ai_suggestions.append("DYNAMIC LINE BALANCING: Reallocate S. Fernando from Cold Salad to Hot Kitchen to balance ticket throughput.")
+
+    proactive_fallbacks = [
+        "DINNER RUSH ALERT: Station 1 (Hot Kitchen) requires +1 Cook at 7:00 PM due to 115 projected orders.",
+        "GRILL & PROTEIN LINE SYNC: Station 2 (Grill) requires +1 Prep Cook for forecasted dinner protein orders (18.2 load).",
+        "PIZZA DECK PREPARATION: Station 4 (Pizza) requires line lead support for 30x forecasted dinner pizza orders.",
+        "FRYER BATCH PREP: Station 5 (Fryer) oil temperature recovery and appetizer batching sync."
+    ]
+    for fb in proactive_fallbacks:
+        if len(ai_suggestions) >= 3:
+            break
+        if not any(fb[:20] in s for s in ai_suggestions):
+            ai_suggestions.append(fb)
+
     return {
         "researcher": "Pahesara H.H.D.S (IT23349292)",
         "module": "Component 2: Kitchen Efficiency and Staff Optimization Analytics",
@@ -391,11 +495,7 @@ def get_kitchen_metrics():
         "stations": stations,
         "staff": staff,
         "hourly_peak_forecast": forecast,
-        "ai_allocation_suggestions": [
-            "⚠️ DINNER RUSH ALERT: Station 1 (Hot Kitchen) requires +1 Cook at 7:00 PM due to 115 projected orders.",
-            "Reallocate S. Fernando from Cold Salad to Hot Kitchen during 7:00 PM - 9:00 PM window.",
-            "Pre-portion 30x Pizza dough bases & Fryer cuttlefish at 5:30 PM to bypass peak queues."
-        ]
+        "ai_allocation_suggestions": ai_suggestions[:3]
     }
 
 @router.get("/upskilling-recommendations")
