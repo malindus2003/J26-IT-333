@@ -34,6 +34,9 @@ ENV/
 *firebase*.json
 *serviceAccount*.json
 serviceAccountKey.json
+firebase_service_account.json
+backend/firebase_service_account.json
+*service_account*.json
 
 # Logs
 npm-debug.log*
