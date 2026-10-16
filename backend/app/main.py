@@ -6,12 +6,23 @@ from .routers import sensors, vision, predictions, inventory, recommendations, d
 from .data.mock_data import STORAGE_ZONES
 from .routers.inventory import inventory_db
 from .routers.orders import orders_db
+from .firebase import init_firebase, get_firebase_status
 
 app = FastAPI(
     title="AI & IoT Smart Restaurant Management & Waste Reduction System",
     description="Integrated 4-Component System for Food Demand Prediction, Smart Waste Sorting, Multi-Modal Spoilage Detection, Kitchen Efficiency, and Order & Inventory Management.",
     version="2.1.0"
 )
+
+@app.on_event("startup")
+def on_startup():
+    init_firebase()
+
+@app.get("/api/firebase/status")
+def check_firebase_status():
+    """Live health-check endpoint for Firebase Realtime Database & Firestore connectivity."""
+    return get_firebase_status()
+
 
 # Mount static assets for dish images
 _static_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static")

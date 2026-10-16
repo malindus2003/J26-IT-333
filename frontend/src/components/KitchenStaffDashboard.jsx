@@ -5,7 +5,7 @@ import {
   CheckSquare, Pizza, Plus, Minus, Hash, Search, Cpu, Sparkles, Database, Layers,
   CheckCheck, Armchair, PackageCheck, RefreshCw, Filter, ArrowUpRight, ShoppingBag, Check, Zap,
   ChevronDown, Bell, Calendar, BarChart2, Target, Sunrise, Sun, Moon, UserPlus, Star, BadgeCheck,
-  GraduationCap, BookOpen
+  GraduationCap, BookOpen, Edit3, Trash2, Save
 } from 'lucide-react';
 import { ResponsiveContainer, LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Legend, ReferenceArea } from 'recharts';
 import axios from 'axios';
@@ -86,6 +86,7 @@ export default function KitchenStaffDashboard({
 
   // --- Staff Sub-Tab State & Admin Onboarding State ---
   const [staffSubTab, setStaffSubTab] = useState('directory'); // 'directory' | 'onboard'
+  const [adminStaffView, setAdminStaffView] = useState('onboard'); // 'onboard' | 'matrix'
   const [isSubmittingStaff, setIsSubmittingStaff] = useState(false);
   const [lastAddedStaff, setLastAddedStaff] = useState(null);
   const [newStaffForm, setNewStaffForm] = useState({
@@ -106,6 +107,29 @@ export default function KitchenStaffDashboard({
     contact_phone: '+94 77 123 4567',
     join_date: new Date().toISOString().split('T')[0]
   });
+
+  // --- Admin Staff Update Profile & Delete Modal State ---
+  const [editingStaff, setEditingStaff] = useState(null);
+  const [editStaffForm, setEditStaffForm] = useState({
+    emp_id: '',
+    name: '',
+    role: 'Chef de Partie (Level 3)',
+    base_station: 'Hot Kitchen',
+    shift: '07:00 AM - 04:00 PM',
+    hot_kitchen: 4,
+    grill_station: 3,
+    cold_salad: 3,
+    pizza_station: 3,
+    fryer_station: 3,
+    efficiency_rating: 85,
+    skill_gap: '',
+    training_recommendation: '',
+    career_progression: '',
+    contact_phone: ''
+  });
+  const [isUpdatingStaff, setIsUpdatingStaff] = useState(false);
+  const [deletingStaff, setDeletingStaff] = useState(null);
+  const [isDeletingStaff, setIsDeletingStaff] = useState(false);
 
   const fetchLiveOrders = async () => {
     try {
@@ -601,6 +625,113 @@ export default function KitchenStaffDashboard({
       setTimeout(() => setDismissedToast(""), 4000);
     } finally {
       setIsSubmittingStaff(false);
+    }
+  };
+
+  const handleOpenEditStaff = (staffMember) => {
+    if (!staffMember) return;
+    setEditingStaff(staffMember);
+    setEditStaffForm({
+      emp_id: staffMember.emp_id || staffMember.id || '',
+      name: staffMember.name || '',
+      role: staffMember.role || staffMember.skill_level || 'Chef de Partie (Level 3)',
+      base_station: staffMember.base_station || staffMember.assigned_station?.split('(')[0]?.trim() || 'Hot Kitchen',
+      shift: staffMember.shift || '07:00 AM - 04:00 PM',
+      hot_kitchen: Number(staffMember.hot_kitchen || 3),
+      grill_station: Number(staffMember.grill_station || 3),
+      cold_salad: Number(staffMember.cold_salad || 3),
+      pizza_station: Number(staffMember.pizza_station || 3),
+      fryer_station: Number(staffMember.fryer_station || 3),
+      efficiency_rating: Number(staffMember.efficiency_rating ?? 85),
+      skill_gap: staffMember.skill_gap || '',
+      training_recommendation: staffMember.training_recommendation || '',
+      career_progression: staffMember.career_progression || '',
+      contact_phone: staffMember.contact_phone || ''
+    });
+  };
+
+  const handleSaveEditStaff = async (e) => {
+    if (e) e.preventDefault();
+    if (!editingStaff) return;
+    const targetId = editingStaff.emp_id || editingStaff.id;
+    if (!editStaffForm.name.trim()) {
+      setDismissedToast("⚠️ Staff member name cannot be blank.");
+      setTimeout(() => setDismissedToast(""), 3500);
+      return;
+    }
+
+    setIsUpdatingStaff(true);
+    try {
+      const payload = {
+        name: editStaffForm.name.trim(),
+        role: editStaffForm.role,
+        base_station: editStaffForm.base_station,
+        assigned_station: editStaffForm.base_station,
+        shift: editStaffForm.shift,
+        hot_kitchen: Number(editStaffForm.hot_kitchen),
+        grill_station: Number(editStaffForm.grill_station),
+        cold_salad: Number(editStaffForm.cold_salad),
+        pizza_station: Number(editStaffForm.pizza_station),
+        fryer_station: Number(editStaffForm.fryer_station),
+        efficiency_rating: Number(editStaffForm.efficiency_rating),
+        skill_gap: editStaffForm.skill_gap,
+        training_recommendation: editStaffForm.training_recommendation,
+        career_progression: editStaffForm.career_progression,
+        contact_phone: editStaffForm.contact_phone
+      };
+
+      const res = await axios.put(`http://localhost:8000/api/kitchen/staff/${targetId}`, payload);
+      const updated = res.data?.staff_member || { ...editingStaff, ...payload };
+
+      setData(prev => {
+        if (!prev) return prev;
+        const updatedStaff = (prev.staff || []).map(s => {
+          if ((s.emp_id && s.emp_id === targetId) || (s.id && s.id === targetId) || s.name === editingStaff.name) {
+            return { ...s, ...updated };
+          }
+          return s;
+        });
+        return { ...prev, staff: updatedStaff };
+      });
+
+      setDismissedToast(`✅ Profile for ${updated.name || targetId} successfully updated!`);
+      setTimeout(() => setDismissedToast(""), 4500);
+      setEditingStaff(null);
+    } catch (err) {
+      console.error("Failed to update staff profile:", err);
+      setDismissedToast("❌ Failed to update staff profile. Please try again.");
+      setTimeout(() => setDismissedToast(""), 4000);
+    } finally {
+      setIsUpdatingStaff(false);
+    }
+  };
+
+  const handleConfirmDeleteStaff = async () => {
+    if (!deletingStaff) return;
+    const targetId = deletingStaff.emp_id || deletingStaff.id;
+    const targetName = deletingStaff.name || targetId;
+
+    setIsDeletingStaff(true);
+    try {
+      await axios.delete(`http://localhost:8000/api/kitchen/staff/${targetId}`);
+
+      setData(prev => {
+        if (!prev) return prev;
+        const filtered = (prev.staff || []).filter(s =>
+          s.emp_id !== targetId && s.id !== targetId && s.name !== targetName
+        );
+        return { ...prev, staff: filtered };
+      });
+
+      setDismissedToast(`🗑️ ${targetName} (${targetId}) removed from kitchen workforce.`);
+      setTimeout(() => setDismissedToast(""), 4500);
+      setDeletingStaff(null);
+    } catch (err) {
+      console.error("Failed to delete staff member:", err);
+      setDismissedToast("❌ Failed to remove staff member. Please check backend connection.");
+      setTimeout(() => setDismissedToast(""), 4000);
+    } finally {
+      setIsDeletingStaff(false);
     }
   };
 
@@ -2939,11 +3070,18 @@ export default function KitchenStaffDashboard({
           </button>
 
           <button
-            onClick={() => setActiveKitchenTab('staff')}
+            onClick={() => {
+              setActiveKitchenTab('staff');
+              setTimeout(() => {
+                const el = document.getElementById('staff-optimization-section');
+                if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              }, 50);
+            }}
             className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${activeKitchenTab === 'staff'
-              ? 'bg-emerald-700 text-white shadow-md shadow-emerald-700/20'
+              ? 'bg-emerald-700 text-white shadow-md shadow-emerald-700/20 ring-2 ring-emerald-500'
               : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
               }`}
+            title="Manage kitchen staff, view skill competencies, update profiles and delete staff"
           >
             <Users className="h-4 w-4" />
             <span>Staff Optimization & Skill Development</span>
@@ -5344,11 +5482,11 @@ export default function KitchenStaffDashboard({
       {/* STAFF OPTIMIZATION & SKILL DEVELOPMENT VIEW                                */}
       {/* ========================================================================= */}
       {(activeKitchenTab === 'staff' || activeKitchenTab === 'all') && (
-        <div className="space-y-6 animate-fade-in">
+        <div id="staff-optimization-section" className="space-y-6 animate-fade-in scroll-mt-20">
 
           {/* Sub-Tab Navigation Bar inside Staff Optimization & Skill Development */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white dark:bg-slate-900 p-2.5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs">
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
                 onClick={() => setStaffSubTab('directory')}
@@ -5369,9 +5507,12 @@ export default function KitchenStaffDashboard({
 
               <button
                 type="button"
-                onClick={() => setStaffSubTab('onboard')}
+                onClick={() => {
+                  setStaffSubTab('onboard');
+                  setAdminStaffView('onboard');
+                }}
                 className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
-                  staffSubTab === 'onboard'
+                  staffSubTab === 'onboard' && adminStaffView === 'onboard'
                     ? 'bg-emerald-700 text-white shadow-md shadow-emerald-700/20'
                     : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
                 }`}
@@ -5380,6 +5521,25 @@ export default function KitchenStaffDashboard({
                 <span>Add New Staff Member</span>
                 <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-orange-600 text-white">
                   Admin
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setStaffSubTab('onboard');
+                  setAdminStaffView('matrix');
+                }}
+                className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+                  staffSubTab === 'onboard' && adminStaffView === 'matrix'
+                    ? 'bg-emerald-700 text-white shadow-md shadow-emerald-700/20'
+                    : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                }`}
+              >
+                <Database className="h-4 w-4" />
+                <span>Staff Skill & Station Allocation Matrix</span>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-orange-600 text-white">
+                  Admin Only
                 </span>
               </button>
             </div>
@@ -5410,11 +5570,25 @@ export default function KitchenStaffDashboard({
                   <div className="flex flex-wrap items-center gap-2.5">
                     <button
                       type="button"
-                      onClick={() => setStaffSubTab('onboard')}
+                      onClick={() => {
+                        setStaffSubTab('onboard');
+                        setAdminStaffView('onboard');
+                      }}
                       className="px-4 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs shadow-md shadow-emerald-700/20 transition-all flex items-center gap-2 cursor-pointer shrink-0"
                     >
                       <UserPlus className="h-4 w-4" />
                       <span>+ Onboard New Staff</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setStaffSubTab('onboard');
+                        setAdminStaffView('matrix');
+                      }}
+                      className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold text-xs border border-slate-200 dark:border-slate-700 transition-all flex items-center gap-2 cursor-pointer shrink-0"
+                    >
+                      <Database className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                      <span>Workforce Matrix (Admin)</span>
                     </button>
                   </div>
                 </div>
@@ -5482,6 +5656,8 @@ export default function KitchenStaffDashboard({
                         {member.name}
                       </h4>
                       <div className="flex items-center gap-1.5 mt-0.5 text-[10px] text-slate-500 dark:text-slate-400 font-medium">
+                        <span className="font-bold text-slate-700 dark:text-slate-300">{member.emp_id || member.id}</span>
+                        <span>•</span>
                         <span>{member.assigned_station}</span>
                         {member.shift && <span>• {member.shift}</span>}
                       </div>
@@ -5628,71 +5804,37 @@ export default function KitchenStaffDashboard({
             </div>
           </div>
 
-          {/* Section 2: Staff Skill & Station Allocation Matrix (Roster Table) */}
-          <div className="glass-panel p-6 rounded-3xl border border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 shadow-xs space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200 dark:border-slate-800 pb-3">
+          {/* Section 2: Staff Skill & Station Allocation Matrix (Admin Restricted Notice) */}
+          <div className="p-5 rounded-3xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-2xs">
+            <div className="flex items-center gap-3.5 text-slate-600 dark:text-slate-300">
+              <div className="p-3 rounded-2xl bg-orange-100 dark:bg-orange-950/70 text-orange-700 dark:text-orange-400 shrink-0">
+                <Lock className="h-5 w-5" />
+              </div>
               <div>
-                <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                  <Database className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-                  Staff Skill & Station Allocation Matrix
-                </h3>
+                <div className="flex items-center gap-2">
+                  <h4 className="font-extrabold text-sm text-slate-900 dark:text-white">
+                    Staff Skill & Station Allocation Matrix
+                  </h4>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-orange-100 text-orange-800 dark:bg-orange-950 dark:text-orange-300 border border-orange-200 dark:border-orange-800">
+                    Admin Only
+                  </span>
+                </div>
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                  Complete workforce roster with station skill ratings, shift allocations, and efficiency benchmarks
+                  Workforce skill ratings across all 5 bays, shift rosters, and staff profile editing/deletion are strictly restricted to the Admin Portal.
                 </p>
               </div>
             </div>
-
-            <div className="overflow-x-auto rounded-2xl border border-slate-200 dark:border-slate-800">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-slate-50 dark:bg-slate-950/80 text-slate-600 dark:text-slate-400 font-bold border-b border-slate-200 dark:border-slate-800 uppercase text-[10px]">
-                  <tr>
-                    <th className="py-3 px-4">Staff Member</th>
-                    <th className="py-3 px-3">Primary Bay</th>
-                    <th className="py-3 px-3">Shift Hours</th>
-                    <th className="py-3 px-3 text-center">Efficiency</th>
-                    <th className="py-3 px-2 text-center">Hot Kitchen</th>
-                    <th className="py-3 px-2 text-center">Grill</th>
-                    <th className="py-3 px-2 text-center">Cold Salad</th>
-                    <th className="py-3 px-2 text-center">Pizza</th>
-                    <th className="py-3 px-2 text-center">Fryer</th>
-                    <th className="py-3 px-4">Identified Skill-Gap</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800 font-medium">
-                  {filteredStaffList.slice(0, 15).map((m) => (
-                    <tr key={m.id || m.emp_id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors">
-                      <td className="py-3 px-4">
-                        <div className="font-bold text-slate-900 dark:text-white">{m.name}</div>
-                        <div className="text-[10px] text-slate-500 dark:text-slate-400">{m.skill_level}</div>
-                      </td>
-                      <td className="py-3 px-3 text-slate-700 dark:text-slate-300 font-medium">{m.assigned_station}</td>
-                      <td className="py-3 px-3 text-slate-500 dark:text-slate-400 text-[11px]">{m.shift || '10:00 AM - 08:30 PM'}</td>
-                      <td className="py-3 px-3 text-center">
-                        <span className="font-extrabold text-emerald-600 dark:text-emerald-400">{m.efficiency_rating ?? 85}%</span>
-                      </td>
-                      <td className="py-3 px-2 text-center">
-                        <span className="px-2 py-0.5 rounded font-bold bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300">{m.hot_kitchen || 4}★</span>
-                      </td>
-                      <td className="py-3 px-2 text-center">
-                        <span className="px-2 py-0.5 rounded font-bold bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300">{m.grill_station || 4}★</span>
-                      </td>
-                      <td className="py-3 px-2 text-center">
-                        <span className="px-2 py-0.5 rounded font-bold bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300">{m.cold_salad || 4}★</span>
-                      </td>
-                      <td className="py-3 px-2 text-center">
-                        <span className="px-2 py-0.5 rounded font-bold bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300">{m.pizza_station || 4}★</span>
-                      </td>
-                      <td className="py-3 px-2 text-center">
-                        <span className="px-2 py-0.5 rounded font-bold bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300">{m.fryer_station || 4}★</span>
-                      </td>
-                      <td className="py-3 px-4 text-slate-600 dark:text-slate-300 text-[11px]">
-                        {m.skill_gap || 'Foundation Line Pace'}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setStaffSubTab('onboard');
+                setAdminStaffView('matrix');
+              }}
+              className="px-4 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs shadow-md shadow-emerald-700/20 transition-all flex items-center gap-2 cursor-pointer shrink-0"
+            >
+              <Database className="h-4 w-4" />
+              <span>Access Admin Matrix →</span>
+            </button>
           </div>
 
           {/* Section 3: Automated AI Recommendation System — Staff Upskilling & Competency Pathways */}
@@ -6265,25 +6407,58 @@ export default function KitchenStaffDashboard({
                 <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                   <div className="flex items-start gap-4">
                     <div className="p-3.5 rounded-2xl bg-gradient-to-br from-emerald-600 to-teal-700 text-white shadow-lg shadow-emerald-700/25 shrink-0">
-                      <UserPlus className="h-6 w-6" />
+                      {adminStaffView === 'matrix' ? <Database className="h-6 w-6" /> : <UserPlus className="h-6 w-6" />}
                     </div>
                     <div>
                       <div className="flex items-center gap-2">
                         <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-orange-100 text-orange-800 dark:bg-orange-950 dark:text-orange-300 border border-orange-200 dark:border-orange-800">
                           Admin Portal
                         </span>
-                        <span className="text-xs text-slate-400">• New Culinary Personnel Onboarding</span>
+                        <span className="text-xs text-slate-400">
+                          {adminStaffView === 'matrix' ? '• Staff Skill & Station Allocation Matrix (View, Edit & Delete)' : '• New Culinary Personnel Onboarding'}
+                        </span>
                       </div>
                       <h3 className="text-xl font-black text-slate-900 dark:text-white tracking-tight mt-1">
-                        Register & Assess New Kitchen Staff Member
+                        {adminStaffView === 'matrix' ? 'Staff Skill & Station Allocation Matrix' : 'Register & Assess New Kitchen Staff Member'}
                       </h3>
                       <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-2xl font-medium">
-                        Add newly joined culinary staff, assign baseline station & shift schedules, evaluate multi-station competencies (1–5★), and configure AI-guided succession milestones.
+                        {adminStaffView === 'matrix'
+                          ? 'Strictly restricted admin workforce roster: complete station skill ratings, shift allocations, efficiency benchmarks, and inline profile editing & deletion.'
+                          : 'Add newly joined culinary staff, assign baseline station & shift schedules, evaluate multi-station competencies (1–5★), and configure AI-guided succession milestones.'
+                        }
                       </p>
                     </div>
                   </div>
 
                   <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+                    {/* View Switcher Buttons */}
+                    <div className="flex items-center gap-1.5 p-1 bg-slate-100 dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700">
+                      <button
+                        type="button"
+                        onClick={() => setAdminStaffView('onboard')}
+                        className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+                          adminStaffView === 'onboard'
+                            ? 'bg-emerald-700 text-white shadow-sm'
+                            : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
+                        }`}
+                      >
+                        <UserPlus className="h-3.5 w-3.5" />
+                        <span>Add New Staff Member</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setAdminStaffView('matrix')}
+                        className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+                          adminStaffView === 'matrix'
+                            ? 'bg-emerald-700 text-white shadow-sm'
+                            : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
+                        }`}
+                      >
+                        <Database className="h-3.5 w-3.5" />
+                        <span>Staff Skill & Station Allocation Matrix</span>
+                      </button>
+                    </div>
+
                     <button
                       type="button"
                       onClick={() => setStaffSubTab('directory')}
@@ -6331,7 +6506,110 @@ export default function KitchenStaffDashboard({
                 )}
               </div>
 
-              {/* Form & Live Preview Grid */}
+              {/* VIEW 1: STAFF SKILL & STATION ALLOCATION MATRIX (ADMIN VIEW) */}
+              {adminStaffView === 'matrix' && (
+                <div className="glass-panel p-6 rounded-3xl border border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 shadow-xs space-y-4 animate-fade-in">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200 dark:border-slate-800 pb-3">
+                    <div>
+                      <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                        <Database className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                        Staff Skill & Station Allocation Matrix
+                      </h3>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                        Complete workforce roster with station skill ratings, shift allocations, and efficiency benchmarks
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-orange-100 text-orange-800 dark:bg-orange-950 dark:text-orange-300 border border-orange-200 dark:border-orange-800 flex items-center gap-1.5">
+                        <Lock className="h-3 w-3" />
+                        Admin Only • View, Edit & Delete
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="overflow-x-auto rounded-2xl border border-slate-200 dark:border-slate-800">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-slate-50 dark:bg-slate-950/80 text-slate-600 dark:text-slate-400 font-bold border-b border-slate-200 dark:border-slate-800 uppercase text-[10px]">
+                        <tr>
+                          <th className="py-3 px-4">Staff Member</th>
+                          <th className="py-3 px-3">Primary Bay</th>
+                          <th className="py-3 px-3">Shift Hours</th>
+                          <th className="py-3 px-3 text-center">Efficiency</th>
+                          <th className="py-3 px-2 text-center">Hot Kitchen</th>
+                          <th className="py-3 px-2 text-center">Grill</th>
+                          <th className="py-3 px-2 text-center">Cold Salad</th>
+                          <th className="py-3 px-2 text-center">Pizza</th>
+                          <th className="py-3 px-2 text-center">Fryer</th>
+                          <th className="py-3 px-4">Identified Skill-Gap</th>
+                          <th className="py-3 px-3 text-center">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 dark:divide-slate-800 font-medium">
+                        {filteredStaffList.map((m) => (
+                          <tr key={m.id || m.emp_id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors">
+                            <td className="py-3 px-4">
+                              <div className="flex items-center gap-2">
+                                <span className="font-extrabold text-[10px] px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                                  {m.emp_id || m.id}
+                                </span>
+                                <div>
+                                  <div className="font-bold text-slate-900 dark:text-white">{m.name}</div>
+                                  <div className="text-[10px] text-slate-500 dark:text-slate-400">{m.skill_level}</div>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="py-3 px-3 text-slate-700 dark:text-slate-300 font-medium">{m.assigned_station}</td>
+                            <td className="py-3 px-3 text-slate-500 dark:text-slate-400 text-[11px]">{m.shift || '10:00 AM - 08:30 PM'}</td>
+                            <td className="py-3 px-3 text-center">
+                              <span className="font-extrabold text-emerald-600 dark:text-emerald-400">{m.efficiency_rating ?? 85}%</span>
+                            </td>
+                            <td className="py-3 px-2 text-center">
+                              <span className="px-2 py-0.5 rounded font-bold bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300">{m.hot_kitchen || 4}★</span>
+                            </td>
+                            <td className="py-3 px-2 text-center">
+                              <span className="px-2 py-0.5 rounded font-bold bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300">{m.grill_station || 4}★</span>
+                            </td>
+                            <td className="py-3 px-2 text-center">
+                              <span className="px-2 py-0.5 rounded font-bold bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300">{m.cold_salad || 4}★</span>
+                            </td>
+                            <td className="py-3 px-2 text-center">
+                              <span className="px-2 py-0.5 rounded font-bold bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300">{m.pizza_station || 4}★</span>
+                            </td>
+                            <td className="py-3 px-2 text-center">
+                              <span className="px-2 py-0.5 rounded font-bold bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300">{m.fryer_station || 4}★</span>
+                            </td>
+                            <td className="py-3 px-4 text-slate-600 dark:text-slate-300 text-[11px]">
+                              {m.skill_gap || 'Foundation Line Pace'}
+                            </td>
+                            <td className="py-3 px-3 text-center whitespace-nowrap">
+                              <div className="flex items-center justify-center gap-1.5">
+                                <button
+                                  onClick={() => handleOpenEditStaff(m)}
+                                  className="p-1.5 rounded-lg bg-slate-100 hover:bg-emerald-100 dark:bg-slate-800 dark:hover:bg-emerald-950/60 text-slate-600 hover:text-emerald-700 dark:text-slate-300 dark:hover:text-emerald-400 transition-colors cursor-pointer shadow-2xs"
+                                  title={`Edit profile for ${m.name}`}
+                                >
+                                  <Edit3 className="h-3.5 w-3.5" />
+                                </button>
+                                <button
+                                  onClick={() => setDeletingStaff(m)}
+                                  className="p-1.5 rounded-lg bg-slate-100 hover:bg-rose-100 dark:bg-slate-800 dark:hover:bg-rose-950/60 text-slate-600 hover:text-rose-700 dark:text-slate-300 dark:hover:text-rose-400 transition-colors cursor-pointer shadow-2xs"
+                                  title={`Delete ${m.name}`}
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* VIEW 2: ADD NEW STAFF MEMBER (ADMIN ONBOARDING VIEW) */}
+              {adminStaffView === 'onboard' && (
+              /* Form & Live Preview Grid */
               <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
                 
                 {/* LEFT: Onboarding Form (7 Columns) */}
@@ -6874,6 +7152,7 @@ export default function KitchenStaffDashboard({
                 </div>
 
               </div>
+              )}
             </div>
           )}
 
@@ -7595,6 +7874,290 @@ export default function KitchenStaffDashboard({
                 className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 font-bold text-xs cursor-pointer transition-colors"
               >
                 Dismiss Alert Pop-Up
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* ADMIN EDIT STAFF PROFILE MODAL                                             */}
+      {/* ========================================================================= */}
+      {editingStaff && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-xs animate-fade-in">
+          <div className="bg-white dark:bg-slate-900 w-full max-w-2xl rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl p-6 sm:p-7 space-y-5 max-h-[90vh] overflow-y-auto">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-2xl bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300">
+                  <Edit3 className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-slate-900 dark:text-white">
+                    Update Staff Profile & Competencies
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 font-medium">
+                    Editing profile for <span className="font-bold text-slate-800 dark:text-slate-200">{editingStaff.name}</span> ({editingStaff.emp_id || editingStaff.id})
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingStaff(null)}
+                className="p-2 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer transition-colors"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Edit Form */}
+            <form onSubmit={handleSaveEditStaff} className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Full Name */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    Staff Full Name *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={editStaffForm.name}
+                    onChange={(e) => setEditStaffForm(prev => ({ ...prev, name: e.target.value }))}
+                    className="w-full px-3.5 py-2.5 rounded-xl text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 font-semibold text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 outline-hidden"
+                  />
+                </div>
+
+                {/* Role / Skill Level */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    Kitchen Role & Level
+                  </label>
+                  <select
+                    value={editStaffForm.role}
+                    onChange={(e) => setEditStaffForm(prev => ({ ...prev, role: e.target.value }))}
+                    className="w-full px-3.5 py-2.5 rounded-xl text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 font-semibold text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 outline-hidden cursor-pointer"
+                  >
+                    <option value="Executive Chef (Level 5)">Executive Chef (Level 5)</option>
+                    <option value="Executive Sous Chef (Level 4)">Executive Sous Chef (Level 4)</option>
+                    <option value="Station Specialist (Level 3)">Station Specialist (Level 3)</option>
+                    <option value="Chef de Partie (Level 3)">Chef de Partie (Level 3)</option>
+                    <option value="Float Specialist">Float Specialist (Cross-Station Lead)</option>
+                    <option value="Commis Chef (Level 2)">Commis Chef (Level 2)</option>
+                    <option value="Kitchen Trainee (Level 1)">Kitchen Trainee (Level 1)</option>
+                  </select>
+                </div>
+
+                {/* Primary Station */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    Primary Kitchen Station
+                  </label>
+                  <select
+                    value={editStaffForm.base_station}
+                    onChange={(e) => setEditStaffForm(prev => ({ ...prev, base_station: e.target.value }))}
+                    className="w-full px-3.5 py-2.5 rounded-xl text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 font-semibold text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 outline-hidden cursor-pointer"
+                  >
+                    <option value="Hot Kitchen">Hot Kitchen / Saute</option>
+                    <option value="Grill">Grill Station</option>
+                    <option value="Cold Salad">Cold Salad & Garde Manger</option>
+                    <option value="Pizza">Pizza Station</option>
+                    <option value="Fryer">Fryer Station</option>
+                  </select>
+                </div>
+
+                {/* Shift Hours */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    Shift Assignment
+                  </label>
+                  <select
+                    value={editStaffForm.shift}
+                    onChange={(e) => setEditStaffForm(prev => ({ ...prev, shift: e.target.value }))}
+                    className="w-full px-3.5 py-2.5 rounded-xl text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 font-semibold text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 outline-hidden cursor-pointer"
+                  >
+                    <option value="07:00 AM - 04:00 PM">Morning Shift (07:00 AM - 04:00 PM)</option>
+                    <option value="01:00 PM - 10:00 PM">Afternoon Shift (01:00 PM - 10:00 PM)</option>
+                    <option value="03:00 PM - 11:00 PM">Night Rush Shift (03:00 PM - 11:00 PM)</option>
+                    <option value="10:00 AM - 08:30 PM">All-Day Executive (10:00 AM - 08:30 PM)</option>
+                    <option value="11:00 AM - 09:30 PM">Mid-Day Flex (11:00 AM - 09:30 PM)</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Efficiency Rating Slider */}
+              <div className="bg-slate-50 dark:bg-slate-800/60 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-700 space-y-2">
+                <div className="flex items-center justify-between text-xs font-bold text-slate-800 dark:text-slate-200">
+                  <span>Efficiency Benchmark Rating:</span>
+                  <span className={`px-2 py-0.5 rounded-full text-xs font-black ${
+                    editStaffForm.efficiency_rating >= 80 ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300' :
+                    editStaffForm.efficiency_rating >= 60 ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300' :
+                    'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300'
+                  }`}>
+                    {editStaffForm.efficiency_rating}%
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min="20"
+                  max="100"
+                  step="1"
+                  value={editStaffForm.efficiency_rating}
+                  onChange={(e) => setEditStaffForm(prev => ({ ...prev, efficiency_rating: Number(e.target.value) }))}
+                  className="w-full accent-emerald-600 cursor-pointer"
+                />
+              </div>
+
+              {/* Station Star Ratings */}
+              <div className="space-y-2">
+                <label className="block text-xs font-black uppercase tracking-wider text-slate-700 dark:text-slate-300">
+                  Station Skill Competency Ratings (1★ to 5★):
+                </label>
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                  {[
+                    { key: 'hot_kitchen', label: 'Hot Kitchen' },
+                    { key: 'grill_station', label: 'Grill' },
+                    { key: 'cold_salad', label: 'Cold Salad' },
+                    { key: 'pizza_station', label: 'Pizza' },
+                    { key: 'fryer_station', label: 'Fryer' }
+                  ].map(st => (
+                    <div key={st.key} className="bg-slate-50 dark:bg-slate-800/80 p-2 rounded-xl border border-slate-200 dark:border-slate-700 text-center space-y-1">
+                      <div className="text-[10px] font-bold text-slate-600 dark:text-slate-400">{st.label}</div>
+                      <select
+                        value={editStaffForm[st.key]}
+                        onChange={(e) => setEditStaffForm(prev => ({ ...prev, [st.key]: Number(e.target.value) }))}
+                        className="w-full text-center text-xs font-black py-1 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-amber-600 dark:text-amber-400 cursor-pointer"
+                      >
+                        <option value="1">1★ Basic</option>
+                        <option value="2">2★ Novice</option>
+                        <option value="3">3★ Skilled</option>
+                        <option value="4">4★ Advanced</option>
+                        <option value="5">5★ Master</option>
+                      </select>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Skill Gap & Training */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    Identified Skill Gap
+                  </label>
+                  <input
+                    type="text"
+                    value={editStaffForm.skill_gap}
+                    onChange={(e) => setEditStaffForm(prev => ({ ...prev, skill_gap: e.target.value }))}
+                    placeholder="e.g. High-Volume Wood Oven Proofing"
+                    className="w-full px-3 py-2 rounded-xl text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 font-medium text-slate-900 dark:text-white outline-hidden"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    AI Training Recommendation
+                  </label>
+                  <input
+                    type="text"
+                    value={editStaffForm.training_recommendation}
+                    onChange={(e) => setEditStaffForm(prev => ({ ...prev, training_recommendation: e.target.value }))}
+                    placeholder="e.g. Foundation Deep Fryer Safety & Oil Filtration"
+                    className="w-full px-3 py-2 rounded-xl text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 font-medium text-slate-900 dark:text-white outline-hidden"
+                  />
+                </div>
+              </div>
+
+              {/* Career Progression Pathway */}
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                  Career Progression Track
+                </label>
+                <input
+                  type="text"
+                  value={editStaffForm.career_progression}
+                  onChange={(e) => setEditStaffForm(prev => ({ ...prev, career_progression: e.target.value }))}
+                  placeholder="e.g. Head of Pizza Track (82% Completed)"
+                  className="w-full px-3 py-2 rounded-xl text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 font-medium text-slate-900 dark:text-white outline-hidden"
+                />
+              </div>
+
+              {/* Modal Buttons */}
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-200 dark:border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setEditingStaff(null)}
+                  className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold text-xs cursor-pointer transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isUpdatingStaff}
+                  className="px-5 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 active:scale-95 text-white font-extrabold text-xs shadow-md shadow-emerald-700/20 cursor-pointer flex items-center gap-2 transition-all disabled:opacity-60"
+                >
+                  <Save className="h-4 w-4" />
+                  <span>{isUpdatingStaff ? 'Saving Changes...' : 'Save Profile Changes'}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* ADMIN DELETE STAFF MEMBER CONFIRMATION MODAL                               */}
+      {/* ========================================================================= */}
+      {deletingStaff && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-xs animate-fade-in">
+          <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-3xl border border-rose-200 dark:border-rose-900/80 shadow-2xl p-6 space-y-4">
+            <div className="flex items-center gap-3 text-rose-600 dark:text-rose-400">
+              <div className="p-3 rounded-2xl bg-rose-100 dark:bg-rose-950/80">
+                <Trash2 className="h-6 w-6" />
+              </div>
+              <div>
+                <h3 className="text-base font-black text-slate-900 dark:text-white">
+                  Remove Staff Member?
+                </h3>
+                <span className="text-xs font-semibold text-rose-600 dark:text-rose-400">
+                  Permanent Kitchen Roster Action
+                </span>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+              Are you sure you want to remove <strong className="text-slate-900 dark:text-white">{deletingStaff.name}</strong> ({deletingStaff.emp_id || deletingStaff.id}) from the active kitchen workforce?
+            </p>
+
+            <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-700 text-xs space-y-1">
+              <div className="flex justify-between text-slate-600 dark:text-slate-400">
+                <span>Primary Bay:</span>
+                <span className="font-bold text-slate-900 dark:text-white">{deletingStaff.assigned_station}</span>
+              </div>
+              <div className="flex justify-between text-slate-600 dark:text-slate-400">
+                <span>Shift Hours:</span>
+                <span className="font-bold text-slate-900 dark:text-white">{deletingStaff.shift || 'Standard Shift'}</span>
+              </div>
+              <div className="flex justify-between text-slate-600 dark:text-slate-400">
+                <span>Efficiency Rating:</span>
+                <span className="font-bold text-emerald-600 dark:text-emerald-400">{deletingStaff.efficiency_rating ?? 85}%</span>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setDeletingStaff(null)}
+                className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold text-xs cursor-pointer transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isDeletingStaff}
+                onClick={handleConfirmDeleteStaff}
+                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 active:scale-95 text-white font-extrabold text-xs shadow-md shadow-rose-600/20 cursor-pointer flex items-center gap-1.5 transition-all disabled:opacity-60"
+              >
+                <Trash2 className="h-4 w-4" />
+                <span>{isDeletingStaff ? 'Removing...' : 'Confirm Remove'}</span>
               </button>
             </div>
           </div>

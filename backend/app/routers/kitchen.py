@@ -5,7 +5,7 @@ from typing import List, Dict, Any, Optional
 
 import numpy as np
 import pandas as pd
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 router = APIRouter(prefix="/api/kitchen", tags=["Component 2: Kitchen Efficiency & Staff Optimization"])
@@ -46,7 +46,24 @@ class NewStaffRequest(BaseModel):
     career_progression: Optional[str] = None
     contact_phone: Optional[str] = None
 
-# In-memory reallocation, live station adjustments, and custom added staff
+class UpdateStaffRequest(BaseModel):
+    name: Optional[str] = None
+    role: Optional[str] = None
+    base_station: Optional[str] = None
+    assigned_station: Optional[str] = None
+    shift: Optional[str] = None
+    efficiency_rating: Optional[int] = None
+    skill_gap: Optional[str] = None
+    training_recommendation: Optional[str] = None
+    career_progression: Optional[str] = None
+    hot_kitchen: Optional[int] = None
+    grill_station: Optional[int] = None
+    cold_salad: Optional[int] = None
+    pizza_station: Optional[int] = None
+    fryer_station: Optional[int] = None
+    contact_phone: Optional[str] = None
+
+# In-memory reallocation, live station adjustments, deleted staff set, and custom added staff
 active_staff_reallocations: Dict[str, Dict[str, Any]] = {}
 station_cook_adjustments: Dict[str, int] = {
     "Hot Kitchen": 0,
@@ -57,6 +74,7 @@ station_cook_adjustments: Dict[str, int] = {
 }
 CUSTOM_STAFF_METADATA: Dict[str, Dict[str, Any]] = {}
 CUSTOM_ADDED_STAFF: List[Dict[str, Any]] = []
+DELETED_STAFF_IDS: set = set()
 
 def classify_dish_station(dish_name: str) -> str:
     nl = (dish_name or "").lower()
@@ -281,7 +299,11 @@ def get_staff_data() -> List[Dict[str, Any]]:
             emp_id = str(row.get("emp_id", f"EMP{len(records)+1:02d}"))
             name = str(row.get("name", "Kitchen Chef"))
             base_st = str(row.get("base_station", "Hot Kitchen"))
-            
+
+            # Exclude deleted staff members
+            if emp_id in DELETED_STAFF_IDS or name in DELETED_STAFF_IDS or name.split('(')[0].strip() in DELETED_STAFF_IDS:
+                continue
+
             # Canonical station mapping
             clean_station = "Hot Kitchen"
             if "hot" in base_st.lower():
@@ -303,12 +325,12 @@ def get_staff_data() -> List[Dict[str, Any]]:
                     is_reallocated = True
                     reallocated_to = realloc['to']
                     break
-            
+
             scores = {col: int(row.get(col, 3)) for col in station_cols}
             avg_score = sum(scores.values()) / float(len(scores))
             eff_rating = min(98, max(55, int(round(avg_score * 17.5 + 11.0))))
             speed_score = f"{min(5.0, round(avg_score * 0.85 + 0.65, 1))} / 5.0"
-            
+
             min_col = min(scores, key=scores.get)
             skill_gap, training_rec, prog_prefix = gap_training_map.get(min_col, ("Advanced Pastry & Bakery", "Executive Kitchen Leadership & Precision Control", "Line Master Track"))
 
@@ -339,6 +361,11 @@ def get_staff_data() -> List[Dict[str, Any]]:
 
             if emp_id in CUSTOM_STAFF_METADATA:
                 custom = CUSTOM_STAFF_METADATA[emp_id]
+                if custom.get("name"):
+                    name = custom["name"]
+                if custom.get("assigned_station"):
+                    clean_station = custom["assigned_station"]
+                    base_st = custom["assigned_station"]
                 if custom.get("shift"):
                     shift = custom["shift"]
                 if custom.get("role") or custom.get("skill_level"):
@@ -351,6 +378,9 @@ def get_staff_data() -> List[Dict[str, Any]]:
                     progression = custom["career_progression"]
                 if custom.get("efficiency_rating") is not None:
                     eff_rating = custom["efficiency_rating"]
+                for sc in station_cols:
+                    if custom.get(sc) is not None:
+                        scores[sc] = int(custom[sc])
 
             records.append({
                 "id": emp_id,
@@ -377,9 +407,13 @@ def get_staff_data() -> List[Dict[str, Any]]:
         # Append any newly added custom staff not present in CSV records
         existing_ids = {r.get("id") for r in records} | {r.get("emp_id") for r in records}
         for cs in CUSTOM_ADDED_STAFF:
-            if cs.get("id") not in existing_ids and cs.get("emp_id") not in existing_ids:
+            cs_id = str(cs.get("id") or cs.get("emp_id"))
+            cs_name = str(cs.get("name") or "")
+            if cs_id in DELETED_STAFF_IDS or cs_name in DELETED_STAFF_IDS:
+                continue
+            if cs_id not in existing_ids:
                 records.append(cs)
-                existing_ids.add(cs.get("id"))
+                existing_ids.add(cs_id)
 
         return records
     return [
@@ -1453,6 +1487,167 @@ def add_new_staff_member(payload: NewStaffRequest):
         "status": "success",
         "message": f"New staff member {payload.name.strip()} ({emp_id}) successfully onboarded and registered.",
         "staff_member": new_record
+    }
+
+@router.put("/staff/{emp_id}")
+def update_staff_profile(emp_id: str, payload: UpdateStaffRequest):
+    """
+    Updates an existing staff member's profile, including station allocations,
+    shift assignments, skill ratings, efficiency, and career progression.
+    """
+    all_staff = get_staff_data()
+    existing = next((s for s in all_staff if str(s.get("emp_id") or s.get("id")) == emp_id or s.get("name") == emp_id), None)
+    if not existing:
+        raise HTTPException(status_code=404, detail=f"Staff member {emp_id} not found")
+
+    if emp_id not in CUSTOM_STAFF_METADATA:
+        CUSTOM_STAFF_METADATA[emp_id] = {}
+
+    meta = CUSTOM_STAFF_METADATA[emp_id]
+    if payload.name and payload.name.strip():
+        meta["name"] = payload.name.strip()
+    if payload.role and payload.role.strip():
+        meta["role"] = payload.role.strip()
+        meta["skill_level"] = payload.role.strip()
+    if payload.base_station and payload.base_station.strip():
+        meta["assigned_station"] = payload.base_station.strip()
+        meta["base_station"] = payload.base_station.strip()
+    elif payload.assigned_station and payload.assigned_station.strip():
+        meta["assigned_station"] = payload.assigned_station.strip()
+        meta["base_station"] = payload.assigned_station.strip()
+    if payload.shift and payload.shift.strip():
+        meta["shift"] = payload.shift.strip()
+    if payload.efficiency_rating is not None:
+        meta["efficiency_rating"] = max(10, min(100, int(payload.efficiency_rating)))
+    if payload.skill_gap and payload.skill_gap.strip():
+        meta["skill_gap"] = payload.skill_gap.strip()
+    if payload.training_recommendation and payload.training_recommendation.strip():
+        meta["training_recommendation"] = payload.training_recommendation.strip()
+    if payload.career_progression and payload.career_progression.strip():
+        meta["career_progression"] = payload.career_progression.strip()
+    if payload.hot_kitchen is not None:
+        meta["hot_kitchen"] = max(1, min(5, int(payload.hot_kitchen)))
+    if payload.grill_station is not None:
+        meta["grill_station"] = max(1, min(5, int(payload.grill_station)))
+    if payload.cold_salad is not None:
+        meta["cold_salad"] = max(1, min(5, int(payload.cold_salad)))
+    if payload.pizza_station is not None:
+        meta["pizza_station"] = max(1, min(5, int(payload.pizza_station)))
+    if payload.fryer_station is not None:
+        meta["fryer_station"] = max(1, min(5, int(payload.fryer_station)))
+    if payload.contact_phone is not None:
+        meta["contact_phone"] = payload.contact_phone.strip()
+
+    # Also update in CUSTOM_ADDED_STAFF if present
+    for cs in CUSTOM_ADDED_STAFF:
+        if str(cs.get("emp_id") or cs.get("id")) == emp_id:
+            for k, v in meta.items():
+                cs[k] = v
+
+    # Also update row in staff_database.csv if present
+    csv_paths = [
+        os.path.join(BACKEND_DIR, "data", "staff_database.csv"),
+        os.path.join(BACKEND_DIR, "staff_database.csv")
+    ]
+    for p in csv_paths:
+        if os.path.exists(p):
+            try:
+                lines = []
+                with open(p, "r", encoding="utf-8") as rf:
+                    r = csv.reader(rf)
+                    header = next(r, None)
+                    if header:
+                        lines.append(header)
+                    for row in r:
+                        if row and len(row) > 0 and row[0].strip() == emp_id:
+                            name_val = meta.get("name", row[1] if len(row) > 1 else "")
+                            st_val = meta.get("base_station", row[2] if len(row) > 2 else "Hot Kitchen")
+                            hk = meta.get("hot_kitchen", row[3] if len(row) > 3 else 3)
+                            gk = meta.get("grill_station", row[4] if len(row) > 4 else 3)
+                            cs = meta.get("cold_salad", row[5] if len(row) > 5 else 3)
+                            pz = meta.get("pizza_station", row[6] if len(row) > 6 else 3)
+                            fr = meta.get("fryer_station", row[7] if len(row) > 7 else 3)
+                            lines.append([emp_id, name_val, st_val, hk, gk, cs, pz, fr])
+                        else:
+                            lines.append(row)
+                with open(p, "w", newline="", encoding="utf-8") as wf:
+                    w = csv.writer(wf)
+                    w.writerows(lines)
+            except Exception as e:
+                print(f"Warning: could not update {p}: {e}")
+
+    # Re-fetch updated profile
+    updated_all = get_staff_data()
+    updated_member = next((s for s in updated_all if str(s.get("emp_id") or s.get("id")) == emp_id or s.get("name") == emp_id), None)
+
+    return {
+        "status": "success",
+        "message": f"Staff profile for {emp_id} successfully updated.",
+        "staff_member": updated_member
+    }
+
+@router.delete("/staff/{emp_id}")
+def delete_staff_member(emp_id: str):
+    """
+    Deletes a staff member from the active roster, in-memory allocations,
+    and updates staff database records.
+    """
+    all_staff = get_staff_data()
+    existing = next((s for s in all_staff if str(s.get("emp_id") or s.get("id")) == emp_id or s.get("name") == emp_id), None)
+    if not existing:
+        raise HTTPException(status_code=404, detail=f"Staff member {emp_id} not found")
+
+    staff_name = existing.get("name", emp_id)
+    real_id = str(existing.get("emp_id") or existing.get("id") or emp_id)
+
+    # Add to DELETED_STAFF_IDS set
+    DELETED_STAFF_IDS.add(real_id)
+    DELETED_STAFF_IDS.add(staff_name)
+    DELETED_STAFF_IDS.add(staff_name.split('(')[0].strip())
+
+    # Remove from CUSTOM_ADDED_STAFF
+    global CUSTOM_ADDED_STAFF
+    CUSTOM_ADDED_STAFF = [cs for cs in CUSTOM_ADDED_STAFF if str(cs.get("emp_id") or cs.get("id")) != real_id and cs.get("name") != staff_name]
+
+    # Remove from active allocations if reallocated
+    if staff_name in active_staff_reallocations:
+        del active_staff_reallocations[staff_name]
+    if real_id in active_staff_reallocations:
+        del active_staff_reallocations[real_id]
+
+    # Clean up custom metadata
+    if real_id in CUSTOM_STAFF_METADATA:
+        del CUSTOM_STAFF_METADATA[real_id]
+
+    # Rewrite CSV files to remove deleted staff if present
+    csv_paths = [
+        os.path.join(BACKEND_DIR, "data", "staff_database.csv"),
+        os.path.join(BACKEND_DIR, "staff_database.csv")
+    ]
+    for p in csv_paths:
+        if os.path.exists(p):
+            try:
+                lines = []
+                with open(p, "r", encoding="utf-8") as rf:
+                    r = csv.reader(rf)
+                    header = next(r, None)
+                    if header:
+                        lines.append(header)
+                    for row in r:
+                        if row and len(row) > 0:
+                            if row[0].strip() == real_id or (len(row) > 1 and row[1].strip() == staff_name):
+                                continue
+                            lines.append(row)
+                with open(p, "w", newline="", encoding="utf-8") as wf:
+                    w = csv.writer(wf)
+                    w.writerows(lines)
+            except Exception as e:
+                print(f"Warning: could not rewrite {p}: {e}")
+
+    return {
+        "status": "success",
+        "message": f"Staff member {staff_name} ({real_id}) successfully removed from kitchen roster.",
+        "deleted_id": real_id
     }
 
 @router.get("/surge-recommendations")
