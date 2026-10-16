@@ -48,6 +48,7 @@ export default function KitchenStaffDashboard({
   const [upskillStationFilter, setUpskillStationFilter] = useState('ALL');
   const [upskillSearchQuery, setUpskillSearchQuery] = useState('');
   const [upskillPageSize, setUpskillPageSize] = useState(12);
+  const [firebaseStatus, setFirebaseStatus] = useState({ connected: true, status: 'connected' });
   const [enrolledPathways, setEnrolledPathways] = useState(() => {
     try {
       const saved = localStorage.getItem('upskilling_enrolled_pathways');
@@ -763,6 +764,23 @@ export default function KitchenStaffDashboard({
     const interval = setInterval(fetchLiveOrders, 4000);
     return () => clearInterval(interval);
   }, [refreshTrigger]);
+
+  // Periodic Firebase Realtime Database health-check poll
+  useEffect(() => {
+    const checkFirebase = async () => {
+      try {
+        const res = await axios.get("http://localhost:8000/api/firebase/status");
+        if (res?.data) {
+          setFirebaseStatus(res.data);
+        }
+      } catch (e) {
+        setFirebaseStatus({ connected: false, status: 'disconnected' });
+      }
+    };
+    checkFirebase();
+    const fbInterval = setInterval(checkFirebase, 15000);
+    return () => clearInterval(fbInterval);
+  }, []);
 
   const getStationForDish = (dishName = "") => {
     const nl = (dishName || "").toLowerCase();
@@ -3100,7 +3118,23 @@ export default function KitchenStaffDashboard({
         </div>
 
         {/* Sync Status Badge & Cross-Module Shortcut */}
-        <div className="flex items-center gap-3 pr-2">
+        <div className="flex flex-wrap items-center gap-3 pr-2">
+          {/* Live Firebase Cloud Sync Status Badge */}
+          <div
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold shadow-2xs transition-all ${
+              firebaseStatus?.connected
+                ? 'bg-amber-50 dark:bg-amber-950/60 border border-amber-300 dark:border-amber-800 text-amber-800 dark:text-amber-300'
+                : 'bg-slate-100 dark:bg-slate-800 text-slate-500 border border-slate-200 dark:border-slate-700'
+            }`}
+            title={`Firebase Realtime Database: ${firebaseStatus?.database_url || 'smart-restaurant-333'}`}
+          >
+            <span className="flex h-2 w-2 relative">
+              <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${firebaseStatus?.connected ? 'bg-amber-400' : 'bg-slate-400'}`}></span>
+              <span className={`relative inline-flex rounded-full h-2 w-2 ${firebaseStatus?.connected ? 'bg-amber-500' : 'bg-slate-400'}`}></span>
+            </span>
+            <span>🔥 Firebase Realtime DB: {firebaseStatus?.connected ? 'Connected' : 'Offline'}</span>
+          </div>
+
           <div className="flex items-center gap-2 text-xs font-semibold text-slate-500 dark:text-slate-400">
             <span className="flex h-2.5 w-2.5 relative">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>

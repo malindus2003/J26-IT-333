@@ -7,8 +7,28 @@ import numpy as np
 import pandas as pd
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
+from ..firebase import get_realtime_db
 
 router = APIRouter(prefix="/api/kitchen", tags=["Component 2: Kitchen Efficiency & Staff Optimization"])
+
+def sync_staff_member_to_firebase(emp_id: str, staff_dict: Dict[str, Any]):
+    """Syncs a single staff profile to Firebase Realtime Database."""
+    try:
+        ref = get_realtime_db()
+        if ref:
+            clean_data = {k: v for k, v in staff_dict.items() if not str(k).startswith('_')}
+            ref.child("kitchen_staff").child(str(emp_id)).set(clean_data)
+    except Exception as e:
+        print(f"Firebase sync warning: {e}")
+
+def delete_staff_member_from_firebase(emp_id: str):
+    """Removes a staff profile from Firebase Realtime Database."""
+    try:
+        ref = get_realtime_db()
+        if ref:
+            ref.child("kitchen_staff").child(str(emp_id)).delete()
+    except Exception as e:
+        print(f"Firebase delete warning: {e}")
 
 # backend folder path resolution
 ROUTER_DIR = os.path.dirname(os.path.abspath(__file__))               # backend/app/routers
@@ -1483,6 +1503,9 @@ def add_new_staff_member(payload: NewStaffRequest):
             except Exception as ue:
                 print(f"Warning: could not log to upskilling_recommendations.csv: {ue}")
 
+    # Sync new staff member to Firebase Realtime Database
+    sync_staff_member_to_firebase(emp_id, new_record)
+
     return {
         "status": "success",
         "message": f"New staff member {payload.name.strip()} ({emp_id}) successfully onboarded and registered.",
@@ -1580,6 +1603,10 @@ def update_staff_profile(emp_id: str, payload: UpdateStaffRequest):
     updated_all = get_staff_data()
     updated_member = next((s for s in updated_all if str(s.get("emp_id") or s.get("id")) == emp_id or s.get("name") == emp_id), None)
 
+    # Sync updated profile to Firebase Realtime Database
+    if updated_member:
+        sync_staff_member_to_firebase(emp_id, updated_member)
+
     return {
         "status": "success",
         "message": f"Staff profile for {emp_id} successfully updated.",
@@ -1643,6 +1670,9 @@ def delete_staff_member(emp_id: str):
                     w.writerows(lines)
             except Exception as e:
                 print(f"Warning: could not rewrite {p}: {e}")
+
+    # Remove from Firebase Realtime Database
+    delete_staff_member_from_firebase(real_id)
 
     return {
         "status": "success",
