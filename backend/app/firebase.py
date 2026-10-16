@@ -1,6 +1,6 @@
 import os
 import logging
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from pathlib import Path
 from dotenv import load_dotenv
 
@@ -123,3 +123,31 @@ def get_firebase_status() -> Dict[str, Any]:
             "status": "connected" if firestore_ok else "not_configured"
         }
     }
+
+def sync_all_staff_to_firebase(staff_list: List[Dict[str, Any]]) -> bool:
+    """Syncs all 30 kitchen staff members from staff_database.csv to Firebase Realtime Database."""
+    try:
+        ref = get_realtime_db()
+        if ref:
+            staff_map = {}
+            for s in staff_list:
+                emp_id = str(s.get("emp_id") or s.get("id"))
+                clean_s = {k: v for k, v in s.items() if not str(k).startswith("_")}
+                staff_map[emp_id] = clean_s
+            ref.child("kitchen_staff").set(staff_map)
+            logger.info(f"🔥 Successfully synced {len(staff_map)} kitchen staff members to Firebase.")
+            return True
+    except Exception as e:
+        logger.error(f"Failed to sync staff list to Firebase: {e}")
+    return False
+
+def get_all_staff_from_firebase() -> Optional[Dict[str, Any]]:
+    """Retrieves all kitchen staff profiles directly from Firebase Realtime Database."""
+    try:
+        ref = get_realtime_db()
+        if ref:
+            return ref.child("kitchen_staff").get()
+    except Exception as e:
+        logger.error(f"Failed to fetch staff from Firebase: {e}")
+    return None
+

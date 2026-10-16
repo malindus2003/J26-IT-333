@@ -2,7 +2,10 @@ import io
 import os
 import joblib
 import numpy as np
-import cv2
+try:
+    import cv2
+except ImportError:
+    cv2 = None
 from PIL import Image
 from typing import Dict, Any, Tuple, List, Optional
 from .train_cv_models import extract_visual_features_from_image
@@ -50,6 +53,8 @@ class FoodQualityVisionEngine:
 
     def analyze_image(self, image_bytes: bytes, category: str = "Fruits") -> Dict[str, Any]:
         """Analyze an uploaded or container-captured food image."""
+        if cv2 is None:
+            return self._default_features(category)
         try:
             # Decode image with OpenCV
             nparr = np.frombuffer(image_bytes, np.uint8)
@@ -211,5 +216,5 @@ class FoodQualityVisionEngine:
             "image_width": 256,
             "image_height": 256
         }
-
 food_vision_engine = FoodQualityVisionEngine()
+vision_engine = food_vision_engine

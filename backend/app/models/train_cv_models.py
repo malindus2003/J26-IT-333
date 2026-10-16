@@ -16,19 +16,25 @@ import os
 import json
 import joblib
 import numpy as np
-import cv2
+try:
+    import cv2
+except ImportError:
+    cv2 = None
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier, RandomForestRegressor
 from sklearn.neural_network import MLPClassifier
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import accuracy_score, f1_score, r2_score, mean_squared_error, confusion_matrix
-import xgboost as xgb
+try:
+    import xgboost as xgb
+except ImportError:
+    xgb = None
 
 def extract_visual_features_from_image(img_bgr):
     """
     Extracts a 28-dimensional multi-domain visual feature vector from an image.
     """
-    if img_bgr is None:
+    if cv2 is None or img_bgr is None:
         return np.zeros(28, dtype=np.float32)
 
     img_resized = cv2.resize(img_bgr, (256, 256))

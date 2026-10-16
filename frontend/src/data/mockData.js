@@ -413,3 +413,6 @@ export const DEFAULT_DASHBOARD_STATS = {
   "cost_loss_today_lkr": "10,900.00",
   "system_health": "Optimal Operational Flow"
 };
+
+export { DEFAULT_STAFF_30 } from './staffData';
+

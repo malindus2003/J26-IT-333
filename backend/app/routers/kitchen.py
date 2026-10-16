@@ -436,80 +436,80 @@ def get_staff_data() -> List[Dict[str, Any]]:
                 existing_ids.add(cs_id)
 
         return records
-    return [
-        {
-            "id": "staff-1",
-            "name": "K. Perera (Senior Line Chef)",
-            "assigned_station": "Hot Kitchen",
-            "shift": "11:00 AM - 09:30 PM",
-            "efficiency_rating": 94,
-            "skill_level": "Expert (Level 4)",
-            "speed_score": "4.8 / 5.0",
-            "skill_gap": "Advanced Pastry & Bakery",
-            "training_recommendation": "Executive Kitchen Leadership & Precision Temperature Control",
-            "career_progression": "Ready for Sous-Chef Promotion (88% Milestones Complete)"
-        },
-        {
-            "id": "staff-2",
-            "name": "S. Fernando (Junior Chef)",
-            "assigned_station": "Cold Salad",
-            "shift": "03:00 PM - 11:00 PM",
-            "efficiency_rating": 78,
-            "skill_level": "Intermediate (Level 2)",
-            "speed_score": "3.9 / 5.0",
-            "skill_gap": "High-Heat Saute & Wok Handling",
-            "training_recommendation": "Enrolled in 'High-Volume Stir-Fry Optimization' (Module 3)",
-            "career_progression": "Target: Line Cook Specialist (62% Completed)"
-        },
-        {
-            "id": "staff-3",
-            "name": "T. Silva (Prep Cook)",
-            "assigned_station": "Grill",
-            "shift": "10:00 AM - 07:00 PM",
-            "efficiency_rating": 85,
-            "skill_level": "Intermediate (Level 3)",
-            "speed_score": "4.2 / 5.0",
-            "skill_gap": "HACCP Seafood Core Temperature Monitoring",
-            "training_recommendation": "Seafood Freshness Grading & Quick-Sear Techniques",
-            "career_progression": "Grill Master Track (74% Completed)"
-        },
-        {
-            "id": "staff-4",
-            "name": "A. Jayasinghe (Station Lead)",
-            "assigned_station": "Pizza",
-            "shift": "07:00 AM - 04:00 PM",
-            "efficiency_rating": 91,
-            "skill_level": "Expert (Level 4)",
-            "speed_score": "4.7 / 5.0",
-            "skill_gap": "High-Volume Batch Inventory Planning",
-            "training_recommendation": "Wood-Fired Pizza Deck Oven Management & Crust Proofing",
-            "career_progression": "Head of Pizza Track (82% Completed)"
-        },
-        {
-            "id": "staff-5",
-            "name": "M. Wickramasinghe (Kitchen Trainee)",
-            "assigned_station": "Fryer",
-            "shift": "11:00 AM - 08:00 PM",
-            "efficiency_rating": 64,
-            "skill_level": "Trainee (Level 1)",
-            "speed_score": "3.1 / 5.0",
-            "skill_gap": "Knife Handling, Prep Hygiene & Portion Control",
-            "training_recommendation": "Foundation Kitchen Safety, Deep Fryer Safety & Oil Filtering",
-            "career_progression": "Apprentice Onboarding (35% Completed)"
-        },
-        {
-            "id": "staff-6",
-            "name": "R. Dissanayake (Kitchen Trainee)",
-            "assigned_station": "Hot Kitchen",
-            "shift": "01:00 PM - 10:00 PM",
-            "efficiency_rating": 58,
-            "skill_level": "Trainee (Level 1)",
-            "speed_score": "2.8 / 5.0",
-            "skill_gap": "Station Setup & Order Ticket Flow",
-            "training_recommendation": "Basic Line Cooking Fundamentals & Ticket Dispatching",
-            "career_progression": "Junior Line Apprentice (25% Completed)"
-        }
+
+    # Fallback 1: Query Firebase Realtime Database if CSV not loaded
+    try:
+        from ..firebase import get_all_staff_from_firebase
+        fb_staff = get_all_staff_from_firebase()
+        if fb_staff and isinstance(fb_staff, dict) and len(fb_staff) > 0:
+            return list(fb_staff.values())
+    except Exception:
+        pass
+
+    # Fallback 2: Comprehensive 30-staff workforce roster (EMP01 - EMP30)
+    raw_roster = [
+        ("EMP01", "Chef Kamal (Head Chef)", "Hot Kitchen / Saute", 5, 5, 4, 4, 4),
+        ("EMP02", "Chef Nimal (Senior Sous Chef)", "Grill Station", 5, 5, 3, 4, 4),
+        ("EMP03", "Chef Ruwan (Float Specialist)", "Hot Kitchen / Saute", 4, 4, 4, 4, 4),
+        ("EMP04", "Chef Samantha (Lead Grill Master)", "Grill Station", 4, 5, 2, 3, 4),
+        ("EMP05", "Chef Amara (Italian Lead)", "Pizza Station", 3, 2, 4, 5, 3),
+        ("EMP06", "Chef Priyantha (Pantry In-Charge)", "Cold & Salad Station", 2, 2, 5, 3, 2),
+        ("EMP07", "Chef Sunil (Fast Food Lead)", "Fryer Station", 3, 3, 2, 4, 5),
+        ("EMP08", "Chef Kasun (CDP - Hot Line)", "Hot Kitchen / Saute", 5, 4, 2, 3, 3),
+        ("EMP09", "Chef Dilshan (CDP - Grill)", "Grill Station", 3, 5, 2, 2, 4),
+        ("EMP10", "Chef Dinesh (Float - Senior)", "Pizza Station", 4, 4, 3, 4, 4),
+        ("EMP11", "Chef Chaminda (Demi CDP)", "Hot Kitchen / Saute", 4, 3, 2, 2, 3),
+        ("EMP12", "Chef Roshan (Demi CDP)", "Grill Station", 3, 4, 2, 2, 4),
+        ("EMP13", "Chef Anura (Salad Specialist)", "Cold & Salad Station", 1, 2, 5, 2, 2),
+        ("EMP14", "Chef Nuwan (Pizza Baker)", "Pizza Station", 2, 2, 3, 5, 3),
+        ("EMP15", "Chef Kelum (Fryer Tech)", "Fryer Station", 2, 3, 2, 3, 5),
+        ("EMP16", "Chef Mahesh (Commis I)", "Hot Kitchen / Saute", 3, 3, 2, 2, 3),
+        ("EMP17", "Chef Lahiru (Commis I)", "Grill Station", 2, 3, 2, 3, 4),
+        ("EMP18", "Chef Danushka (Commis I)", "Cold & Salad Station", 2, 2, 4, 3, 2),
+        ("EMP19", "Chef Isuru (Commis I)", "Pizza Station", 2, 2, 2, 4, 3),
+        ("EMP20", "Chef Tharindu (Commis II)", "Fryer Station", 2, 2, 2, 3, 4),
+        ("EMP21", "Chef Kavinda (Commis II)", "Hot Kitchen / Saute", 3, 2, 2, 1, 3),
+        ("EMP22", "Chef Sandun (Commis II)", "Cold & Salad Station", 1, 2, 4, 2, 2),
+        ("EMP23", "Chef Chathura (Commis II)", "Pizza Station", 2, 1, 2, 4, 3),
+        ("EMP24", "Chef Ravindu (Float - Junior)", "Hot Kitchen / Saute", 3, 3, 3, 3, 3),
+        ("EMP25", "Chef Malith (Commis III)", "Grill Station", 2, 3, 1, 2, 3),
+        ("EMP26", "Trainee Oshada", "Hot Kitchen / Saute", 2, 1, 2, 1, 2),
+        ("EMP27", "Trainee Bimsara", "Grill Station", 1, 2, 1, 1, 2),
+        ("EMP28", "Trainee Janith", "Cold & Salad Station", 1, 1, 3, 2, 1),
+        ("EMP29", "Trainee Sachith", "Pizza Station", 1, 1, 2, 3, 2),
+        ("EMP30", "Trainee Kaveen", "Fryer Station", 1, 1, 1, 2, 3)
     ]
+    fb_records = []
+    for emp_id, name, base_st, hk, gs, cs, ps, fs in raw_roster:
+        scores = {"hot_kitchen": hk, "grill_station": gs, "cold_salad": cs, "pizza_station": ps, "fryer_station": fs}
+        avg_score = sum(scores.values()) / 5.0
+        eff = min(98, max(55, int(round(avg_score * 17.5 + 11.0))))
+        clean_st = "Hot Kitchen" if "hot" in base_st.lower() else "Grill" if "grill" in base_st.lower() else "Cold Salad" if "cold" in base_st.lower() else "Pizza" if "pizza" in base_st.lower() else "Fryer"
+        shift = "10:00 AM - 08:30 PM" if "Head Chef" in name else "11:00 AM - 09:30 PM" if "Sous Chef" in name else "07:00 AM - 04:00 PM" if "Lead" in name or "Specialist" in name else "01:00 PM - 10:00 PM" if "CDP" in name else "08:00 AM - 05:00 PM"
+        lvl = "Executive Chef (Level 5)" if "Head Chef" in name else "Executive Sous Chef (Level 4)" if "Sous Chef" in name else "Station Specialist (Level 3)" if "Lead" in name or "Specialist" in name else "Chef de Partie (Level 3)" if "CDP" in name else "Commis Chef (Level 2)" if "Commis" in name else "Kitchen Trainee (Level 1)"
+        fb_records.append({
+            "id": emp_id,
+            "emp_id": emp_id,
+            "name": name,
+            "assigned_station": clean_st,
+            "base_station": base_st,
+            "isReallocated": False,
+            "reallocatedTo": None,
+            "shift": shift,
+            "efficiency_rating": eff,
+            "skill_level": lvl,
+            "speed_score": f"{round(avg_score * 0.85 + 0.65, 1)} / 5.0",
+            "skill_gap": "Advanced Line Technique",
+            "training_recommendation": "Precision Line Cooking & Standard Operating Procedures",
+            "career_progression": "Kitchen Advancement Pathway",
+            "hot_kitchen": hk,
+            "grill_station": gs,
+            "cold_salad": cs,
+            "pizza_station": ps,
+            "fryer_station": fs
+        })
+    return fb_records
+
 
 def get_workload_forecast() -> List[Dict[str, Any]]:
     df = load_csv_data("predicted_daily_workload.csv")
@@ -1335,6 +1335,18 @@ def get_all_staff():
         "status": "success",
         "staff": staff_list,
         "total_count": len(staff_list)
+    }
+
+@router.post("/staff/sync-firebase")
+def sync_all_staff_to_cloud():
+    """Syncs all 30 staff members from staff_database.csv to Firebase Realtime Database."""
+    from ..firebase import sync_all_staff_to_firebase
+    staff_list = get_staff_data()
+    success = sync_all_staff_to_firebase(staff_list)
+    return {
+        "status": "success" if success else "warning",
+        "synced_count": len(staff_list),
+        "message": f"Successfully synced {len(staff_list)} staff members to Firebase Realtime Database (/kitchen_staff)." if success else "Firebase offline or credentials not found."
     }
 
 @router.post("/staff")

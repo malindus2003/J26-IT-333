@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { ResponsiveContainer, LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Legend, ReferenceArea } from 'recharts';
 import axios from 'axios';
+import { DEFAULT_STAFF_30 } from '../data/staffData';
 
 export default function KitchenStaffDashboard({
   isDarkMode,
@@ -1996,14 +1997,7 @@ export default function KitchenStaffDashboard({
           { id: "station-4", name: "Pizza", actual_load: 14.5, predicted_load: 13.8, active_cooks: 2, recommended_cooks: 2, avg_prep_time_mins: 5.2, target_prep_time_mins: 5.0, queue_length: 4, load_level: 55, predicted_load_level: 52, bottleneck_status: "Smooth Flow", action: "Maintain current deck oven line pacing" },
           { id: "station-5", name: "Fryer", actual_load: 7.3, predicted_load: 6.9, active_cooks: 1, recommended_cooks: 1, avg_prep_time_mins: 3.5, target_prep_time_mins: 4.0, queue_length: 2, load_level: 40, predicted_load_level: 38, bottleneck_status: "Smooth Flow", action: "Maintain current line staffing & prep batch oil temperature" }
         ],
-        staff: [
-          { id: "staff-1", name: "K. Perera (Senior Line Chef)", assigned_station: "Hot Kitchen", shift: "11:00 AM - 09:30 PM", efficiency_rating: 94, skill_level: "Expert (Level 4)", speed_score: "4.8 / 5.0", skill_gap: "Advanced Pastry & Bakery", training_recommendation: "Executive Kitchen Leadership & Precision Temperature Control", career_progression: "Ready for Sous-Chef Promotion (88% Milestones Complete)" },
-          { id: "staff-2", name: "S. Fernando (Junior Chef)", assigned_station: "Cold Salad", shift: "03:00 PM - 11:00 PM", efficiency_rating: 78, skill_level: "Intermediate (Level 2)", speed_score: "3.9 / 5.0", skill_gap: "High-Heat Saute & Wok Handling", training_recommendation: "Enrolled in 'High-Volume Stir-Fry Optimization' (Module 3)", career_progression: "Target: Line Cook Specialist (62% Completed)" },
-          { id: "staff-3", name: "T. Silva (Prep Cook)", assigned_station: "Grill", shift: "10:00 AM - 07:00 PM", efficiency_rating: 85, skill_level: "Intermediate (Level 3)", speed_score: "4.2 / 5.0", skill_gap: "HACCP Seafood Core Temperature Monitoring", training_recommendation: "Seafood Freshness Grading & Quick-Sear Techniques", career_progression: "Grill Master Track (74% Completed)" },
-          { id: "staff-4", name: "A. Jayasinghe (Station Lead)", assigned_station: "Pizza", shift: "07:00 AM - 04:00 PM", efficiency_rating: 91, skill_level: "Expert (Level 4)", speed_score: "4.7 / 5.0", skill_gap: "High-Volume Batch Inventory Planning", training_recommendation: "Wood-Fired Pizza Deck Oven Management & Crust Proofing", career_progression: "Head of Pizza Track (82% Completed)" },
-          { id: "staff-5", name: "M. Wickramasinghe (Kitchen Trainee)", assigned_station: "Fryer", shift: "11:00 AM - 08:00 PM", efficiency_rating: 64, skill_level: "Trainee (Level 1)", speed_score: "3.1 / 5.0", skill_gap: "Knife Handling, Prep Hygiene & Portion Control", training_recommendation: "Foundation Kitchen Safety, Deep Fryer Safety & Oil Filtering", career_progression: "Apprentice Onboarding (35% Completed)" },
-          { id: "staff-6", name: "R. Dissanayake (Kitchen Trainee)", assigned_station: "Hot Kitchen", shift: "01:00 PM - 10:00 PM", efficiency_rating: 58, skill_level: "Trainee (Level 1)", speed_score: "2.8 / 5.0", skill_gap: "Station Setup & Order Ticket Flow", training_recommendation: "Basic Line Cooking Fundamentals & Ticket Dispatching", career_progression: "Junior Line Apprentice (25% Completed)" }
-        ],
+        staff: DEFAULT_STAFF_30,
         hourly_peak_forecast: [
           { hour: "07:00", predicted_orders: 28, staff_required: 4, actual_staff: 4 },
           { hour: "08:00 (Breakfast Peak)", predicted_orders: 76, staff_required: 6, actual_staff: 6 },

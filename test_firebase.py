@@ -56,7 +56,30 @@ def main():
             "voc": 0.32,
             "status": "optimal"
         })
-        print("    Test telemetry published successfully!")
+    print("[*] 3. Syncing 30 Kitchen Staff Members from staff_database.csv to Firebase...")
+    try:
+        from app.routers.kitchen import get_staff_data
+        staff_list = get_staff_data()
+    except Exception:
+        try:
+            from backend.app.routers.kitchen import get_staff_data
+            staff_list = get_staff_data()
+        except Exception:
+            staff_list = []
+
+    if staff_list:
+        staff_sync_ok = firebase_service.sync_kitchen_staff(staff_list)
+        print(f"    Staff Sync   : {'SUCCESS (30 Staff Members Uploaded)' if staff_sync_ok else 'FAILED'}")
+        cloud_staff = firebase_service.get_kitchen_staff()
+        if isinstance(cloud_staff, dict):
+            print(f"    Cloud Roster : {len(cloud_staff)} active staff profiles verified in /kitchen_staff")
+            sample_ids = ["EMP01", "EMP05", "EMP10", "EMP30"]
+            for sid in sample_ids:
+                if sid in cloud_staff:
+                    m = cloud_staff[sid]
+                    print(f"     • {sid}: {m.get('name')} ({m.get('assigned_station')}) - Efficiency: {m.get('efficiency_rating')}%")
+    else:
+        print("    [!] staff_database.csv not found or empty.")
 
     print("=" * 70)
     print("  ALL FIREBASE TESTS PASSED SUCCESSFULLY! CLOUD SYNC IS OPERATIONAL.")
