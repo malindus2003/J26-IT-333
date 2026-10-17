@@ -6,7 +6,7 @@ echo ========================================================
 echo.
 
 echo [1/2] Launching Python FastAPI Backend on http://localhost:8000 ...
-start "FastAPI Backend" cmd /k "cd backend && python run.py"
+start "FastAPI Backend" cmd /k "cd backend && call .venv\Scripts\activate && python run.py"
 
 timeout /t 3 /nobreak >nul
 

@@ -5,7 +5,7 @@ import {
   Database, Sliders, Layers, Plus, Check, X, Printer, ChefHat, ShieldCheck, 
   Flame, Scale, PieChart, Info, HelpCircle, Activity, ChevronRight, ChevronLeft, ChevronDown, Eye, Play,
   Zap, Clock, Award, FileText, ToggleLeft, ToggleRight, Sun, Droplets, Utensils,
-  Users
+  Users, MapPin
 } from 'lucide-react';
 import { 
   ResponsiveContainer, BarChart, Bar, LineChart, Line, XAxis, YAxis, 
@@ -45,15 +45,8 @@ export default function DemandForecastingDashboard({ isDarkMode, currentRole = '
   const [searchQuery, setSearchQuery] = useState('');
 
   // Modals
-  const [showAddModal, setShowAddModal] = useState(false);
   const [showPrepSheetModal, setShowPrepSheetModal] = useState(false);
   const [selectedItemIngredients, setSelectedItemIngredients] = useState(null);
-
-  // New Item Form State
-  const [newItemName, setNewItemName] = useState('');
-  const [newItemCategory, setNewItemCategory] = useState('Main Course');
-  const [newItemPrice, setNewItemPrice] = useState('1250');
-  const [newItemBaseAvg, setNewItemBaseAvg] = useState('60');
 
   // Simulation State
   const [simWeather, setSimWeather] = useState('Thunderstorm Monsoon');
@@ -65,13 +58,6 @@ export default function DemandForecastingDashboard({ isDarkMode, currentRole = '
   const [simShift, setSimShift] = useState('Dinner');
   const [simResult, setSimResult] = useState(null);
   const [simulating, setSimulating] = useState(false);
-
-  // Retraining State
-  const [isRetraining, setIsRetraining] = useState(false);
-  const [retrainProgress, setRetrainProgress] = useState(0);
-  const [retrainLogs, setRetrainLogs] = useState([]);
-  const [retrainResult, setRetrainResult] = useState(null);
-  const [selectedTrainingWindow, setSelectedTrainingWindow] = useState(90);
 
   useEffect(() => {
     fetchDemandData();
@@ -85,13 +71,9 @@ export default function DemandForecastingDashboard({ isDarkMode, currentRole = '
     } catch (err) {
       console.error("Failed to load demand forecasts, using fallback:", err);
       setData({
-        researcher: "Nanayakkara K.A.J.Y (IT23314542)",
-        module: "Component 1: AI Food Demand Prediction",
+        module: "AI Food Demand Prediction",
         model_performance: {
-          algorithm: "Hybrid Random Forest + Prophet Multi-Source Time-Series",
-          rmse: 4.12,
-          mae: 3.05,
-          mape: "4.8%",
+          reliability: "High Confidence",
           training_window_days: 90
         },
         contextual_factors: {
@@ -113,30 +95,6 @@ export default function DemandForecastingDashboard({ isDarkMode, currentRole = '
           { category: "Short Eats & Kottu", projected_orders: 110, share_pct: 26.2 },
           { category: "Italian", projected_orders: 45, share_pct: 10.7 },
           { category: "Dessert", projected_orders: 60, share_pct: 14.3 }
-        ],
-        data_pipeline_health: {
-          total_pos_records_ingested: 18450,
-          clean_records_pct: 99.4,
-          missing_values_imputed: 38,
-          outliers_handled: 12,
-          engineered_features_count: 28,
-          features_list: ["Lag-1 Day", "Lag-7 Day", "Lag-14 Day", "7-Day Moving Avg", "14-Day Moving Avg", "Precipitation_mm", "Temp_C", "Is_Holiday", "Promo_Discount_Pct", "Pax_Reservations", "Food_Category_Code", "Waste_Feedback_Index"]
-        },
-        retraining_history: [
-          {
-            id: "train-log-1",
-            timestamp: "2026-08-25 04:30 AM",
-            records_ingested: 18450,
-            training_window: "90 Days POS Data",
-            rmse_before: 4.62,
-            rmse_after: 4.12,
-            mae_before: 3.48,
-            mae_after: 3.05,
-            mape_before: "5.7%",
-            mape_after: "4.8%",
-            status: "Success",
-            trigger: "Scheduled Automated Weekly Retraining"
-          }
         ],
         items: [
           {
@@ -268,36 +226,32 @@ export default function DemandForecastingDashboard({ isDarkMode, currentRole = '
     try {
       const res = await axios.patch(`http://localhost:8000/api/demand/menu/${itemId}/toggle-status`);
       if (res.data.status === 'success') {
-        setData(prev => ({
-          ...prev,
-          items: prev.items.map(item => 
-            item.id === itemId ? { ...item, status: res.data.new_status } : item
-          )
-        }));
+        setData(prev => {
+          const updatedItems = prev.items.map(item => 
+            item.id === itemId ? { 
+              ...item, 
+              status: res.data.new_status,
+              prep_recommendation: res.data.new_prep_recommendation !== undefined ? res.data.new_prep_recommendation : (res.data.new_status === 'Unavailable' ? 0 : item.prep_recommendation),
+              buffer_quantity: res.data.new_buffer_quantity !== undefined ? res.data.new_buffer_quantity : (res.data.new_status === 'Unavailable' ? 0 : item.buffer_quantity)
+            } : item
+          );
+          const totalProjected = updatedItems.filter(i => i.status === 'Available').reduce((acc, curr) => acc + (curr.predicted_demand_today || 0), 0);
+          const totalPrep = updatedItems.filter(i => i.status === 'Available').reduce((acc, curr) => acc + (curr.prep_recommendation || 0), 0);
+          const totalBuf = updatedItems.filter(i => i.status === 'Available').reduce((acc, curr) => acc + (curr.buffer_quantity || 0), 0);
+          return {
+            ...prev,
+            items: updatedItems,
+            kpi_summary: {
+              ...prev.kpi_summary,
+              total_projected_orders: totalProjected,
+              total_prep_recommended: totalPrep,
+              total_safety_buffer: totalBuf
+            }
+          };
+        });
       }
     } catch (err) {
       console.error("Failed to toggle item status:", err);
-    }
-  };
-
-  const handleAddNewItem = async (e) => {
-    e.preventDefault();
-    if (!newItemName) return;
-    try {
-      const res = await axios.post("http://localhost:8000/api/demand/menu/add", {
-        name: newItemName,
-        category: newItemCategory,
-        price: parseFloat(newItemPrice) || 1000,
-        historical_avg: parseInt(newItemBaseAvg) || 50,
-        prep_lead_time_mins: 25
-      });
-      if (res.data.status === 'success') {
-        setShowAddModal(false);
-        setNewItemName('');
-        fetchDemandData();
-      }
-    } catch (err) {
-      console.error("Failed to add menu item:", err);
     }
   };
 
@@ -319,37 +273,6 @@ export default function DemandForecastingDashboard({ isDarkMode, currentRole = '
     } finally {
       setSimulating(false);
     }
-  };
-
-  const handleTriggerRetraining = async () => {
-    setIsRetraining(true);
-    setRetrainProgress(15);
-    setRetrainLogs(["Initializing POS sales ingestion pipeline...", "Connecting to restaurant POS database..."]);
-    setRetrainResult(null);
-
-    setTimeout(() => {
-      setRetrainProgress(45);
-      setRetrainLogs(prev => [...prev, "Ingesting 18,450 historical transaction records across 90 days...", "Running missing record imputation and Winsorization outlier smoothing..."]);
-    }, 900);
-
-    setTimeout(() => {
-      setRetrainProgress(75);
-      setRetrainLogs(prev => [...prev, "Feature engineering: Lag-1, Lag-7, Lag-14, 7-day Rolling Averages...", "Training Random Forest Regressor (150 estimators) & Facebook Prophet seasonality model..."]);
-    }, 1800);
-
-    setTimeout(async () => {
-      try {
-        const res = await axios.post(`http://localhost:8000/api/demand/retrain?training_window_days=${selectedTrainingWindow}`);
-        setRetrainProgress(100);
-        setRetrainResult(res.data);
-        setRetrainLogs(res.data.pipeline_steps);
-        fetchDemandData();
-      } catch (err) {
-        console.error("Retraining failed:", err);
-      } finally {
-        setIsRetraining(false);
-      }
-    }, 2800);
   };
 
   if (loading || !data) {
@@ -395,8 +318,8 @@ export default function DemandForecastingDashboard({ isDarkMode, currentRole = '
     { 
       id: 'xai', 
       label: 'Explainable AI (XAI) & Factor Attribution', 
-      shortLabel: 'XAI Drivers',
-      description: 'Feature importance rankings, SHAP values, holiday effects & weather impact weights',
+      shortLabel: 'Explainable AI',
+      description: 'Transparent attribution breakdown explaining key factors and real-time conditions driving customer dish demand',
       badge: 'Explainable AI',
       badgeColor: 'bg-purple-100 text-purple-900 dark:bg-purple-950 dark:text-purple-300 border-purple-300 dark:border-purple-700',
       icon: <Cpu className="h-4 w-4" />, 
@@ -411,30 +334,10 @@ export default function DemandForecastingDashboard({ isDarkMode, currentRole = '
       badgeColor: 'bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-300 border-amber-300 dark:border-amber-700',
       icon: <Sliders className="h-4 w-4" />, 
       roles: ['admin'] 
-    },
-    { 
-      id: 'retraining', 
-      label: 'Data Pipeline & Continuous Model Retraining', 
-      shortLabel: 'Retraining',
-      description: 'POS sales ingestion pipelines, automated model retraining logs & drift monitors',
-      badge: 'MLOps',
-      badgeColor: 'bg-rose-100 text-rose-900 dark:bg-rose-950 dark:text-rose-300 border-rose-300 dark:border-rose-700',
-      icon: <Database className="h-4 w-4" />, 
-      roles: ['admin'] 
-    },
-    { 
-      id: 'closed_loop', 
-      label: 'Closed Feedback Loop & Cross-Module Intelligence', 
-      shortLabel: 'Feedback Loop',
-      description: 'Cross-module sync connecting leftover plate waste metrics directly into future demand targets',
-      badge: 'Closed-Loop',
-      badgeColor: 'bg-teal-100 text-teal-900 dark:bg-teal-950 dark:text-teal-300 border-teal-300 dark:border-teal-700',
-      icon: <Sparkles className="h-4 w-4" />, 
-      roles: ['admin'] 
     }
   ];
 
-  const visibleTabs = allTabs;
+  const visibleTabs = allTabs.filter(t => t.roles.includes(userRole));
 
   const currentTabIdx = visibleTabs.findIndex(t => t.id === activeTab);
   const handlePrevTab = () => {
@@ -451,152 +354,119 @@ export default function DemandForecastingDashboard({ isDarkMode, currentRole = '
   return (
     <div className="space-y-6">
       
-      {/* Research Header Banner */}
+      {/* Research Header Banner with Role-Adaptive View */}
       <div className="glass-panel p-3.5 sm:p-6 rounded-xl sm:rounded-2xl bg-white dark:bg-slate-900 border border-[#cbdad0] dark:border-slate-800 shadow-sm relative">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 sm:gap-5">
           <div className="space-y-1.5 sm:space-y-2 max-w-3xl">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="px-2.5 sm:px-3 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-black bg-emerald-700 text-white shadow-sm flex items-center gap-1.5">
-                <TrendingUp className="h-3 w-3 sm:h-3.5 sm:w-3.5" /> Component 1: AI Demand Prediction
-              </span>
-              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
-                Multi-Source Time-Series
-              </span>
+              {userRole === 'staff' ? (
+                <>
+                  <span className="px-2.5 sm:px-3 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-black bg-emerald-700 text-white shadow-sm flex items-center gap-1.5">
+                    <ChefHat className="h-3 w-3 sm:h-3.5 sm:w-3.5" /> Kitchen Prep Station Mode
+                  </span>
+                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
+                    Live Shift Prep Guidance
+                  </span>
+                </>
+              ) : (
+                <>
+                  <span className="px-2.5 sm:px-3 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-black bg-emerald-700 text-white shadow-sm flex items-center gap-1.5">
+                    <TrendingUp className="h-3 w-3 sm:h-3.5 sm:w-3.5" /> Component 1: AI Demand Prediction
+                  </span>
+                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                    Multi-Source Time-Series
+                  </span>
+                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
+                    Executive / Manager View
+                  </span>
+                  <span className="px-2.5 py-0.5 rounded text-[10px] font-black bg-emerald-50 dark:bg-emerald-950/70 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800 flex items-center gap-1 shadow-2xs">
+                    <MapPin className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
+                    <span>{data?.active_branch?.name || "Hikkaduwa Beachfront (Main Branch)"}</span>
+                    <span className="text-[9px] font-mono opacity-80">({data?.active_branch?.latitude || 6.1395}°N, {data?.active_branch?.longitude || 80.1063}°E)</span>
+                  </span>
+                </>
+              )}
             </div>
             
             <h2 className="text-base sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight leading-tight">
-              Multi-Source Food Demand Forecasting & Kitchen Preparation Sizing
+              {userRole === 'staff' 
+                ? "Kitchen Food Preparation & Batch Sizing Guidance"
+                : "Multi-Source Food Demand Forecasting & Kitchen Preparation Sizing"
+              }
             </h2>
             <p className="text-[11px] sm:text-xs text-slate-600 dark:text-slate-300 leading-relaxed font-medium">
-              Multi-source time-series forecasting integrating 60–90 days POS records, live weather APIs, holiday calendars, reservations, and promotions to produce item-level prep targets and dynamic safety buffers while eliminating overproduction waste.
+              {userRole === 'staff'
+                ? "Shift prep quantities and safety buffers for line cooks and prep stations. Mark items out of stock (86) or print daily kitchen prep sheets."
+                : "Multi-source time-series forecasting integrating 60–90 days POS records, live weather APIs, holiday calendars, reservations, and promotions to produce item-level prep targets and dynamic safety buffers while eliminating overproduction waste."
+              }
             </p>
           </div>
 
-          {/* Key Metric Highlight */}
-          <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-center p-3 sm:p-4 rounded-xl sm:rounded-2xl bg-[#f4f8f5] dark:bg-slate-800/90 border border-[#d5e2d9] dark:border-slate-700 shadow-sm w-full sm:w-auto min-w-0 sm:min-w-[210px]">
-            <span className="text-[9px] sm:text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider">Model Accuracy (MAPE)</span>
-            <div className="text-xl sm:text-2xl font-black text-emerald-700 dark:text-emerald-400 mt-0.5">{data.model_performance.mape} (95.2%)</div>
-            <div className="text-[10px] sm:text-[11px] text-slate-600 dark:text-slate-300 font-semibold mt-0.5 sm:mt-1 flex items-center gap-1">
-              <CheckCircle className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-emerald-600" />
-              <span>RMSE: {data.model_performance.rmse} • MAE: {data.model_performance.mae}</span>
+          {/* Right Header Panel: Role Selector & Adaptive KPIs */}
+          <div className="flex flex-col sm:items-end gap-2.5 w-full sm:w-auto">
+            
+            {/* Role Switcher Pill: Only accessible to Admin/Manager; Kitchen staff cannot view manager data */}
+            {currentRole === 'admin' && (
+              <div className="flex items-center gap-1 p-1 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 self-start sm:self-end">
+                <span className="text-[10px] text-slate-500 font-bold px-1.5">Preview:</span>
+                <button
+                  type="button"
+                  onClick={() => setUserRole('admin')}
+                  className={`px-2.5 py-1 rounded-lg text-[10px] font-black transition-all cursor-pointer ${
+                    userRole === 'admin'
+                      ? 'bg-emerald-700 text-white shadow-xs'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                  }`}
+                >
+                  Manager View
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setUserRole('staff'); setActiveTab('overview'); }}
+                  className={`px-2.5 py-1 rounded-lg text-[10px] font-black transition-all cursor-pointer ${
+                    userRole === 'staff'
+                      ? 'bg-emerald-700 text-white shadow-xs'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                  }`}
+                >
+                  Chef View
+                </button>
+              </div>
+            )}
+
+            {/* Key Metric Highlight */}
+            <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-center p-3 sm:p-4 rounded-xl sm:rounded-2xl bg-[#f4f8f5] dark:bg-slate-800/90 border border-[#d5e2d9] dark:border-slate-700 shadow-sm w-full min-w-0 sm:min-w-[220px]">
+              {userRole === 'staff' ? (
+                <>
+                  <span className="text-[9px] sm:text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider">Today's Kitchen Target</span>
+                  <div className="text-xl sm:text-2xl font-black text-emerald-700 dark:text-emerald-400 mt-0.5">{data.kpi_summary.total_prep_recommended} Portions</div>
+                  <div className="text-[10px] sm:text-[11px] text-slate-600 dark:text-slate-300 font-semibold mt-0.5 sm:mt-1 flex items-center gap-1">
+                    <ShieldCheck className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-amber-600" />
+                    <span>+{data.kpi_summary.total_safety_buffer} safety buffer included</span>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <span className="text-[9px] sm:text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider">Forecast Reliability</span>
+                  <div className="text-xl sm:text-2xl font-black text-emerald-700 dark:text-emerald-400 mt-0.5">High Confidence</div>
+                  <div className="text-[10px] sm:text-[11px] text-slate-600 dark:text-slate-300 font-semibold mt-0.5 sm:mt-1 flex items-center gap-1">
+                    <CheckCircle className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-emerald-600" />
+                    <span>Calibrated on 90-day POS sales & weather</span>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>
       </div>
 
-      {/* Standalone Subcategory Navigation & Dropdown Bar (No Parent Clipping, High Z-Index) */}
-      <div className="p-3 sm:p-4 rounded-xl sm:rounded-2xl bg-white dark:bg-slate-900 border border-[#cbdad0] dark:border-slate-800 shadow-sm relative z-30">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
-          
-          {/* Main Dropdown Selector */}
-          <div className="relative w-full lg:w-96" ref={demandDropdownRef}>
-            <div className="flex items-center justify-between gap-2 mb-1.5 lg:hidden">
-              <span className="text-[10px] uppercase font-black text-slate-500 dark:text-slate-400">
-                Select Demand Subcategory:
-              </span>
-              <span className="text-[10px] font-bold text-emerald-700 dark:text-emerald-400">
-                6 Subcategories Available
-              </span>
-            </div>
-
-            {(() => {
-              const currentTabObj = allTabs.find(t => t.id === activeTab) || allTabs[0];
-              return (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => setDemandDropdownOpen(!demandDropdownOpen)}
-                    className="w-full px-3.5 py-2.5 rounded-xl border-2 border-emerald-600/30 hover:border-emerald-600 dark:border-emerald-500/40 dark:hover:border-emerald-500 bg-[#f8faf9] dark:bg-slate-800 flex items-center justify-between gap-3 shadow-2xs transition-all text-left cursor-pointer group"
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="p-2 rounded-xl bg-emerald-700 text-white shadow-sm flex-shrink-0 group-hover:scale-105 transition-transform">
-                        {currentTabObj.icon}
-                      </div>
-                      <div className="min-w-0">
-                        <div className="text-[9px] uppercase font-black text-emerald-700 dark:text-emerald-400 leading-tight tracking-wider">
-                          Active Demand Subcategory
-                        </div>
-                        <div className="text-xs sm:text-sm font-black text-slate-900 dark:text-white truncate">
-                          {currentTabObj.label}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-1.5 flex-shrink-0">
-                      <span className={`hidden sm:inline-block text-[9px] font-black px-2 py-0.5 rounded-full border ${currentTabObj.badgeColor}`}>
-                        {currentTabObj.badge}
-                      </span>
-                      <ChevronDown className={`h-4 w-4 text-emerald-700 dark:text-emerald-400 transition-transform duration-200 ${demandDropdownOpen ? 'rotate-180' : ''}`} />
-                    </div>
-                  </button>
-
-                  {/* Dropdown Options Popup with High Z-Index & No Clipping */}
-                  {demandDropdownOpen && (
-                    <div className="absolute left-0 right-0 lg:left-0 lg:right-auto mt-2 w-full lg:w-[420px] rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 shadow-2xl p-2 z-50 space-y-1.5 animate-fade-in max-h-[420px] overflow-y-auto no-scrollbar">
-                      <div className="px-3 py-2 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
-                        <span className="text-[10px] uppercase font-black tracking-wider text-slate-400">
-                          6 Demand Subcategories
-                        </span>
-                        <span className="text-[10px] font-bold text-emerald-700 dark:text-emerald-400">
-                          Tap to switch
-                        </span>
-                      </div>
-
-                      {allTabs.map((tab) => {
-                        const isSelected = tab.id === activeTab;
-                        return (
-                          <button
-                            key={tab.id}
-                            type="button"
-                            onClick={() => {
-                              setActiveTab(tab.id);
-                              setDemandDropdownOpen(false);
-                            }}
-                            className={`w-full p-2.5 rounded-xl text-left transition-all flex items-start gap-3 cursor-pointer ${
-                              isSelected
-                                ? 'bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-700/60 shadow-2xs'
-                                : 'hover:bg-slate-100 dark:hover:bg-slate-800 border border-transparent'
-                            }`}
-                          >
-                            <div className={`p-2 rounded-xl flex-shrink-0 mt-0.5 border ${
-                              isSelected
-                                ? 'bg-emerald-700 text-white border-emerald-700'
-                                : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700'
-                            }`}>
-                              {tab.icon}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center justify-between gap-1">
-                                <span className={`text-xs font-black truncate ${isSelected ? 'text-emerald-950 dark:text-emerald-200' : 'text-slate-900 dark:text-white'}`}>
-                                  {tab.label}
-                                </span>
-                                {isSelected ? (
-                                  <span className="text-[10px] font-black px-1.5 py-0.5 rounded bg-emerald-700 text-white flex-shrink-0 flex items-center gap-1">
-                                    <Check className="h-3 w-3" /> Active
-                                  </span>
-                                ) : (
-                                  <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full border flex-shrink-0 ${tab.badgeColor}`}>
-                                    {tab.badge}
-                                  </span>
-                                )}
-                              </div>
-                              <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 line-clamp-2 leading-tight">
-                                {tab.description}
-                              </p>
-                            </div>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
-                </>
-              );
-            })()}
-          </div>
-
-          {/* Stepper & Quick Pills Toolbar */}
-          <div className="flex items-center justify-between sm:justify-end gap-2 w-full lg:w-auto">
+      {/* Subcategory Navigation: Shown for Admin/Manager with clean selecting tabs */}
+      {userRole === 'admin' ? (
+        <div className="p-2.5 sm:p-3 rounded-xl sm:rounded-2xl bg-white dark:bg-slate-900 border border-[#cbdad0] dark:border-slate-800 shadow-sm">
+          <div className="flex items-center justify-between gap-2 overflow-x-auto no-scrollbar">
+            
             {/* Previous / Next Stepper */}
-            <div className="flex items-center bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-0.5 shadow-2xs">
+            <div className="flex items-center bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-0.5 shadow-2xs flex-shrink-0">
               <button
                 type="button"
                 onClick={handlePrevTab}
@@ -606,7 +476,7 @@ export default function DemandForecastingDashboard({ isDarkMode, currentRole = '
                 <ChevronLeft className="h-4 w-4" />
               </button>
               <span className="text-[10px] font-mono font-bold px-2.5 text-slate-600 dark:text-slate-400 select-none">
-                {currentTabIdx + 1}/{allTabs.length}
+                {currentTabIdx + 1}/{visibleTabs.length}
               </span>
               <button
                 type="button"
@@ -618,14 +488,14 @@ export default function DemandForecastingDashboard({ isDarkMode, currentRole = '
               </button>
             </div>
 
-            {/* Quick 1-Tap Pills */}
-            <div className="flex items-center gap-1 overflow-x-auto no-scrollbar py-0.5">
-              {allTabs.map((t) => (
+            {/* Selecting Pills (Tabs) */}
+            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5 flex-1 justify-start sm:justify-end">
+              {visibleTabs.map((t) => (
                 <button
                   key={t.id}
                   type="button"
                   onClick={() => setActiveTab(t.id)}
-                  className={`px-2.5 py-1.5 rounded-xl text-[11px] font-bold transition-all whitespace-nowrap border cursor-pointer ${
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap border cursor-pointer ${
                     activeTab === t.id
                       ? 'bg-emerald-700 text-white border-emerald-700 shadow-2xs'
                       : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-[#d5e2d9] dark:border-slate-700 hover:bg-emerald-50 dark:hover:bg-slate-700'
@@ -635,10 +505,36 @@ export default function DemandForecastingDashboard({ isDarkMode, currentRole = '
                 </button>
               ))}
             </div>
+
+          </div>
+        </div>
+      ) : (
+        /* Focused Clean Kitchen Station Header Bar for Chef */
+        <div className="p-3.5 sm:p-4 rounded-xl sm:rounded-2xl bg-emerald-50/70 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-xl bg-emerald-700 text-white shadow-sm flex-shrink-0">
+              <ChefHat className="h-5 w-5" />
+            </div>
+            <div>
+              <span className="text-xs font-black text-emerald-950 dark:text-emerald-200 uppercase tracking-wide">
+                Daily Shift Prep Station • Kitchen Service Active
+              </span>
+              <p className="text-[11px] text-slate-600 dark:text-slate-400 font-medium">
+                Review batch sizes below. Click the toggle to 86 / mark out-of-stock items, or print the checklist for line cooks.
+              </p>
+            </div>
           </div>
 
+          <button
+            type="button"
+            onClick={() => setShowPrepSheetModal(true)}
+            className="px-3.5 py-2 rounded-xl text-xs font-black bg-emerald-700 hover:bg-emerald-800 text-white flex items-center justify-center gap-2 shadow-sm transition-colors cursor-pointer self-start sm:self-auto"
+          >
+            <Printer className="h-4 w-4" />
+            Print Shift Prep Sheet
+          </button>
         </div>
-      </div>
+      )}
 
       {/* Multi-Source Live Contextual Drivers Bar (Always visible for quick situational awareness) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
@@ -649,7 +545,14 @@ export default function DemandForecastingDashboard({ isDarkMode, currentRole = '
             <CloudRain className="h-5 w-5" />
           </div>
           <div className="min-w-0 flex-1">
-            <span className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400">Weather Intelligence</span>
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400">Weather Intelligence</span>
+              {data.contextual_factors?.weather_live && (
+                <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300">
+                  Live Open-Meteo
+                </span>
+              )}
+            </div>
             <div className="text-xs font-extrabold text-slate-900 dark:text-white truncate">{data.contextual_factors.weather_condition}</div>
             <div className="text-[11px] text-sky-700 dark:text-sky-400 font-bold truncate">{data.contextual_factors.weather_impact}</div>
           </div>
@@ -673,9 +576,16 @@ export default function DemandForecastingDashboard({ isDarkMode, currentRole = '
             <Award className="h-5 w-5" />
           </div>
           <div className="min-w-0 flex-1">
-            <span className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400">Local Event Radar</span>
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400">Local Event Radar</span>
+              {data.contextual_factors?.calendar_live && (
+                <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300">
+                  Live Calendar
+                </span>
+              )}
+            </div>
             <div className="text-xs font-extrabold text-slate-900 dark:text-white truncate">{data.contextual_factors.local_events}</div>
-            <div className="text-[11px] text-purple-700 dark:text-purple-400 font-bold truncate">+22% evening takeaway surge</div>
+            <div className="text-[11px] text-purple-700 dark:text-purple-400 font-bold truncate">{data.contextual_factors.event_impact || "+22% evening takeaway surge"}</div>
           </div>
         </div>
 
@@ -737,7 +647,7 @@ export default function DemandForecastingDashboard({ isDarkMode, currentRole = '
                   Item-Level Kitchen Preparation Sizing Table
                 </h3>
                 <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
-                  Exact shift prep volumes and safety buffers generated by Random Forest + Prophet time-series models
+                  Exact shift prep volumes and safety buffers calculated to optimize batch preparation and eliminate food waste
                 </p>
               </div>
 
@@ -745,17 +655,10 @@ export default function DemandForecastingDashboard({ isDarkMode, currentRole = '
               <div className="flex flex-wrap items-center gap-2">
                 <button
                   onClick={() => setShowPrepSheetModal(true)}
-                  className="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-[#f0f5f2] hover:bg-[#e4ece7] text-slate-700 dark:bg-slate-800 dark:text-slate-300 border border-[#d5e2d9] dark:border-slate-700 flex items-center gap-1.5 shadow-sm transition-colors"
+                  className="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-[#f0f5f2] hover:bg-[#e4ece7] text-slate-700 dark:bg-slate-800 dark:text-slate-300 border border-[#d5e2d9] dark:border-slate-700 flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer"
                 >
                   <Printer className="h-3.5 w-3.5 text-emerald-700 dark:text-emerald-400" />
                   Export Chef Prep Sheet
-                </button>
-                <button
-                  onClick={() => setShowAddModal(true)}
-                  className="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-emerald-700 hover:bg-emerald-800 text-white shadow-sm flex items-center gap-1.5 transition-colors"
-                >
-                  <Plus className="h-3.5 w-3.5" />
-                  Add POS Menu Item
                 </button>
               </div>
             </div>
@@ -828,21 +731,34 @@ export default function DemandForecastingDashboard({ isDarkMode, currentRole = '
                       </td>
 
                       <td className="py-3.5 px-4">
-                        <span className="px-3 py-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-900 dark:text-emerald-300 font-extrabold border border-emerald-300 dark:border-emerald-700 shadow-sm inline-block">
-                          Prepare {item.prep_recommendation} portions
-                        </span>
+                        {item.status === 'Available' ? (
+                          <span className="px-3 py-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-900 dark:text-emerald-300 font-extrabold border border-emerald-300 dark:border-emerald-700 shadow-sm inline-block">
+                            Prepare {item.prep_recommendation} portions
+                          </span>
+                        ) : (
+                          <span className="px-3 py-1.5 rounded-xl bg-rose-50 dark:bg-rose-950/60 text-rose-800 dark:text-rose-300 font-extrabold border border-rose-300 dark:border-rose-700 shadow-sm inline-block">
+                            Prep Halted (0 portions)
+                          </span>
+                        )}
                       </td>
 
-                      <td className="py-3.5 px-3 font-mono font-bold text-amber-700 dark:text-amber-400">
-                        +{item.buffer_quantity} ready
+                      <td className="py-3.5 px-3 font-mono font-bold">
+                        {item.status === 'Available' ? (
+                          <span className="text-amber-700 dark:text-amber-400">+{item.buffer_quantity} ready</span>
+                        ) : (
+                          <span className="text-slate-400 dark:text-slate-500 font-normal">0 buffer</span>
+                        )}
                       </td>
 
-                      <td className="py-3.5 px-4 max-w-xs">
-                        <ul className="text-[11px] text-slate-600 dark:text-slate-300 space-y-1 list-disc list-inside font-medium">
+                      <td className="py-3 px-4 max-w-xs">
+                        <div className="space-y-1">
                           {item.key_drivers.map((d, idx) => (
-                            <li key={idx} className="leading-snug">{d}</li>
+                            <div key={idx} className="text-[11px] text-slate-600 dark:text-slate-300 truncate font-medium flex items-center gap-1.5" title={d}>
+                              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 flex-shrink-0"></span>
+                              <span className="truncate">{d}</span>
+                            </div>
                           ))}
-                        </ul>
+                        </div>
                       </td>
 
                       <td className="py-3.5 px-3 text-center">
@@ -851,7 +767,7 @@ export default function DemandForecastingDashboard({ isDarkMode, currentRole = '
                             ? 'bg-emerald-100 text-emerald-900 border-emerald-300 dark:bg-emerald-500/20 dark:text-emerald-300 dark:border-emerald-700'
                             : 'bg-rose-100 text-rose-900 border-rose-300 dark:bg-rose-500/20 dark:text-rose-300 dark:border-rose-700'
                         }`}>
-                          {item.status}
+                          {item.status === 'Available' ? 'In Stock' : 'Out of Stock (86)'}
                         </span>
                       </td>
 
@@ -866,13 +782,17 @@ export default function DemandForecastingDashboard({ isDarkMode, currentRole = '
                           </button>
                           <button
                             onClick={() => handleToggleStatus(item.id)}
-                            className="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700"
-                            title={item.status === 'Available' ? "Mark as Unavailable" : "Mark as Available"}
+                            className={`p-1.5 rounded-lg border transition-colors ${
+                              item.status === 'Available'
+                                ? 'bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700'
+                                : 'bg-rose-100 hover:bg-rose-200 dark:bg-rose-950/80 dark:hover:bg-rose-900 text-rose-800 dark:text-rose-200 border-rose-300 dark:border-rose-700'
+                            }`}
+                            title={item.status === 'Available' ? "Mark as Out of Stock / 86 (Suppress Kitchen Prep)" : "Restore to In Stock (Resume Kitchen Prep)"}
                           >
                             {item.status === 'Available' ? (
                               <ToggleRight className="h-4 w-4 text-emerald-600" />
                             ) : (
-                              <ToggleLeft className="h-4 w-4 text-rose-500" />
+                              <ToggleLeft className="h-4 w-4 text-rose-600" />
                             )}
                           </button>
                         </div>
@@ -904,7 +824,7 @@ export default function DemandForecastingDashboard({ isDarkMode, currentRole = '
                   7-Day Multi-Day Restaurant Food Demand Forecast
                 </h3>
                 <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
-                  Comparing actual POS historical orders vs Prophet + Random Forest predicted volumes
+                  Comparing actual POS historical orders vs XGBoost Regressor predicted volumes
                 </p>
               </div>
               <div className="flex items-center gap-2">
@@ -1042,14 +962,128 @@ export default function DemandForecastingDashboard({ isDarkMode, currentRole = '
       {activeTab === 'xai' && (
         <div className="space-y-6">
           
+          {/* EXPLAINABLE AI ATTRIBUTION PANEL */}
+          <div className="glass-panel p-6 rounded-2xl bg-white dark:bg-slate-900 border border-[#cbdad0] dark:border-slate-800 shadow-sm space-y-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#e2ece5] dark:border-slate-800 pb-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-purple-100 text-purple-800 dark:bg-purple-950/80 dark:text-purple-300 border border-purple-300 dark:border-purple-700">
+                    Explainable AI (XAI)
+                  </span>
+                  <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                    <Cpu className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+                    Demand Drivers & Factor Attribution
+                  </h3>
+                </div>
+                <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mt-1">
+                  Transparent breakdown explaining the operational, calendar, weather, and sales factors that drive restaurant customer demand
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-emerald-800 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 px-3 py-1.5 rounded-xl border border-emerald-300 dark:border-emerald-700">
+                  Explainable AI Active
+                </span>
+              </div>
+            </div>
+
+            {/* 4 Feature Category Attribution Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="p-4 rounded-xl bg-emerald-50/70 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-emerald-900 dark:text-emerald-300">Historical Sales Baseline</span>
+                  <span className="text-sm font-black text-emerald-800 dark:text-emerald-400">53.8%</span>
+                </div>
+                <div className="w-full bg-emerald-200 dark:bg-emerald-900/60 rounded-full h-2 overflow-hidden">
+                  <div className="bg-emerald-600 h-2 rounded-full" style={{ width: '53.8%' }}></div>
+                </div>
+                <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-tight">
+                  7-Day (26.8%) & 14-Day (20.4%) moving trends + yesterday's demand (2.3%).
+                </p>
+              </div>
+
+              <div className="p-4 rounded-xl bg-sky-50/70 dark:bg-sky-950/30 border border-sky-200 dark:border-sky-800 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-sky-900 dark:text-sky-300">Operational & Calendar</span>
+                  <span className="text-sm font-black text-sky-800 dark:text-sky-400">22.8%</span>
+                </div>
+                <div className="w-full bg-sky-200 dark:bg-sky-900/60 rounded-full h-2 overflow-hidden">
+                  <div className="bg-sky-600 h-2 rounded-full" style={{ width: '22.8%' }}></div>
+                </div>
+                <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-tight">
+                  Operating vs closed days (13.9%), month seasonality (3.2%), and weekend peaks (1.5%).
+                </p>
+              </div>
+
+              <div className="p-4 rounded-xl bg-purple-50/70 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-purple-900 dark:text-purple-300">Category & Pricing</span>
+                  <span className="text-sm font-black text-purple-800 dark:text-purple-400">11.2%</span>
+                </div>
+                <div className="w-full bg-purple-200 dark:bg-purple-900/60 rounded-full h-2 overflow-hidden">
+                  <div className="bg-purple-600 h-2 rounded-full" style={{ width: '11.2%' }}></div>
+                </div>
+                <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-tight">
+                  Cross-category demand surges (3.2%) and menu pricing elasticity (0.9%).
+                </p>
+              </div>
+
+              <div className="p-4 rounded-xl bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-amber-900 dark:text-amber-300">Weather & Environment</span>
+                  <span className="text-sm font-black text-amber-800 dark:text-amber-400">4.5%</span>
+                </div>
+                <div className="w-full bg-amber-200 dark:bg-amber-900/60 rounded-full h-2 overflow-hidden">
+                  <div className="bg-amber-600 h-2 rounded-full" style={{ width: '4.5%' }}></div>
+                </div>
+                <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-tight">
+                  Rainfall volume (1.7%), temperature shifts (1.1%), and rain threshold flags (0.9%).
+                </p>
+              </div>
+            </div>
+
+            {/* Key Factor Attribution Breakdown Bars */}
+            <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-[#cbdad0] dark:border-slate-700 space-y-3">
+              <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wide">
+                Key Demand Factor Weights
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2.5 text-xs">
+                {[
+                  { name: "7-Day Moving Sales Baseline", pct: 26.8, bar: "bg-emerald-600", desc: "Captures weekly demand inertia" },
+                  { name: "14-Day Extended Trend", pct: 20.4, bar: "bg-emerald-500", desc: "Captures multi-week trend stability" },
+                  { name: "Operating & Holiday Schedule", pct: 13.9, bar: "bg-sky-600", desc: "Suppresses demand during closures" },
+                  { name: "Peak Volume Capacity Window", pct: 4.7, bar: "bg-emerald-400", desc: "Estimates shift rush capacity" },
+                  { name: "Monthly Seasonality Factor", pct: 3.2, bar: "bg-purple-600", desc: "Accounts for annual tourist seasonality" },
+                  { name: "Prior-Day Consumption", pct: 2.3, bar: "bg-teal-500", desc: "Immediate prior-day consumption" },
+                  { name: "Day of Week Pattern (Mon-Sun)", pct: 2.0, bar: "bg-sky-500", desc: "Midweek vs weekend dining volume" },
+                  { name: "Rainfall & Weather Impact", pct: 1.7, bar: "bg-amber-500", desc: "Shifts orders to warm comfort meals" }
+                ].map((feat) => (
+                  <div key={feat.name} className="space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="font-semibold text-slate-800 dark:text-slate-200 text-[11px]">{feat.name}</span>
+                      <span className="font-black text-slate-900 dark:text-white font-mono">{feat.pct}%</span>
+                    </div>
+                    <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-1.5 overflow-hidden">
+                      <div className={`${feat.bar} h-1.5 rounded-full`} style={{ width: `${feat.pct * 3}%` }}></div>
+                    </div>
+                    <span className="text-[10px] text-slate-500 dark:text-slate-400">{feat.desc}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            
+          </div>
+
+          {/* ITEM-LEVEL SHAP FACTOR DECOMPOSITION */}
           <div className="glass-panel p-6 rounded-2xl bg-white dark:bg-slate-900 border border-[#cbdad0] dark:border-slate-800 shadow-sm space-y-4">
             <div className="border-b border-[#e2ece5] dark:border-slate-800 pb-3">
               <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                <Cpu className="h-5 w-5 text-emerald-700 dark:text-emerald-400" />
-                Explainable AI (XAI): Multi-Source Factor Decomposition (SHAP-Style)
+                <Layers className="h-5 w-5 text-emerald-700 dark:text-emerald-400" />
+                Explainable AI: Dish-Level Factor Breakdown
               </h3>
               <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
-                Explaining WHY demand is predicted to rise or fall for each menu item using feature attribution values
+                Explaining WHY demand is forecasted to rise or fall for each specific dish using localized factor attribution
               </p>
             </div>
 
@@ -1308,369 +1342,6 @@ export default function DemandForecastingDashboard({ isDarkMode, currentRole = '
 
           </div>
 
-        </div>
-      )}
-
-      {/* ========================================================================= */}
-      {/* TAB 5: DATA PREPROCESSING & CONTINUOUS MODEL RETRAINING */}
-      {/* ========================================================================= */}
-      {activeTab === 'retraining' && (
-        <div className="space-y-6">
-          
-          {/* Data Validation Pipeline Telemetry */}
-          <div className="glass-panel p-6 rounded-2xl bg-white dark:bg-slate-900 border border-[#cbdad0] dark:border-slate-800 shadow-sm space-y-4">
-            <div className="border-b border-[#e2ece5] dark:border-slate-800 pb-3">
-              <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                <Database className="h-5 w-5 text-emerald-700 dark:text-emerald-400" />
-                Data Ingestion, Validation & Feature Engineering Pipeline
-              </h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
-                Real-time data quality monitoring across 60–90 days SME restaurant POS records
-              </p>
-            </div>
-
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700">
-                <span className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400">POS Records Ingested</span>
-                <div className="text-lg font-black text-slate-900 dark:text-white mt-0.5">{data.data_pipeline_health.total_pos_records_ingested.toLocaleString()} Rows</div>
-                <span className="text-[10px] text-emerald-600 font-bold">90-Day Rolling Window</span>
-              </div>
-
-              <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700">
-                <span className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400">Clean Records Health</span>
-                <div className="text-lg font-black text-emerald-700 dark:text-emerald-400 mt-0.5">{data.data_pipeline_health.clean_records_pct}%</div>
-                <span className="text-[10px] text-slate-500">Validation Passed</span>
-              </div>
-
-              <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700">
-                <span className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400">Imputations & Outliers</span>
-                <div className="text-lg font-black text-slate-900 dark:text-white mt-0.5">{data.data_pipeline_health.missing_values_imputed} Imputed</div>
-                <span className="text-[10px] text-slate-500">{data.data_pipeline_health.outliers_handled} Winsorized spikes</span>
-              </div>
-
-              <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700">
-                <span className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400">Engineered Features</span>
-                <div className="text-lg font-black text-purple-700 dark:text-purple-400 mt-0.5">{data.data_pipeline_health.engineered_features_count} Features</div>
-                <span className="text-[10px] text-purple-600 font-bold">Lags, Rolling Avg, Weather</span>
-              </div>
-            </div>
-
-            {/* Feature List Tags */}
-            <div className="p-4 rounded-xl bg-[#f8faf9] dark:bg-slate-800/50 border border-[#d5e2d9] dark:border-slate-700 space-y-2">
-              <span className="text-xs font-bold text-slate-800 dark:text-slate-200">Active Multi-Source Model Features:</span>
-              <div className="flex flex-wrap gap-1.5">
-                {data.data_pipeline_health.features_list.map(f => (
-                  <span key={f} className="px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 shadow-sm">
-                    {f}
-                  </span>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* Interactive Retraining Console */}
-          <div className="glass-panel p-6 rounded-2xl bg-white dark:bg-slate-900 border border-[#cbdad0] dark:border-slate-800 shadow-sm space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#e2ece5] dark:border-slate-800 pb-3">
-              <div>
-                <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                  <Zap className="h-5 w-5 text-emerald-700 dark:text-emerald-400" />
-                  Continuous Model Retraining & Performance Evaluation
-                </h3>
-                <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
-                  Trigger automated model retraining as newly available POS transactions arrive
-                </p>
-              </div>
-
-              <div className="flex items-center gap-3">
-                <select
-                  value={selectedTrainingWindow}
-                  onChange={e => setSelectedTrainingWindow(parseInt(e.target.value))}
-                  className="px-3 py-1.5 rounded-xl text-xs bg-slate-50 dark:bg-slate-800 border border-[#d5e2d9] dark:border-slate-700 text-slate-900 dark:text-white font-medium"
-                >
-                  <option value={60}>60 Days Training Window</option>
-                  <option value={90}>90 Days Training Window</option>
-                </select>
-
-                <button
-                  onClick={handleTriggerRetraining}
-                  disabled={isRetraining}
-                  className="px-4 py-2 rounded-xl text-xs font-black bg-emerald-700 hover:bg-emerald-800 text-white shadow-sm flex items-center gap-1.5 disabled:opacity-50 transition-all"
-                >
-                  {isRetraining ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
-                  <span>Trigger Auto-Retraining</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Retraining Progress Bar */}
-            {isRetraining && (
-              <div className="space-y-2 pt-2">
-                <div className="flex justify-between text-xs font-bold text-slate-700 dark:text-slate-300">
-                  <span>Executing 5-Fold Cross Validation & Model Refitting...</span>
-                  <span>{retrainProgress}%</span>
-                </div>
-                <div className="w-full bg-slate-100 dark:bg-slate-800 h-2.5 rounded-full overflow-hidden">
-                  <div className="bg-emerald-600 h-full transition-all duration-300" style={{ width: `${retrainProgress}%` }}></div>
-                </div>
-              </div>
-            )}
-
-            {/* Retraining Logs Terminal View */}
-            <div className="p-4 rounded-xl bg-slate-950 text-emerald-400 font-mono text-xs space-y-1.5 overflow-x-auto max-h-48 overflow-y-auto border border-slate-800">
-              <div className="text-slate-500 font-bold mb-2">// Automated Model Training & Evaluation Engine Log</div>
-              {retrainLogs.length > 0 ? (
-                retrainLogs.map((log, i) => (
-                  <div key={i} className="flex items-start gap-2">
-                    <span className="text-slate-600 select-none">&gt;</span>
-                    <span>{log}</span>
-                  </div>
-                ))
-              ) : (
-                <div className="text-slate-500">// System ready. Click "Trigger Auto-Retraining" to simulate new POS batch ingestion.</div>
-              )}
-            </div>
-
-            {/* Retraining Evaluation Comparison Cards */}
-            {retrainResult && (
-              <div className="p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-700 space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-emerald-900 dark:text-emerald-300 uppercase">Evaluation Metrics Comparison</span>
-                  <span className="text-xs font-bold text-emerald-800 dark:text-emerald-300 bg-white dark:bg-slate-900 px-2.5 py-1 rounded-lg border border-emerald-300 dark:border-emerald-700">
-                    {retrainResult.metrics.improvement_pct}
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-3 gap-3 text-center">
-                  <div className="p-3 rounded-xl bg-white dark:bg-slate-900 border border-emerald-200 dark:border-emerald-700/60">
-                    <span className="text-[10px] text-slate-500 uppercase font-bold">RMSE Error</span>
-                    <div className="text-sm font-black text-slate-800 dark:text-white mt-0.5">
-                      4.12 <span className="text-emerald-600 font-bold">→ {retrainResult.metrics.rmse}</span>
-                    </div>
-                  </div>
-
-                  <div className="p-3 rounded-xl bg-white dark:bg-slate-900 border border-emerald-200 dark:border-emerald-700/60">
-                    <span className="text-[10px] text-slate-500 uppercase font-bold">MAE Error</span>
-                    <div className="text-sm font-black text-slate-800 dark:text-white mt-0.5">
-                      3.05 <span className="text-emerald-600 font-bold">→ {retrainResult.metrics.mae}</span>
-                    </div>
-                  </div>
-
-                  <div className="p-3 rounded-xl bg-white dark:bg-slate-900 border border-emerald-200 dark:border-emerald-700/60">
-                    <span className="text-[10px] text-slate-500 uppercase font-bold">MAPE (Accuracy)</span>
-                    <div className="text-sm font-black text-emerald-700 dark:text-emerald-400 mt-0.5">
-                      4.8% <span className="font-bold">→ {retrainResult.metrics.mape}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Retraining History Table */}
-            <div className="pt-2">
-              <span className="text-xs font-bold text-slate-800 dark:text-slate-200 block mb-2">Model Version Retraining History</span>
-              <div className="overflow-x-auto rounded-xl border border-[#cbdad0] dark:border-slate-800">
-                <table className="w-full text-left text-xs text-slate-700 dark:text-slate-300">
-                  <thead className="bg-[#f4f8f5] dark:bg-slate-950 text-slate-800 dark:text-slate-300 uppercase font-bold border-b border-[#cbdad0] dark:border-slate-800">
-                    <tr>
-                      <th className="py-2.5 px-3">Timestamp</th>
-                      <th className="py-2.5 px-3">Records Ingested</th>
-                      <th className="py-2.5 px-3">RMSE</th>
-                      <th className="py-2.5 px-3">MAE</th>
-                      <th className="py-2.5 px-3">MAPE</th>
-                      <th className="py-2.5 px-3 text-right">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-[#e4ece7] dark:divide-slate-800 bg-white dark:bg-slate-900">
-                    {data.retraining_history.map(log => (
-                      <tr key={log.id}>
-                        <td className="py-2.5 px-3 font-semibold">{log.timestamp}</td>
-                        <td className="py-2.5 px-3 font-mono">{log.records_ingested.toLocaleString()}</td>
-                        <td className="py-2.5 px-3 font-mono">{log.rmse_after}</td>
-                        <td className="py-2.5 px-3 font-mono">{log.mae_after}</td>
-                        <td className="py-2.5 px-3 font-mono font-bold text-emerald-600">{log.mape_after}</td>
-                        <td className="py-2.5 px-3 text-right">
-                          <span className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 text-[10px] font-bold">
-                            {log.status}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-          </div>
-
-        </div>
-      )}
-
-      {/* ========================================================================= */}
-      {/* TAB 6: CLOSED FEEDBACK LOOP & CROSS-MODULE INTELLIGENCE */}
-      {/* ========================================================================= */}
-      {activeTab === 'closed_loop' && (
-        <div className="space-y-6">
-          
-          <div className="glass-panel p-6 rounded-2xl bg-white dark:bg-slate-900 border border-[#cbdad0] dark:border-slate-800 shadow-sm space-y-4">
-            <div className="border-b border-[#e2ece5] dark:border-slate-800 pb-3">
-              <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                <Sparkles className="h-5 w-5 text-emerald-700 dark:text-emerald-400" />
-                Cross-Component Closed Feedback Mechanism (Demand ⇄ Waste & Spoilage)
-              </h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
-                Demonstrates how waste measurements and spoilage alerts dynamically adjust food demand preparation parameters
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              
-              {/* Waste Feedback Loop Card */}
-              <div className="p-5 rounded-2xl bg-slate-50 dark:bg-slate-800/70 border border-[#cbdad0] dark:border-slate-700 space-y-3">
-                <div className="flex items-center gap-2">
-                  <span className="p-2 rounded-xl bg-rose-50 dark:bg-rose-500/10 text-rose-600 border border-rose-200 dark:border-rose-500/20">
-                    <Scale className="h-4 w-4" />
-                  </span>
-                  <div>
-                    <h4 className="text-sm font-bold text-slate-900 dark:text-white">Waste Feedback Dampening</h4>
-                    <span className="text-[11px] text-slate-500">Connected to Component 4: Smart Waste Bin</span>
-                  </div>
-                </div>
-
-                <div className="p-3.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs space-y-2">
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">7-Day Overproduction Waste:</span>
-                    <span className="font-bold text-rose-600">14.2 kg recorded</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">Most Overproduced Item:</span>
-                    <span className="font-bold text-slate-800 dark:text-slate-200">Leftover Keeri Rice & Fried Rice</span>
-                  </div>
-                  <div className="pt-2 border-t border-slate-100 dark:border-slate-800 text-[11px] text-slate-600 dark:text-slate-300 leading-snug">
-                    <span className="font-bold text-emerald-700 dark:text-emerald-400 block mb-0.5">Automated Demand Adjustment:</span>
-                    The AI demand engine applied an automatic <strong>-4% safety buffer dampener</strong> on Keeri Rice portions today, preventing repeated kitchen over-portioning and food discard.
-                  </div>
-                </div>
-              </div>
-
-              {/* Spoilage Feedback Loop Card */}
-              <div className="p-5 rounded-2xl bg-slate-50 dark:bg-slate-800/70 border border-[#cbdad0] dark:border-slate-700 space-y-3">
-                <div className="flex items-center gap-2">
-                  <span className="p-2 rounded-xl bg-amber-50 dark:bg-amber-500/10 text-amber-600 border border-amber-200 dark:border-amber-500/20">
-                    <Flame className="h-4 w-4" />
-                  </span>
-                  <div>
-                    <h4 className="text-sm font-bold text-slate-900 dark:text-white">Spoilage FIFO Recipe Push</h4>
-                    <span className="text-[11px] text-slate-500">Connected to Component 3: Food Spoilage & RSL</span>
-                  </div>
-                </div>
-
-                <div className="p-3.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs space-y-2">
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">Flagged Expiring Batch:</span>
-                    <span className="font-bold text-amber-600">Papaya & Melon (#B-402)</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">Remaining Shelf-Life:</span>
-                    <span className="font-bold text-slate-800 dark:text-slate-200">14 Hours (FIFO Priority)</span>
-                  </div>
-                  <div className="pt-2 border-t border-slate-100 dark:border-slate-800 text-[11px] text-slate-600 dark:text-slate-300 leading-snug">
-                    <span className="font-bold text-emerald-700 dark:text-emerald-400 block mb-0.5">Automated Demand Adjustment:</span>
-                    The demand prediction engine elevated <strong>Tropical Fruit Salad with Honey prep recommendations by +50%</strong> and scheduled a 15% flash pairing discount to consume ripe batches before spoilage.
-                  </div>
-                </div>
-              </div>
-
-            </div>
-
-          </div>
-
-        </div>
-      )}
-
-      {/* ========================================================================= */}
-      {/* MODAL: ADD NEW POS MENU ITEM */}
-      {/* ========================================================================= */}
-      {showAddModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fadeIn">
-          <div className="glass-panel bg-white dark:bg-slate-900 max-w-md w-full p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
-              <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                <Plus className="h-4 w-4 text-emerald-600" />
-                Add New POS Menu Item
-              </h3>
-              <button onClick={() => setShowAddModal(false)} className="p-1 rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800">
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-
-            <form onSubmit={handleAddNewItem} className="space-y-3.5 text-xs">
-              <div>
-                <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Dish Name</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g., Sri Lankan Chicken Biryani"
-                  value={newItemName}
-                  onChange={e => setNewItemName(e.target.value)}
-                  className="w-full px-3.5 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-emerald-600"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Category</label>
-                  <select
-                    value={newItemCategory}
-                    onChange={e => setNewItemCategory(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"
-                  >
-                    <option value="Main Course">Main Course</option>
-                    <option value="Short Eats & Kottu">Short Eats & Kottu</option>
-                    <option value="Italian">Italian</option>
-                    <option value="Dessert">Dessert</option>
-                    <option value="Beverages">Beverages</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Price (LKR)</label>
-                  <input
-                    type="number"
-                    required
-                    value={newItemPrice}
-                    onChange={e => setNewItemPrice(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Initial Daily Baseline Sales Avg (Portions)</label>
-                <input
-                  type="number"
-                  value={newItemBaseAvg}
-                  onChange={e => setNewItemBaseAvg(e.target.value)}
-                  className="w-full px-3.5 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"
-                />
-              </div>
-
-              <div className="flex justify-end gap-2 pt-3 border-t border-slate-200 dark:border-slate-800">
-                <button
-                  type="button"
-                  onClick={() => setShowAddModal(false)}
-                  className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2 rounded-xl text-xs font-bold bg-emerald-700 hover:bg-emerald-800 text-white shadow-sm"
-                >
-                  Add to Forecasting Engine
-                </button>
-              </div>
-            </form>
-          </div>
         </div>
       )}
 
