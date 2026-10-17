@@ -44,3 +44,4 @@ Timestamp,Event_Phase,Station,Queue_Length,Action_Taken,Chef_Involved,Previous_S
 2026-10-15 08:21:22 PM,Chef Samantha,Off-Duty (Morning Shift),Grill,Night workload surge on-call relief for Grill (5★ skill),SUCCESS
 2026-10-15 08:24:42 PM,Chef Dinesh (Float - Senior),Off-Duty (Morning Shift),Hot Kitchen,Night workload surge on-call relief for Hot Kitchen (4★ skill),SUCCESS
 2026-10-15 09:54:27 PM,Chef Ruwan (Float Specialist),Prep Station,Pizza,Test surge reallocation,SUCCESS
+2026-10-17 04:04:35 PM,Chef Sunil,Fryer,Pizza,Direct surge reallocation to Pizza,SUCCESS

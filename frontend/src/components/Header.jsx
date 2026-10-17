@@ -90,7 +90,7 @@ export const getModulesForRole = (currentRole = 'admin', stats = null) => {
     return [
       {
         id: 'kds',
-        label: 'Kitchen Display (KDS)',
+        label: 'Kitchen Display',
         shortLabel: 'KDS Tickets',
         badge: stats?.active_kitchen_tickets ? `${stats.active_kitchen_tickets}` : null,
         badgeColor: 'bg-amber-500',

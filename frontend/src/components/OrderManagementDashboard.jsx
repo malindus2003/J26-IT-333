@@ -773,7 +773,7 @@ export default function OrderManagementDashboard({ onRefresh, isDarkMode, curren
                 }`}
             >
               <ChefHat className="h-4 w-4" />
-              <span>Kitchen Display (KDS)</span>
+              <span>Kitchen Display</span>
             </button>
 
             <button
@@ -1100,7 +1100,7 @@ export default function OrderManagementDashboard({ onRefresh, isDarkMode, curren
             <div>
               <h3 className="text-base font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
                 <ChefHat className="h-5 w-5 text-emerald-700 dark:text-emerald-400" />
-                Kitchen Display System (KDS) Live Tickets
+                Kitchen Display System Live Tickets
               </h3>
               <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
                 {isStaff
