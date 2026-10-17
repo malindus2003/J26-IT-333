@@ -2,7 +2,7 @@ import os
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
-from .routers import sensors, vision, predictions, inventory, recommendations, demand, kitchen, waste, orders
+from .routers import sensors, vision, predictions, inventory, recommendations, demand, kitchen, waste, orders, auth
 from .data.mock_data import STORAGE_ZONES
 from .routers.inventory import inventory_db
 from .routers.orders import orders_db
@@ -50,6 +50,7 @@ app.add_middleware(
 )
 
 # Register All Research Project Modules & Operational Routing
+app.include_router(auth.router)             # Authentication & Role Access
 app.include_router(orders.router)           # Order Management & Live POS
 app.include_router(inventory.router)        # Connected Inventory & Smart FIFO
 app.include_router(demand.router)           # Component 1 (Nanayakkara K.A.J.Y)
@@ -108,3 +109,8 @@ def get_dashboard_summary():
         "total_revenue_lkr": total_revenue_lkr,
         "system_health": "Optimal Operational Flow"
     }
+
+@app.get("/api/status")
+def get_system_status():
+    return {"status": "online", "message": "Smart Restaurant API Operational"}
+

@@ -1,0 +1,443 @@
+{
+  "produce_classes": [
+    "Embul Banana (Ambul Kesel)",
+    "Karthakolomban Mango",
+    "Red Lady Papaya (Rathu Papol)",
+    "Mauritius Pineapple (Gampaha Annasi)",
+    "Sri Lankan Avocado (Butter Fruit)",
+    "Peach",
+    "Fresh Apple",
+    "Fresh Strawberry",
+    "Orange / Citrus",
+    "Lime / Lemon",
+    "Grapes",
+    "Watermelon",
+    "Guava (Pera)",
+    "Pomegranate (Delum)",
+    "Passion Fruit",
+    "Dragon Fruit",
+    "Jackfruit / Kos / Varaka",
+    "Fresh Pear",
+    "Plum",
+    "Kiwi Fruit",
+    "Local Tomatoes (Thakkali)",
+    "Nuwara Eliya Carrots",
+    "Spinach / Leafy Greens",
+    "Gotukola (Centella Asiatica)",
+    "Kankun (Water Spinach)",
+    "Mukunuwenna (Alternanthera)",
+    "Romaine Lettuce",
+    "Green Chillies (Amu Miris)",
+    "Capsicum / Bell Pepper",
+    "Cucumber (Pipinna)",
+    "Green Beans (Bonchi)",
+    "Potato (Ala)",
+    "Eggplant (Brinjal / Wambatu)",
+    "Red Onion (Rathu Lunu)",
+    "Garlic (Sudu Lunu)",
+    "Cabbage (Gova)",
+    "Cauliflower",
+    "Broccoli",
+    "Beetroot",
+    "Pumpkin (Wattakka)",
+    "Bitter Gourd (Karawila)",
+    "Snake Gourd (Pathola)",
+    "Ridge Gourd (Wetawalu)",
+    "Radish (Rabu)",
+    "Okra (Bandakka / Ladies Finger)",
+    "Mushroom (Bimmal)",
+    "Ginger (Inguru)"
+  ],
+  "produce_info": {
+    "Embul Banana (Ambul Kesel)": {
+      "icon": "\ud83c\udf4c",
+      "category": "Fruits",
+      "shelf_life": 168.0,
+      "scientific": "Musa acuminata (Embul)",
+      "short_name": "Banana",
+      "variety": "Embul / Seeni Kesel"
+    },
+    "Karthakolomban Mango": {
+      "icon": "\ud83e\udd6d",
+      "category": "Fruits",
+      "shelf_life": 192.0,
+      "scientific": "Mangifera indica (Karthakolomban)",
+      "short_name": "Mango",
+      "variety": "Jaffna Karthakolomban"
+    },
+    "Red Lady Papaya (Rathu Papol)": {
+      "icon": "\ud83c\udf48",
+      "category": "Fruits",
+      "shelf_life": 144.0,
+      "scientific": "Carica papaya (Red Lady F1)",
+      "short_name": "Papaya",
+      "variety": "Red Lady F1"
+    },
+    "Mauritius Pineapple (Gampaha Annasi)": {
+      "icon": "\ud83c\udf4d",
+      "category": "Fruits",
+      "shelf_life": 216.0,
+      "scientific": "Ananas comosus (Mauritius)",
+      "short_name": "Pineapple",
+      "variety": "Mauritius Gampaha"
+    },
+    "Sri Lankan Avocado (Butter Fruit)": {
+      "icon": "\ud83e\udd51",
+      "category": "Fruits",
+      "shelf_life": 180.0,
+      "scientific": "Persea americana (Local Butter)",
+      "short_name": "Avocado",
+      "variety": "Kandy Butter Fruit"
+    },
+    "Peach": {
+      "icon": "\ud83c\udf51",
+      "category": "Fruits",
+      "shelf_life": 240.0,
+      "scientific": "Prunus persica",
+      "short_name": "Peach",
+      "variety": "Golden Queen / Nectarine"
+    },
+    "Fresh Apple": {
+      "icon": "\ud83c\udf4e",
+      "category": "Fruits",
+      "shelf_life": 720.0,
+      "scientific": "Malus domestica",
+      "short_name": "Apple",
+      "variety": "Fuji / Royal Gala"
+    },
+    "Fresh Strawberry": {
+      "icon": "\ud83c\udf53",
+      "category": "Fruits",
+      "shelf_life": 120.0,
+      "scientific": "Fragaria \u00d7 ananassa",
+      "short_name": "Strawberry",
+      "variety": "Nuwara Eliya Ambepussa"
+    },
+    "Orange / Citrus": {
+      "icon": "\ud83c\udf4a",
+      "category": "Fruits",
+      "shelf_life": 360.0,
+      "scientific": "Citrus sinensis",
+      "short_name": "Orange",
+      "variety": "Bibile Sweet Orange"
+    },
+    "Lime / Lemon": {
+      "icon": "\ud83c\udf4b",
+      "category": "Fruits",
+      "shelf_life": 420.0,
+      "scientific": "Citrus aurantifolia",
+      "short_name": "Lime",
+      "variety": "Monaragala Dehi"
+    },
+    "Grapes": {
+      "icon": "\ud83c\udf47",
+      "category": "Fruits",
+      "shelf_life": 240.0,
+      "scientific": "Vitis vinifera",
+      "short_name": "Grapes",
+      "variety": "Jaffna Red Globe"
+    },
+    "Watermelon": {
+      "icon": "\ud83c\udf49",
+      "category": "Fruits",
+      "shelf_life": 336.0,
+      "scientific": "Citrullus lanatus",
+      "short_name": "Watermelon",
+      "variety": "Thanamalwila Komadu"
+    },
+    "Guava (Pera)": {
+      "icon": "\ud83c\udf50",
+      "category": "Fruits",
+      "shelf_life": 192.0,
+      "scientific": "Psidium guajava",
+      "short_name": "Guava",
+      "variety": "Bangkok Apple Pera"
+    },
+    "Pomegranate (Delum)": {
+      "icon": "\ud83e\uded0",
+      "category": "Fruits",
+      "shelf_life": 480.0,
+      "scientific": "Punica granatum",
+      "short_name": "Pomegranate",
+      "variety": "Kalpitiya Red Delum"
+    },
+    "Passion Fruit": {
+      "icon": "\ud83c\udf48",
+      "category": "Fruits",
+      "shelf_life": 240.0,
+      "scientific": "Passiflora edulis",
+      "short_name": "Passion Fruit",
+      "variety": "Bandarawela Purple"
+    },
+    "Dragon Fruit": {
+      "icon": "\ud83d\udc09",
+      "category": "Fruits",
+      "shelf_life": 288.0,
+      "scientific": "Selenicereus undatus",
+      "short_name": "Dragon Fruit",
+      "variety": "Red Flesh Pitaya"
+    },
+    "Jackfruit / Kos / Varaka": {
+      "icon": "\ud83c\udf48",
+      "category": "Fruits",
+      "shelf_life": 168.0,
+      "scientific": "Artocarpus heterophyllus",
+      "short_name": "Jackfruit",
+      "variety": "Honey Varaka"
+    },
+    "Fresh Pear": {
+      "icon": "\ud83c\udf50",
+      "category": "Fruits",
+      "shelf_life": 360.0,
+      "scientific": "Pyrus communis",
+      "short_name": "Pear",
+      "variety": "Packham / D'Anjou"
+    },
+    "Plum": {
+      "icon": "\ud83e\uded0",
+      "category": "Fruits",
+      "shelf_life": 240.0,
+      "scientific": "Prunus domestica",
+      "short_name": "Plum",
+      "variety": "Black Amber"
+    },
+    "Kiwi Fruit": {
+      "icon": "\ud83e\udd5d",
+      "category": "Fruits",
+      "shelf_life": 480.0,
+      "scientific": "Actinidia deliciosa",
+      "short_name": "Kiwi",
+      "variety": "Hayward Green"
+    },
+    "Local Tomatoes (Thakkali)": {
+      "icon": "\ud83c\udf45",
+      "category": "Vegetables",
+      "shelf_life": 168.0,
+      "scientific": "Solanum lycopersicum",
+      "short_name": "Tomato",
+      "variety": "Maheshi / Padma"
+    },
+    "Nuwara Eliya Carrots": {
+      "icon": "\ud83e\udd55",
+      "category": "Vegetables",
+      "shelf_life": 360.0,
+      "scientific": "Daucus carota",
+      "short_name": "Carrot",
+      "variety": "Upcountry Kuroda"
+    },
+    "Spinach / Leafy Greens": {
+      "icon": "\ud83e\udd6c",
+      "category": "Vegetables",
+      "shelf_life": 120.0,
+      "scientific": "Spinacia oleracea",
+      "short_name": "Spinach",
+      "variety": "English Spinach"
+    },
+    "Gotukola (Centella Asiatica)": {
+      "icon": "\ud83c\udf31",
+      "category": "Vegetables",
+      "shelf_life": 96.0,
+      "scientific": "Centella asiatica",
+      "short_name": "Gotukola",
+      "variety": "Local Dwarf Leafy"
+    },
+    "Kankun (Water Spinach)": {
+      "icon": "\ud83c\udf3f",
+      "category": "Vegetables",
+      "shelf_life": 90.0,
+      "scientific": "Ipomoea aquatica",
+      "short_name": "Kankun",
+      "variety": "Sri Lankan Water Kankun"
+    },
+    "Mukunuwenna (Alternanthera)": {
+      "icon": "\ud83c\udf31",
+      "category": "Vegetables",
+      "shelf_life": 84.0,
+      "scientific": "Alternanthera sessilis",
+      "short_name": "Mukunuwenna",
+      "variety": "Local Sessilis"
+    },
+    "Romaine Lettuce": {
+      "icon": "\ud83e\udd6c",
+      "category": "Vegetables",
+      "shelf_life": 144.0,
+      "scientific": "Lactuca sativa",
+      "short_name": "Lettuce",
+      "variety": "Romaine / Butterhead"
+    },
+    "Green Chillies (Amu Miris)": {
+      "icon": "\ud83c\udf36\ufe0f",
+      "category": "Vegetables",
+      "shelf_life": 192.0,
+      "scientific": "Capsicum frutescens",
+      "short_name": "Green Chillies",
+      "variety": "MI-2 Local Hot"
+    },
+    "Capsicum / Bell Pepper": {
+      "icon": "\ud83e\uded1",
+      "category": "Vegetables",
+      "shelf_life": 240.0,
+      "scientific": "Capsicum annuum grossum",
+      "short_name": "Capsicum",
+      "variety": "Badulla Bell Pepper"
+    },
+    "Cucumber (Pipinna)": {
+      "icon": "\ud83e\udd52",
+      "category": "Vegetables",
+      "shelf_life": 216.0,
+      "scientific": "Cucumis sativus",
+      "short_name": "Cucumber",
+      "variety": "Local Green Pipinna"
+    },
+    "Green Beans (Bonchi)": {
+      "icon": "\ud83e\uded8",
+      "category": "Vegetables",
+      "shelf_life": 144.0,
+      "scientific": "Phaseolus vulgaris",
+      "short_name": "Green Beans",
+      "variety": "Welimada Bush Bean"
+    },
+    "Potato (Ala)": {
+      "icon": "\ud83e\udd54",
+      "category": "Vegetables",
+      "shelf_life": 720.0,
+      "scientific": "Solanum tuberosum",
+      "short_name": "Potato",
+      "variety": "Granola / Welimada Ala"
+    },
+    "Eggplant (Brinjal / Wambatu)": {
+      "icon": "\ud83c\udf46",
+      "category": "Vegetables",
+      "shelf_life": 192.0,
+      "scientific": "Solanum melongena",
+      "short_name": "Eggplant",
+      "variety": "Thinnavely Purple"
+    },
+    "Red Onion (Rathu Lunu)": {
+      "icon": "\ud83e\uddc5",
+      "category": "Vegetables",
+      "shelf_life": 960.0,
+      "scientific": "Allium cepa",
+      "short_name": "Red Onion",
+      "variety": "Jaffna Vethalan Shallot"
+    },
+    "Garlic (Sudu Lunu)": {
+      "icon": "\ud83e\uddc4",
+      "category": "Vegetables",
+      "shelf_life": 1440.0,
+      "scientific": "Allium sativum",
+      "short_name": "Garlic",
+      "variety": "Welimada Sudu Lunu"
+    },
+    "Cabbage (Gova)": {
+      "icon": "\ud83e\udd6c",
+      "category": "Vegetables",
+      "shelf_life": 480.0,
+      "scientific": "Brassica oleracea capitata",
+      "short_name": "Cabbage",
+      "variety": "Green Ball Gova"
+    },
+    "Cauliflower": {
+      "icon": "\ud83e\udd66",
+      "category": "Vegetables",
+      "shelf_life": 240.0,
+      "scientific": "Brassica oleracea botrytis",
+      "short_name": "Cauliflower",
+      "variety": "Snowball White"
+    },
+    "Broccoli": {
+      "icon": "\ud83e\udd66",
+      "category": "Vegetables",
+      "shelf_life": 216.0,
+      "scientific": "Brassica oleracea italica",
+      "short_name": "Broccoli",
+      "variety": "Calabrese Green"
+    },
+    "Beetroot": {
+      "icon": "\ud83c\udf60",
+      "category": "Vegetables",
+      "shelf_life": 480.0,
+      "scientific": "Beta vulgaris",
+      "short_name": "Beetroot",
+      "variety": "Crimson Globe"
+    },
+    "Pumpkin (Wattakka)": {
+      "icon": "\ud83c\udf83",
+      "category": "Vegetables",
+      "shelf_life": 960.0,
+      "scientific": "Cucurbita moschata",
+      "short_name": "Pumpkin",
+      "variety": "Ruhunu Wattakka"
+    },
+    "Bitter Gourd (Karawila)": {
+      "icon": "\ud83e\udd52",
+      "category": "Vegetables",
+      "shelf_life": 168.0,
+      "scientific": "Momordica charantia",
+      "short_name": "Bitter Gourd",
+      "variety": "Thinnavely Karawila"
+    },
+    "Snake Gourd (Pathola)": {
+      "icon": "\ud83e\udd52",
+      "category": "Vegetables",
+      "shelf_life": 144.0,
+      "scientific": "Trichosanthes cucumerina",
+      "short_name": "Snake Gourd",
+      "variety": "TA-2 Pathola"
+    },
+    "Ridge Gourd (Wetawalu)": {
+      "icon": "\ud83e\udd52",
+      "category": "Vegetables",
+      "shelf_life": 144.0,
+      "scientific": "Luffa acutangula",
+      "short_name": "Ridge Gourd",
+      "variety": "Local Wetawalu"
+    },
+    "Radish (Rabu)": {
+      "icon": "\ud83e\udd55",
+      "category": "Vegetables",
+      "shelf_life": 288.0,
+      "scientific": "Raphanus sativus",
+      "short_name": "Radish",
+      "variety": "Beeralu White Rabu"
+    },
+    "Okra (Bandakka / Ladies Finger)": {
+      "icon": "\ud83e\udedb",
+      "category": "Vegetables",
+      "shelf_life": 144.0,
+      "scientific": "Abelmoschus esculentus",
+      "short_name": "Okra",
+      "variety": "Haritha Bandakka"
+    },
+    "Mushroom (Bimmal)": {
+      "icon": "\ud83c\udf44",
+      "category": "Vegetables",
+      "shelf_life": 120.0,
+      "scientific": "Pleurotus ostreatus",
+      "short_name": "Mushroom",
+      "variety": "American Oyster Bimmal"
+    },
+    "Ginger (Inguru)": {
+      "icon": "\ud83e\udeda",
+      "category": "Vegetables",
+      "shelf_life": 1200.0,
+      "scientific": "Zingiber officinale",
+      "short_name": "Ginger",
+      "variety": "Local Rangoon Inguru"
+    }
+  },
+  "feature_count": 36,
+  "training_samples": 9160,
+  "test_samples": 1374,
+  "produce_accuracy": 0.7154,
+  "produce_f1": 0.7159,
+  "spoilage_accuracy": 0.9789,
+  "spoilage_f1": 0.9789,
+  "spoilage_r2": 0.9208,
+  "stage_classes": {
+    "0": "Fresh / Firm (Grade A)",
+    "1": "Optimal Ripe (Grade B)",
+    "2": "Overripe / Softening (Use Today)",
+    "3": "Spoiled / Rotten (Grade F)"
+  }
+}

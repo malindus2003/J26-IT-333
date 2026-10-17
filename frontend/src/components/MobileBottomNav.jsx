@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { 
   Menu, X, Sparkles, Bell, RefreshCw, Sun, Moon, Check, 
   ChevronRight, Layers, ShoppingBag, Package, Cpu, Users, 
-  TrendingUp, Trash2, Crown, CreditCard, ChefHat
+  TrendingUp, Trash2, Crown, CreditCard, ChefHat, LogOut
 } from 'lucide-react';
 import { ROLES } from './Header';
 
@@ -11,12 +11,13 @@ export default function MobileBottomNav({
   activeModule, 
   onSelectModule,
   currentRole = 'admin',
-  onSelectRole,
   onRefresh,
   activeAlertCount = 0,
   onOpenAlerts,
   isDarkMode,
-  onToggleTheme
+  onToggleTheme,
+  currentUser = null,
+  onLogout = null
 }) {
   const [moreSheetOpen, setMoreSheetOpen] = useState(false);
 
@@ -47,17 +48,6 @@ export default function MobileBottomNav({
 
   const handleSelect = (moduleId) => {
     onSelectModule(moduleId);
-    setMoreSheetOpen(false);
-  };
-
-  const handleRoleChange = (roleId) => {
-    if (onSelectRole) {
-      onSelectRole(roleId);
-      const targetRole = ROLES.find(r => r.id === roleId);
-      if (targetRole && targetRole.defaultModule) {
-        onSelectModule(targetRole.defaultModule);
-      }
-    }
     setMoreSheetOpen(false);
   };
 
@@ -256,34 +246,43 @@ export default function MobileBottomNav({
             </div>
 
             {/* Quick Workspace Switcher & Utilities */}
-            <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-2">
-              <span className="text-[10px] uppercase font-black text-slate-400 tracking-wider">
-                Workspace Persona & Tools
-              </span>
+            <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-2.5">
+              
+              {/* User Profile Info Card in Mobile Sheet */}
+              <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-850 border border-slate-200/80 dark:border-slate-800 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="p-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-xs flex-shrink-0">
+                    {ROLES.find(r => r.id === currentRole)?.icon || <Crown className="h-4 w-4 text-emerald-500" />}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-xs font-black text-slate-900 dark:text-white truncate">
+                      {currentUser?.name || ROLES.find(r => r.id === currentRole)?.title}
+                    </div>
+                    <div className="text-[10px] font-mono text-slate-500 dark:text-slate-400 truncate">
+                      {currentUser?.email || (currentRole === 'admin' ? 'admin@gmail.com' : currentRole === 'staff' ? 'kitchen@gmail.com' : 'cashier@gmail.com')}
+                    </div>
+                  </div>
+                </div>
 
-              {/* Persona Switcher Pills */}
-              <div className="grid grid-cols-3 gap-2">
-                {ROLES.map((role) => {
-                  const isCurrentRole = role.id === currentRole;
-                  return (
-                    <button
-                      key={role.id}
-                      type="button"
-                      onClick={() => handleRoleChange(role.id)}
-                      className={`p-2.5 rounded-xl border text-center transition-all cursor-pointer ${
-                        isCurrentRole
-                          ? 'border-emerald-600 bg-emerald-100 dark:bg-emerald-950/70 text-emerald-950 dark:text-emerald-200 font-black shadow-xs'
-                          : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-850 text-slate-700 dark:text-slate-300 font-bold'
-                      }`}
-                    >
-                      <div className="flex justify-center mb-1">
-                        {role.icon}
-                      </div>
-                      <div className="text-[11px] leading-tight truncate">{role.shortTitle}</div>
-                    </button>
-                  );
-                })}
+                {onLogout && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMoreSheetOpen(false);
+                      onLogout();
+                    }}
+                    className="px-2.5 py-1.5 rounded-xl bg-rose-100 hover:bg-rose-200 dark:bg-rose-950/70 text-rose-800 dark:text-rose-300 font-extrabold text-[10px] flex items-center gap-1 cursor-pointer flex-shrink-0"
+                    title="Sign Out"
+                  >
+                    <LogOut className="h-3 w-3 text-rose-600 dark:text-rose-400" />
+                    <span>Logout</span>
+                  </button>
+                )}
               </div>
+
+              <span className="text-[10px] uppercase font-black text-slate-400 tracking-wider block">
+                Quick Actions & Controls
+              </span>
 
               {/* Quick Actions Row: Alerts, Sync, Theme */}
               <div className="grid grid-cols-3 gap-2 pt-1">

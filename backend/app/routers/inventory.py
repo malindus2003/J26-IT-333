@@ -14,19 +14,13 @@ inventory_db = list(INITIAL_INVENTORY)
 # Minimum safe stock threshold in kg per category
 MIN_STOCK_THRESHOLDS_KG = {
     "Fruits": 15.0,
-    "Vegetables": 12.0,
-    "Meat": 10.0,
-    "Fish": 8.0,
-    "Dairy": 15.0
+    "Vegetables": 12.0
 }
 
 # Unit cost estimate in LKR per kg for valuation
 UNIT_COST_LKR_PER_KG = {
     "Fruits": 450.0,
-    "Vegetables": 320.0,
-    "Meat": 1850.0,
-    "Fish": 2200.0,
-    "Dairy": 650.0
+    "Vegetables": 320.0
 }
 
 class RestockPayload(BaseModel):
