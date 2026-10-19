@@ -341,6 +341,7 @@ export default function VisionInspector({ onInspectionComplete }) {
   const [esp32Loading, setEsp32Loading] = useState(false);
   const [esp32Error, setEsp32Error] = useState(null);
   const [esp32AutoPoll, setEsp32AutoPoll] = useState(false);
+  const [esp32PollInterval, setEsp32PollInterval] = useState(3600); // default 1 hour (3600s)
   const [esp32LastCaptureTime, setEsp32LastCaptureTime] = useState(null);
 
   // Interactive Dummy Simulation Slider (0% to 100%)
@@ -554,12 +555,12 @@ export default function VisionInspector({ onInspectionComplete }) {
       captureFromEsp32();
       interval = setInterval(() => {
         captureFromEsp32();
-      }, 8000);
+      }, esp32PollInterval * 1000);
     }
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [esp32AutoPoll, esp32Url]);
+  }, [esp32AutoPoll, esp32Url, esp32PollInterval]);
 
   // Dynamic Remaining Shelf-Life & Spoilage Computation
   const computeRemainingShelfLife = (val, category, isMould) => {
@@ -1683,27 +1684,56 @@ export default function VisionInspector({ onInspectionComplete }) {
               </div>
             )}
 
-            {/* Auto-Poll Controls */}
-            <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 flex items-center justify-between">
-              <div className="space-y-0.5">
-                <span className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
-                  <Radio className={`h-3.5 w-3.5 ${esp32AutoPoll ? 'text-emerald-500 animate-pulse' : 'text-slate-400'}`} />
-                  Continuous Auto-Scan (Every 8s)
-                </span>
-                <span className="text-[10px] text-slate-500 dark:text-slate-400 block">
-                  {esp32LastCaptureTime ? `Last captured: ${esp32LastCaptureTime}` : "Automated periodic container quality assessment"}
-                </span>
+            {/* Auto-Poll Controls with Configurable Frequency */}
+            <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 space-y-2.5">
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <span className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                    <Radio className={`h-3.5 w-3.5 ${esp32AutoPoll ? 'text-emerald-500 animate-pulse' : 'text-slate-400'}`} />
+                    Autonomous Container Surveillance
+                  </span>
+                  <span className="text-[10px] text-slate-500 dark:text-slate-400 block">
+                    {esp32LastCaptureTime ? `Last captured: ${esp32LastCaptureTime}` : "Periodic non-intrusive container quality assessment"}
+                  </span>
+                </div>
+                <button
+                  onClick={() => setEsp32AutoPoll(prev => !prev)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    esp32AutoPoll
+                      ? 'bg-emerald-600 text-white shadow-sm'
+                      : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-slate-600'
+                  }`}
+                >
+                  {esp32AutoPoll ? "Active (Stop)" : "Enable Auto-Capture"}
+                </button>
               </div>
-              <button
-                onClick={() => setEsp32AutoPoll(prev => !prev)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                  esp32AutoPoll
-                    ? 'bg-emerald-600 text-white shadow-sm'
-                    : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-slate-600'
-                }`}
-              >
-                {esp32AutoPoll ? "Active (Stop)" : "Enable Auto"}
-              </button>
+
+              {/* Interval Selection: 15s (Demo), 15m, 1h (Standard), 4h */}
+              <div className="pt-2 border-t border-slate-200 dark:border-slate-700/60 flex items-center justify-between text-xs">
+                <span className="text-[11px] font-semibold text-slate-600 dark:text-slate-400 flex items-center gap-1">
+                  <Clock className="h-3 w-3 text-slate-400" /> Capture Frequency:
+                </span>
+                <div className="flex items-center gap-1">
+                  {[
+                    { label: "15s (Demo)", val: 15 },
+                    { label: "15m", val: 900 },
+                    { label: "1h (HACCP Standard)", val: 3600 },
+                    { label: "4h", val: 14400 }
+                  ].map(opt => (
+                    <button
+                      key={opt.val}
+                      onClick={() => setEsp32PollInterval(opt.val)}
+                      className={`px-2 py-0.5 rounded text-[10px] font-bold transition-colors cursor-pointer ${
+                        esp32PollInterval === opt.val
+                          ? 'bg-sky-600 text-white shadow-2xs'
+                          : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
 
             {/* Firmware & Arduino Sketch Quick Links */}
