@@ -77,11 +77,20 @@ export default function DemandForecastingDashboard({ isDarkMode, currentRole = '
           training_window_days: 90
         },
         contextual_factors: {
-          weather_condition: "Heavy Evening Rain (24°C)",
-          weather_impact: "+18% delivery & comfort food surge",
-          active_promotions: "10% Family Dinner Flash Deal",
-          reservations_booked: 64,
-          local_events: "Inter-University Rugby Match (Nearby Venue)"
+          weather_condition: "Coastal Rain Showers (25.0°C) • Hikkaduwa",
+          weather_impact: "+16% hot soups, kottu & comfort meal surge",
+          active_promotions: "No Active Campaigns (Regular Menu Rates)",
+          promo_impact: "Standard regular pricing (0% surge)",
+          has_active_promo: false,
+          reservations_booked: 0,
+          reservations_pax: 0,
+          reservations_text: "0 Table Reservations (0 Guests)",
+          reservations_impact: "Standard walk-in customer flow (0% reservation lift)",
+          reservations_live: true,
+          local_events: "No Events Scheduled Today",
+          event_impact: "Standard regular dining (0% surge)",
+          weather_live: true,
+          calendar_live: true
         },
         kpi_summary: {
           total_projected_orders: 420,
@@ -371,18 +380,11 @@ export default function DemandForecastingDashboard({ isDarkMode, currentRole = '
               ) : (
                 <>
                   <span className="px-2.5 sm:px-3 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-black bg-emerald-700 text-white shadow-sm flex items-center gap-1.5">
-                    <TrendingUp className="h-3 w-3 sm:h-3.5 sm:w-3.5" /> Component 1: AI Demand Prediction
+                    <TrendingUp className="h-3 w-3 sm:h-3.5 sm:w-3.5" /> AI Food Demand Forecast
                   </span>
-                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
-                    Multi-Source Time-Series
-                  </span>
-                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
-                    Executive / Manager View
-                  </span>
-                  <span className="px-2.5 py-0.5 rounded text-[10px] font-black bg-emerald-50 dark:bg-emerald-950/70 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800 flex items-center gap-1 shadow-2xs">
+                  <span className="px-2.5 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-bold bg-emerald-50 dark:bg-emerald-950/70 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 flex items-center gap-1">
                     <MapPin className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
                     <span>{data?.active_branch?.name || "Hikkaduwa Beachfront (Main Branch)"}</span>
-                    <span className="text-[9px] font-mono opacity-80">({data?.active_branch?.latitude || 6.1395}°N, {data?.active_branch?.longitude || 80.1063}°E)</span>
                   </span>
                 </>
               )}
@@ -390,14 +392,14 @@ export default function DemandForecastingDashboard({ isDarkMode, currentRole = '
             
             <h2 className="text-base sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight leading-tight">
               {userRole === 'staff' 
-                ? "Kitchen Food Preparation & Batch Sizing Guidance"
-                : "Multi-Source Food Demand Forecasting & Kitchen Preparation Sizing"
+                ? "Kitchen Food Preparation & Batch Sizing"
+                : "Food Demand & Kitchen Prep Forecast"
               }
             </h2>
             <p className="text-[11px] sm:text-xs text-slate-600 dark:text-slate-300 leading-relaxed font-medium">
               {userRole === 'staff'
-                ? "Shift prep quantities and safety buffers for line cooks and prep stations. Mark items out of stock (86) or print daily kitchen prep sheets."
-                : "Multi-source time-series forecasting integrating 60–90 days POS records, live weather APIs, holiday calendars, reservations, and promotions to produce item-level prep targets and dynamic safety buffers while eliminating overproduction waste."
+                ? "Shift prep quantities and safety buffers for line cooks. Mark items out of stock (86) or print daily kitchen prep sheets."
+                : "Item-level demand predictions and kitchen prep guidance calibrated with live weather and dining reservations."
               }
             </p>
           </div>
@@ -405,14 +407,14 @@ export default function DemandForecastingDashboard({ isDarkMode, currentRole = '
           {/* Right Header Panel: Role Selector & Adaptive KPIs */}
           <div className="flex flex-col sm:items-end gap-2.5 w-full sm:w-auto">
             
-            {/* Role Switcher Pill: Only accessible to Admin/Manager; Kitchen staff cannot view manager data */}
+            {/* Role Switcher Pill: Only accessible to Admin/Manager */}
             {currentRole === 'admin' && (
               <div className="flex items-center gap-1 p-1 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 self-start sm:self-end">
-                <span className="text-[10px] text-slate-500 font-bold px-1.5">Preview:</span>
+                <span className="text-[10px] text-slate-500 font-bold px-1.5">View Mode:</span>
                 <button
                   type="button"
                   onClick={() => setUserRole('admin')}
-                  className={`px-2.5 py-1 rounded-lg text-[10px] font-black transition-all cursor-pointer ${
+                  className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer ${
                     userRole === 'admin'
                       ? 'bg-emerald-700 text-white shadow-xs'
                       : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
@@ -423,7 +425,7 @@ export default function DemandForecastingDashboard({ isDarkMode, currentRole = '
                 <button
                   type="button"
                   onClick={() => { setUserRole('staff'); setActiveTab('overview'); }}
-                  className={`px-2.5 py-1 rounded-lg text-[10px] font-black transition-all cursor-pointer ${
+                  className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer ${
                     userRole === 'staff'
                       ? 'bg-emerald-700 text-white shadow-xs'
                       : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
@@ -433,29 +435,6 @@ export default function DemandForecastingDashboard({ isDarkMode, currentRole = '
                 </button>
               </div>
             )}
-
-            {/* Key Metric Highlight */}
-            <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-center p-3 sm:p-4 rounded-xl sm:rounded-2xl bg-[#f4f8f5] dark:bg-slate-800/90 border border-[#d5e2d9] dark:border-slate-700 shadow-sm w-full min-w-0 sm:min-w-[220px]">
-              {userRole === 'staff' ? (
-                <>
-                  <span className="text-[9px] sm:text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider">Today's Kitchen Target</span>
-                  <div className="text-xl sm:text-2xl font-black text-emerald-700 dark:text-emerald-400 mt-0.5">{data.kpi_summary.total_prep_recommended} Portions</div>
-                  <div className="text-[10px] sm:text-[11px] text-slate-600 dark:text-slate-300 font-semibold mt-0.5 sm:mt-1 flex items-center gap-1">
-                    <ShieldCheck className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-amber-600" />
-                    <span>+{data.kpi_summary.total_safety_buffer} safety buffer included</span>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <span className="text-[9px] sm:text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider">Forecast Reliability</span>
-                  <div className="text-xl sm:text-2xl font-black text-emerald-700 dark:text-emerald-400 mt-0.5">High Confidence</div>
-                  <div className="text-[10px] sm:text-[11px] text-slate-600 dark:text-slate-300 font-semibold mt-0.5 sm:mt-1 flex items-center gap-1">
-                    <CheckCircle className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-emerald-600" />
-                    <span>Calibrated on 90-day POS sales & weather</span>
-                  </div>
-                </>
-              )}
-            </div>
           </div>
         </div>
       </div>
@@ -547,11 +526,7 @@ export default function DemandForecastingDashboard({ isDarkMode, currentRole = '
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-1.5">
               <span className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400">Weather Intelligence</span>
-              {data.contextual_factors?.weather_live && (
-                <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300">
-                  Live Open-Meteo
-                </span>
-              )}
+              {data.contextual_factors?.weather_live }
             </div>
             <div className="text-xs font-extrabold text-slate-900 dark:text-white truncate">{data.contextual_factors.weather_condition}</div>
             <div className="text-[11px] text-sky-700 dark:text-sky-400 font-bold truncate">{data.contextual_factors.weather_impact}</div>
@@ -564,9 +539,18 @@ export default function DemandForecastingDashboard({ isDarkMode, currentRole = '
             <Calendar className="h-5 w-5" />
           </div>
           <div className="min-w-0 flex-1">
-            <span className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400">Customer Bookings</span>
-            <div className="text-xs font-extrabold text-slate-900 dark:text-white truncate">{data.contextual_factors.reservations_booked} Table Reservations</div>
-            <div className="text-[11px] text-amber-700 dark:text-amber-400 font-bold truncate">High dinner pre-orders</div>
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400">Customer Bookings</span>
+              {data.contextual_factors?.reservations_live 
+                
+              }
+            </div>
+            <div className="text-xs font-extrabold text-slate-900 dark:text-white truncate">
+              {data.contextual_factors.reservations_text || `${data.contextual_factors.reservations_booked ?? 0} Table Reservations`}
+            </div>
+            <div className="text-[11px] text-amber-700 dark:text-amber-400 font-bold truncate">
+              {data.contextual_factors.reservations_impact || "Standard walk-in customer flow"}
+            </div>
           </div>
         </div>
 
@@ -585,7 +569,7 @@ export default function DemandForecastingDashboard({ isDarkMode, currentRole = '
               )}
             </div>
             <div className="text-xs font-extrabold text-slate-900 dark:text-white truncate">{data.contextual_factors.local_events}</div>
-            <div className="text-[11px] text-purple-700 dark:text-purple-400 font-bold truncate">{data.contextual_factors.event_impact || "+22% evening takeaway surge"}</div>
+            <div className="text-[11px] text-purple-700 dark:text-purple-400 font-bold truncate">{data.contextual_factors.event_impact || "Standard regular dining (0% surge)"}</div>
           </div>
         </div>
 
@@ -597,7 +581,9 @@ export default function DemandForecastingDashboard({ isDarkMode, currentRole = '
           <div className="min-w-0 flex-1">
             <span className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400">Active Campaign</span>
             <div className="text-xs font-extrabold text-slate-900 dark:text-white truncate">{data.contextual_factors.active_promotions}</div>
-            <div className="text-[11px] text-emerald-700 dark:text-emerald-400 font-bold truncate">+12% dining conversion</div>
+            <div className="text-[11px] text-emerald-700 dark:text-emerald-400 font-bold truncate">
+              {data.contextual_factors.promo_impact || (data.contextual_factors.has_active_promo ? "+10% dining surge" : "Standard regular pricing (0% surge)")}
+            </div>
           </div>
         </div>
 
@@ -829,10 +815,10 @@ export default function DemandForecastingDashboard({ isDarkMode, currentRole = '
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-xs font-bold text-emerald-800 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 px-3 py-1 rounded-xl border border-emerald-200 dark:border-emerald-700">
-                  Today (Friday): 480 Projected
+                  {data.multi_day_forecast?.find(d => d.day?.includes('Today'))?.day || 'Today'}: {data.multi_day_forecast?.find(d => d.day?.includes('Today'))?.predicted_orders || 480} Projected
                 </span>
                 <span className="text-xs font-bold text-purple-800 dark:text-purple-300 bg-purple-50 dark:bg-purple-950/60 px-3 py-1 rounded-xl border border-purple-200 dark:border-purple-700">
-                  Weekend Peak: 560 Projected
+                  Weekend Peak: {Math.max(...(data.multi_day_forecast?.map(d => d.predicted_orders) || [560]))} Projected
                 </span>
               </div>
             </div>
