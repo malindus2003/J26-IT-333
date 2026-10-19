@@ -336,7 +336,7 @@ export default function VisionInspector({ onInspectionComplete }) {
   const [cameraError, setCameraError] = useState(null);
 
   // ESP32-CAM Wi-Fi Hardware Node State
-  const [esp32Url, setEsp32Url] = useState(() => localStorage.getItem("esp32_cam_url") || "http://192.168.1.100/capture");
+  const [esp32Url, setEsp32Url] = useState(() => localStorage.getItem("esp32_cam_url") || "http://172.20.10.2/capture");
   const [isEsp32ModalOpen, setIsEsp32ModalOpen] = useState(false);
   const [esp32Loading, setEsp32Loading] = useState(false);
   const [esp32Error, setEsp32Error] = useState(null);
@@ -1664,7 +1664,7 @@ export default function VisionInspector({ onInspectionComplete }) {
             <div className="space-y-1.5">
               <label className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center justify-between">
                 <span>ESP32-CAM Snapshot URL</span>
-                <span className="text-[10px] font-normal text-slate-400">e.g. http://192.168.1.50/capture</span>
+                <span className="text-[10px] font-normal text-slate-400">e.g. http://172.20.10.2/capture</span>
               </label>
               <div className="flex gap-2">
                 <div className="relative flex-1">
@@ -1673,7 +1673,7 @@ export default function VisionInspector({ onInspectionComplete }) {
                     type="text"
                     value={esp32Url}
                     onChange={(e) => setEsp32Url(e.target.value)}
-                    placeholder="http://192.168.1.100/capture"
+                    placeholder="http://172.20.10.2/capture"
                     className="w-full pl-9 pr-3 py-2 text-xs font-mono font-bold rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-none focus:border-sky-600"
                   />
                 </div>
