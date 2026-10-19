@@ -8,11 +8,12 @@
  * ======================================================================================
  * 
  * Target Board: AI-Thinker ESP32-CAM (OV2640 Sensor)
+ * Compatible with ESP32 Arduino Core v2.x and v3.x (uses native esp_http_server)
  * 
  * Capabilities:
  *  1. Local HTTP Snapshot Server:
- *     - Listens on port 80 (e.g., http://192.168.1.50/capture)
- *     - Snaps a high-quality JPEG upon HTTP request and returns binary image.
+ *     - Listens on port 80 (e.g., http://<ip>/capture)
+ *     - Snaps a high-quality JPEG upon HTTP request and streams binary image.
  *  2. Flash LED Illumination (GPIO 4):
  *     - Automatically illuminates dark cold storage containers/refrigerator shelves
  *       during capture, then turns off to save power and prevent heating produce.
@@ -23,16 +24,15 @@
 
 #include "esp_camera.h"
 #include <WiFi.h>
-#include <WiFiClient.h>
-#include <WebServer.h>
+#include "esp_http_server.h"
 #include <HTTPClient.h>
 
 // ==========================================
 // 1. Wi-Fi Configuration
 // ==========================================
-// Set your Wi-Fi SSID and Password here (or Mobile Hotspot)
-const char* WIFI_SSID     = "YOUR_WIFI_SSID";
-const char* WIFI_PASSWORD = "YOUR_WIFI_PASSWORD";
+// Wi-Fi SSID and Password
+const char* WIFI_SSID     = "Malindu";
+const char* WIFI_PASSWORD = "12345678";
 
 // Central FastAPI Backend IP & Port
 const char* BACKEND_SERVER_URL = "http://192.168.1.10:8000/api/vision/esp32/upload";
@@ -68,13 +68,12 @@ const unsigned long AUTO_PUSH_INTERVAL_MS = 0; // Set e.g. 15000 for 15s push
 #define FLASH_LED_PIN      4 // High-power onboard flash LED
 #define STATUS_LED_PIN    33 // Small red onboard indicator (Active LOW)
 
-WebServer server(80);
+httpd_handle_t camera_httpd = NULL;
 unsigned long lastPushTime = 0;
 
 // ==========================================
-// 3. Camera Frame Capture & HTTP Handlers
+// 3. Flash LED Control
 // ==========================================
-
 void turnOnFlash() {
   digitalWrite(FLASH_LED_PIN, HIGH);
   delay(120); // Brief warm-up for exposure balance
@@ -84,8 +83,12 @@ void turnOffFlash() {
   digitalWrite(FLASH_LED_PIN, LOW);
 }
 
-// Handler: GET /capture - Returns current JPEG frame
-void handleCapture() {
+// ==========================================
+// 4. Native HTTP Server Handlers
+// ==========================================
+
+// Handler: GET /capture - Snaps frame and streams binary JPEG
+static esp_err_t capture_handler(httpd_req_t *req) {
   digitalWrite(STATUS_LED_PIN, LOW); // LED ON
   turnOnFlash();
 
@@ -93,27 +96,26 @@ void handleCapture() {
   turnOffFlash();
 
   if (!fb) {
-    digitalWrite(STATUS_LED_PIN, HIGH);
-    server.send(500, "text/plain", "Camera capture failed");
+    digitalWrite(STATUS_LED_PIN, HIGH); // LED OFF
     Serial.println("[ESP32-CAM] ERROR: Camera capture failed!");
-    return;
+    httpd_resp_send_500(req);
+    return ESP_FAIL;
   }
 
-  server.sendHeader("Access-Control-Allow-Origin", "*");
-  server.sendHeader("Content-Disposition", "inline; filename=capture.jpg");
-  server.setContentLength(fb->len);
-  server.send(200, "image/jpeg", "");
-  
-  WiFiClient client = server.client();
-  client.write(fb->buf, fb->len);
+  httpd_resp_set_type(req, "image/jpeg");
+  httpd_resp_set_hdr(req, "Content-Disposition", "inline; filename=capture.jpg");
+  httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
 
+  esp_err_t res = httpd_resp_send(req, (const char *)fb->buf, fb->len);
+  
   esp_camera_fb_return(fb);
   digitalWrite(STATUS_LED_PIN, HIGH); // LED OFF
   Serial.printf("[ESP32-CAM] Frame streamed (%u bytes)\n", fb->len);
+  return res;
 }
 
-// Handler: GET /status
-void handleStatus() {
+// Handler: GET /status - Returns JSON metadata
+static esp_err_t status_handler(httpd_req_t *req) {
   String json = "{";
   json += "\"status\":\"online\",";
   json += "\"node\":\"ESP32-CAM-Produce-Scanner\",";
@@ -123,12 +125,14 @@ void handleStatus() {
   json += "\"rssi\":" + String(WiFi.RSSI()) + ",";
   json += "\"uptime_ms\":" + String(millis());
   json += "}";
-  server.sendHeader("Access-Control-Allow-Origin", "*");
-  server.send(200, "application/json", json);
+
+  httpd_resp_set_type(req, "application/json");
+  httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
+  return httpd_resp_send(req, json.c_str(), json.length());
 }
 
-// Handler: GET / (Dashboard Index)
-void handleRoot() {
+// Handler: GET / - Web dashboard
+static esp_err_t index_handler(httpd_req_t *req) {
   String html = "<!DOCTYPE html><html><head><meta name='viewport' content='width=device-width, initial-scale=1'>";
   html += "<title>Smart Restaurant ESP32-CAM Optical Node</title>";
   html += "<style>body{font-family:Arial,sans-serif;margin:20px;background:#f0fdf4;color:#1e293b;text-align:center;}";
@@ -146,11 +150,50 @@ void handleRoot() {
   html += "<div><img src='/capture' id='cam' alt='Live Frame' /></div>";
   html += "<p style='font-size:12px;color:#64748b;margin-top:16px;'>Backend Endpoint: <code>" + String(BACKEND_SERVER_URL) + "</code></p>";
   html += "</div></body></html>";
-  server.send(200, "text/html", html);
+
+  httpd_resp_set_type(req, "text/html");
+  httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
+  return httpd_resp_send(req, html.c_str(), html.length());
+}
+
+// Start native HTTP server
+void startCameraServer() {
+  httpd_config_t config = HTTPD_DEFAULT_CONFIG();
+  config.server_port = 80;
+
+  httpd_uri_t index_uri = {
+    .uri       = "/",
+    .method    = HTTP_GET,
+    .handler   = index_handler,
+    .user_ctx  = NULL
+  };
+
+  httpd_uri_t capture_uri = {
+    .uri       = "/capture",
+    .method    = HTTP_GET,
+    .handler   = capture_handler,
+    .user_ctx  = NULL
+  };
+
+  httpd_uri_t status_uri = {
+    .uri       = "/status",
+    .method    = HTTP_GET,
+    .handler   = status_handler,
+    .user_ctx  = NULL
+  };
+
+  if (httpd_start(&camera_httpd, &config) == ESP_OK) {
+    httpd_register_uri_handler(camera_httpd, &index_uri);
+    httpd_register_uri_handler(camera_httpd, &capture_uri);
+    httpd_register_uri_handler(camera_httpd, &status_uri);
+    Serial.println("[ESP32-CAM] Native HTTP Server started on port 80");
+  } else {
+    Serial.println("[ESP32-CAM] ERROR: Failed to start HTTP server!");
+  }
 }
 
 // ==========================================
-// 4. Push Frame to FastAPI Backend (Optional)
+// 5. Push Frame to FastAPI Backend (Optional)
 // ==========================================
 void postSnapshotToBackend() {
   turnOnFlash();
@@ -186,7 +229,7 @@ void postSnapshotToBackend() {
 }
 
 // ==========================================
-// 5. Setup & Initialization
+// 6. Setup & Initialization
 // ==========================================
 void setup() {
   Serial.begin(115200);
@@ -278,23 +321,20 @@ void setup() {
     Serial.print("[ESP32-CAM] IP Address: http://");
     Serial.println(WiFi.localIP());
     Serial.println("[ESP32-CAM] Snapshot URL: http://" + WiFi.localIP().toString() + "/capture");
+    
+    // Start native HTTP Server
+    startCameraServer();
   } else {
     Serial.println("\n[ESP32-CAM] Wi-Fi Connection Timeout! Running in offline mode.");
   }
-
-  // Setup Web Server Routes
-  server.on("/", HTTP_GET, handleRoot);
-  server.on("/capture", HTTP_GET, handleCapture);
-  server.on("/status", HTTP_GET, handleStatus);
-  server.begin();
-  Serial.println("[ESP32-CAM] HTTP Snapshot Server started on port 80");
 }
 
 // ==========================================
-// 6. Main Loop
+// 7. Main Loop
 // ==========================================
 void loop() {
-  server.handleClient();
+  // esp_http_server runs in its own FreeRTOS background task,
+  // so no server.handleClient() is required in loop()!
 
   // Handle optional periodic push
   if (AUTO_PUSH_INTERVAL_MS > 0 && WiFi.status() == WL_CONNECTED) {
@@ -304,5 +344,5 @@ void loop() {
       postSnapshotToBackend();
     }
   }
-  delay(5);
+  delay(10);
 }
