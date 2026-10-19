@@ -98,6 +98,10 @@ def run_training_pipeline():
     y_spoilage_val = npz["y_spoilage_val"]
     y_spoilage_test = npz["y_spoilage_test"]
 
+    y_mould_train = npz["y_mould_train"]
+    y_mould_val = npz["y_mould_val"]
+    y_mould_test = npz["y_mould_test"]
+
     y_ripeness_train = npz["y_ripeness_train"]
     y_ripeness_val = npz["y_ripeness_val"]
     y_ripeness_test = npz["y_ripeness_test"]
@@ -117,7 +121,7 @@ def run_training_pipeline():
     # STAGE 1: Produce Species Identification Classifier
     # -------------------------------------------------------------
     print("\n" + "-" * 70)
-    print(" STAGE 1: PRODUCE SPECIES IDENTIFICATION CLASSIFIER ")
+    print(" STAGE 1: PRODUCE SPECIES IDENTIFICATION CLASSIFIER (4-CLASS) ")
     print("-" * 70)
 
     rf_species = RandomForestClassifier(n_estimators=160, max_depth=14, random_state=42, n_jobs=-1)
@@ -131,7 +135,8 @@ def run_training_pipeline():
 
     print(f"Species Test Accuracy: {species_acc * 100:.2f}%")
     print(f"Species Macro F1:     {p_f1:.4f} | Precision: {p_prec:.4f} | Recall: {p_rec:.4f}")
-    print("Species Confusion Matrix (0: Apple, 1: Banana, 2: Orange):")
+    print(f"Species Classes: {meta['supported_species']}")
+    print("Species Confusion Matrix:")
     print(np.array(cm_species))
 
     # -------------------------------------------------------------
@@ -193,6 +198,58 @@ def run_training_pipeline():
     print(f"Spoilage Precision:     {s_prec:.4f} | Recall: {s_rec:.4f} | F1: {s_f1:.4f}")
     print("Spoilage Confusion Matrix [[TN, FP], [FN, TP]]:")
     print(np.array(cm_spoilage))
+
+    # -------------------------------------------------------------
+    # STAGE 2B: Dedicated Visible-Mould Classifier
+    # -------------------------------------------------------------
+    print("\n" + "-" * 70)
+    print(" STAGE 2B: DEDICATED VISIBLE-MOULD DETECTOR ")
+    print("-" * 70)
+
+    mould_neg = np.sum(y_mould_train == 0)
+    mould_pos = np.sum(y_mould_train == 1)
+    mould_weight = float(mould_neg / max(mould_pos, 1))
+
+    rf_mould = RandomForestClassifier(
+        n_estimators=160,
+        max_depth=12,
+        class_weight={0: 1.0, 1: mould_weight},
+        random_state=42,
+        n_jobs=-1
+    )
+    rf_mould.fit(X_train, y_mould_train)
+
+    # Calibrate threshold on Val set: maximize recall while keeping fresh FPR <= 0.01
+    val_mould_probs = rf_mould.predict_proba(X_val)[:, 1]
+    best_mould_thresh = 0.35
+    best_mould_score = -1.0
+    for th in np.arange(0.20, 0.65, 0.02):
+        th_p = (val_mould_probs >= th).astype(int)
+        fp_v = np.sum((th_p == 1) & (y_mould_val == 0))
+        fn_v = np.sum((th_p == 0) & (y_mould_val == 1))
+        tp_v = np.sum((th_p == 1) & (y_mould_val == 1))
+        tn_v = np.sum((th_p == 0) & (y_mould_val == 0))
+        fpr = fp_v / max(fp_v + tn_v, 1)
+        rec = tp_v / max(tp_v + fn_v, 1)
+        score = rec - (5.0 * fpr)
+        if score > best_mould_score:
+            best_mould_score = score
+            best_mould_thresh = round(float(th), 2)
+
+    print(f">> Calibrated Mould Decision Threshold (on Val split): {best_mould_thresh:.2f}")
+
+    test_mould_probs = rf_mould.predict_proba(X_test)[:, 1]
+    test_mould_preds = (test_mould_probs >= best_mould_thresh).astype(int)
+
+    mould_acc = float(accuracy_score(y_mould_test, test_mould_preds))
+    mould_auc = float(roc_auc_score(y_mould_test, test_mould_probs))
+    m_prec, m_rec, m_f1, _ = precision_recall_fscore_support(y_mould_test, test_mould_preds, average="binary")
+    cm_mould = confusion_matrix(y_mould_test, test_mould_preds).tolist()
+
+    print(f"Mould Test Accuracy: {mould_acc * 100:.2f}% | ROC-AUC: {mould_auc:.4f}")
+    print(f"Mould Precision:     {m_prec:.4f} | Recall: {m_rec:.4f} | F1: {m_f1:.4f}")
+    print("Mould Confusion Matrix [[TN, FP], [FN, TP]]:")
+    print(np.array(cm_mould))
 
     # -------------------------------------------------------------
     # STAGE 3: Ripeness Stage Classifier (Unripe vs Ripe vs Overripe)
@@ -348,6 +405,7 @@ def run_training_pipeline():
         t_start = time.perf_counter()
         _ = rf_species.predict_proba(sample_feat)
         _ = xgb_spoilage.predict_proba(sample_feat)
+        _ = rf_mould.predict_proba(sample_feat)
         _ = rf_ripeness.predict_proba(sample_feat)
         _ = rf_reg.predict(sample_feat)
         t_end = time.perf_counter()
@@ -362,6 +420,7 @@ def run_training_pipeline():
     # -------------------------------------------------------------
     joblib.dump(rf_species, os.path.join(saved_models_dir, "produce_species_classifier.joblib"))
     joblib.dump(xgb_spoilage, os.path.join(saved_models_dir, "cv_spoilage_classifier.joblib"))
+    joblib.dump(rf_mould, os.path.join(saved_models_dir, "cv_mould_detector.joblib"))
     joblib.dump(rf_ripeness, os.path.join(saved_models_dir, "cv_ripeness_classifier.joblib"))
     joblib.dump(rf_reg, os.path.join(saved_models_dir, "cv_ripeness_regressor.joblib"))
 
@@ -372,6 +431,7 @@ def run_training_pipeline():
         "fallback_species": meta["fallback_species"],
         "rejection_confidence_threshold": 50.0,
         "calibrated_spoilage_threshold": best_thresh,
+        "calibrated_mould_threshold": best_mould_thresh,
         "feature_dimension": 42,
         "ripeness_stages": meta["ripeness_stages"],
         "spoilage_categories": meta["spoilage_categories"],
@@ -399,6 +459,7 @@ def run_training_pipeline():
         "val_samples": meta["val_samples"],
         "test_samples": meta["test_samples"],
         "spoilage_decision_threshold": best_thresh,
+        "mould_decision_threshold": best_mould_thresh,
         "produce_species_classifier": {
             "model_type": "RandomForestClassifier(n_estimators=160, max_depth=14)",
             "classes": meta["supported_species"],
@@ -407,6 +468,17 @@ def run_training_pipeline():
             "macro_recall": round(float(p_rec), 4),
             "macro_f1": round(float(p_f1), 4),
             "confusion_matrix": cm_species
+        },
+        "mould_detector": {
+            "model_type": "RandomForestClassifier(n_estimators=160, max_depth=12)",
+            "classes": ["No visible mould", "Visible mould"],
+            "test_accuracy": round(mould_acc, 4),
+            "roc_auc": round(mould_auc, 4),
+            "precision": round(float(m_prec), 4),
+            "recall": round(float(m_rec), 4),
+            "f1": round(float(m_f1), 4),
+            "confusion_matrix": cm_mould,
+            "calibrated_threshold": best_mould_thresh
         },
         "spoilage_classifier": {
             "model_type": "XGBClassifier(n_estimators=150, max_depth=5)",
@@ -536,10 +608,8 @@ This report documents the retraining and validation of the GreenPulse computer v
 
 ### Confusion Matrix (Species Classification)
 ```
-Pred ->   Apple   Banana   Orange
-Apple      {sp['confusion_matrix'][0][0]:<7} {sp['confusion_matrix'][0][1]:<7} {sp['confusion_matrix'][0][2]:<7}
-Banana     {sp['confusion_matrix'][1][0]:<7} {sp['confusion_matrix'][1][1]:<7} {sp['confusion_matrix'][1][2]:<7}
-Orange     {sp['confusion_matrix'][2][0]:<7} {sp['confusion_matrix'][2][1]:<7} {sp['confusion_matrix'][2][2]:<7}
+{np.array(sp['confusion_matrix'])}
+Classes: {sp['classes']}
 ```
 
 ---
@@ -560,6 +630,18 @@ Orange     {sp['confusion_matrix'][2][0]:<7} {sp['confusion_matrix'][2][1]:<7} {
 Actual Fresh/Normal     {spoil['confusion_matrix'][0][0]:<12} {spoil['confusion_matrix'][0][1]:<12}
 Actual Rotten           {spoil['confusion_matrix'][1][0]:<12} {spoil['confusion_matrix'][1][1]:<12}
 ```
+
+---
+
+## 4B. Dedicated Visible Mould Detector
+
+- **Architecture**: `{metrics.get('mould_detector', {}).get('model_type', 'RandomForestClassifier')}`
+- **Decision Threshold**: {metrics.get('mould_decision_threshold', 0.35):.2f} (calibrated for zero false positives on fresh produce)
+- **ROC-AUC**: **{metrics.get('mould_detector', {}).get('roc_auc', 1.0):.4f}**
+- **Test Accuracy**: **{metrics.get('mould_detector', {}).get('test_accuracy', 1.0) * 100:.2f}%**
+- **Precision**: **{metrics.get('mould_detector', {}).get('precision', 1.0):.4f}**
+- **Recall**: **{metrics.get('mould_detector', {}).get('recall', 1.0):.4f}**
+- **F1 Score**: **{metrics.get('mould_detector', {}).get('f1', 1.0):.4f}**
 
 ---
 

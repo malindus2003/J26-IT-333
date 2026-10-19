@@ -3,7 +3,7 @@
 **Project**: J26-IT-333 (AI + IoT-Based Smart Restaurant Management System)  
 **Component 3**: AI-Based Multi-Modal Food Spoilage Prediction & Quality Assessment  
 **Author**: Maddumage M. S. (IT23348820)  
-**Date**: 2026-10-19 13:38:59  
+**Date**: 2026-10-19 15:43:24  
 **Model Version**: v2.3-calibrated  
 
 ---
@@ -25,46 +25,51 @@ This report documents the retraining and validation of the GreenPulse computer v
 
 | Metric | Score | Denominator / Sample Size | Status |
 | :--- | :--- | :--- | :--- |
-| **Fresh-Produce False Positive Spoilage Rate** | **2.78%** | **7 / 252 fresh specimens** | **RESOLVED (Down from 96.7%)** |
-| **Fresh-Produce Specificity / Accuracy** | **97.22%** | **245 / 252 fresh specimens** | **PASS** |
-| **Rotten-Produce Recall / Detection Rate** | **95.65%** | **66 / 69 rotten specimens** | **PASS** |
-| **Missed Spoilage Rate (False Negative)** | **4.35%** | **3 / 69 rotten specimens** | **PASS** |
+| **Fresh-Produce False Positive Spoilage Rate** | **3.46%** | **9 / 260 fresh specimens** | **RESOLVED (Down from 96.7%)** |
+| **Fresh-Produce Specificity / Accuracy** | **96.54%** | **251 / 260 fresh specimens** | **PASS** |
+| **Rotten-Produce Recall / Detection Rate** | **97.26%** | **71 / 73 rotten specimens** | **PASS** |
+| **Missed Spoilage Rate (False Negative)** | **2.74%** | **2 / 73 rotten specimens** | **PASS** |
 
 ### Per-Species Spoilage Confusion Breakdown
 
 - **Apple**:
-  - Fresh Test Specimens: 78 | False Positives: 2 (**2.56% FPR**)
-  - Rotten Test Specimens: 14 | Detected Rot: 14 (**100.0% Recall**)
+  - Fresh Test Specimens: 76 | False Positives: 3 (**3.95% FPR**)
+  - Rotten Test Specimens: 15 | Detected Rot: 15 (**100.0% Recall**)
 
 - **Banana**:
-  - Fresh Test Specimens: 111 | False Positives: 2 (**1.8% FPR**)
-  - Rotten Test Specimens: 31 | Detected Rot: 28 (**90.32% Recall**)
+  - Fresh Test Specimens: 107 | False Positives: 1 (**0.93% FPR**)
+  - Rotten Test Specimens: 30 | Detected Rot: 28 (**93.33% Recall**)
 
 - **Orange**:
-  - Fresh Test Specimens: 63 | False Positives: 3 (**4.76% FPR**)
-  - Rotten Test Specimens: 24 | Detected Rot: 24 (**100.0% Recall**)
+  - Fresh Test Specimens: 69 | False Positives: 5 (**7.25% FPR**)
+  - Rotten Test Specimens: 25 | Detected Rot: 25 (**100.0% Recall**)
+
+- **Strawberry**:
+  - Fresh Test Specimens: 8 | False Positives: 0 (**0.0% FPR**)
+  - Rotten Test Specimens: 3 | Detected Rot: 3 (**100.0% Recall**)
 
 ---
 
 ## 3. Produce Species Identification Model
 
 - **Architecture**: `RandomForestClassifier(n_estimators=160, max_depth=14)`
-- **Supported Classes**: Apple, Banana, Orange
+- **Supported Classes**: Apple, Banana, Orange, Strawberry
 - **Out-of-Distribution Handling**: Rejection threshold at 50.0% confidence, mapping unfamiliar inputs to `Unknown / Unsupported Produce`.
 
 | Metric | Test Set Score |
 | :--- | :--- |
-| **Accuracy** | **75.39%** |
-| **Macro Precision** | **0.7573** |
-| **Macro Recall** | **0.7479** |
-| **Macro F1-Score** | **0.7510** |
+| **Accuracy** | **77.78%** |
+| **Macro Precision** | **0.8364** |
+| **Macro Recall** | **0.8283** |
+| **Macro F1-Score** | **0.8309** |
 
 ### Confusion Matrix (Species Classification)
 ```
-Pred ->   Apple   Banana   Orange
-Apple      70      11      11     
-Banana     8       111     23     
-Orange     3       23      61     
+[[ 73  11   7   0]
+ [  4 105  28   0]
+ [  3  21  70   0]
+ [  0   0   0  11]]
+Classes: ['Apple', 'Banana', 'Orange', 'Strawberry']
 ```
 
 ---
@@ -72,27 +77,39 @@ Orange     3       23      61
 ## 4. Visible Spoilage Classifier
 
 - **Architecture**: `XGBClassifier(n_estimators=150, max_depth=5)`
-- **Decision Threshold**: 0.41 (calibrated on held-out validation set)
-- **ROC-AUC**: **0.9970**
-- **Test Accuracy**: **96.88%**
-- **Precision**: **0.9041**
-- **Recall**: **0.9565**
-- **F1 Score**: **0.9296**
+- **Decision Threshold**: 0.49 (calibrated on held-out validation set)
+- **ROC-AUC**: **0.9968**
+- **Test Accuracy**: **96.70%**
+- **Precision**: **0.8875**
+- **Recall**: **0.9726**
+- **F1 Score**: **0.9281**
 
 ### Confusion Matrix (Spoilage)
 ```
                     Pred Fresh   Pred Rotten
-Actual Fresh/Normal     245          7           
-Actual Rotten           3            66          
+Actual Fresh/Normal     251          9           
+Actual Rotten           2            71          
 ```
+
+---
+
+## 4B. Dedicated Visible Mould Detector
+
+- **Architecture**: `RandomForestClassifier(n_estimators=160, max_depth=12)`
+- **Decision Threshold**: 0.46 (calibrated for zero false positives on fresh produce)
+- **ROC-AUC**: **0.9966**
+- **Test Accuracy**: **97.30%**
+- **Precision**: **0.7879**
+- **Recall**: **0.9286**
+- **F1 Score**: **0.8525**
 
 ---
 
 ## 5. Ripeness Stage Classifier
 
 - **Architecture**: `RandomForestClassifier(n_estimators=150, max_depth=10)`
-- **Test Accuracy**: **94.39%**
-- **Macro F1**: **0.9203**
+- **Test Accuracy**: **94.89%**
+- **Macro F1**: **0.9280**
 
 ---
 
@@ -103,14 +120,14 @@ Actual Rotten           3            66
 
 | Metric | Score |
 | :--- | :--- |
-| **$R^2$ Score** | **0.9440** |
-| **RMSE** | **7.85%** |
-| **MAE** | **3.32%** |
+| **$R^2$ Score** | **0.9160** |
+| **RMSE** | **9.01%** |
+| **MAE** | **4.29%** |
 
 ---
 
 ## 7. Defect Localization & CPU Latency
 
 - **Defect Localization mIoU**: **38.11%**
-- **CPU Inference Latency**: **122.72 ms** (P95: 149.07 ms)
+- **CPU Inference Latency**: **173.58 ms** (P95: 200.70 ms)
 - **Hardware Requirement**: 100% CPU Execution, no GPU dependency, fully compliant with real-time ESP32-CAM ingestion.

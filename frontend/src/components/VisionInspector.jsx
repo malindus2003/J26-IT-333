@@ -142,6 +142,37 @@ const SAMPLE_PRESETS = [
     ]
   },
   {
+    id: "strawberry_fresh",
+    name: "Fresh Garden Strawberry",
+    category: "Fruits",
+    icon: "🍓",
+    identified_produce: "Strawberry",
+    produce_confidence: 72.8,
+    produce_icon: "🍓",
+    scientific_name: "Fragaria × ananassa",
+    container: "Container #C-107 (Zone 1: Fruit Chiller 4°C)",
+    imageUrl: "/images/specimens/strawberry_fresh.jpg",
+    remoteFallbackUrl: "https://images.unsplash.com/photo-1464965911861-746a04b4bca6?w=600&auto=format&fit=crop&q=80",
+    ripeness_stage: "Ripe / Optimal (Grade A)",
+    ripeness_percent: 15,
+    visual_spoilage_score: 8.5,
+    risk_level: "Low",
+    discoloration_score: 1.2,
+    mould_detected: false,
+    mould_coverage: 0.0,
+    mould_confidence: 2.9,
+    texture_degradation: 4.0,
+    baseline_shelf_life_hours: 120.0,
+    remaining_shelf_life_hours: 91.3,
+    detected_defects: [
+      "Firm epidermal achenes",
+      "Vibrant anthocyanin pigmentation (No fungal growth)"
+    ],
+    bounding_boxes: [
+      { label: "HEALTHY TISSUE", type: "fresh", x: 20, y: 18, width: 60, height: 64, color: "#10b981" }
+    ]
+  },
+  {
     id: "rotten_fruit_mould",
     name: "Rotten Fruit (Botrytis Mould Colony)",
     category: "Fruits",
@@ -1281,8 +1312,8 @@ export default function VisionInspector({ onInspectionComplete }) {
                   <span className="text-[10px] sm:text-xs font-semibold text-slate-600 dark:text-slate-400 block truncate">Mould Colony</span>
                   <div className="text-sm sm:text-lg font-bold mt-0.5 flex items-center gap-1">
                     {cvResult.mould_detected ? (
-                      <span className="text-rose-700 dark:text-rose-400 flex items-center gap-1 text-xs sm:text-sm font-bold truncate">
-                        <AlertTriangle className="h-3.5 w-3.5" /> Detected ({cvResult.mould_coverage}%)
+                      <span className="text-rose-700 dark:text-rose-400 flex items-center gap-1 text-xs sm:text-sm font-bold truncate" title={`Confidence: ${cvResult.mould_confidence || 90}%, Coverage: ${cvResult.mould_coverage}%`}>
+                        <AlertTriangle className="h-3.5 w-3.5" /> Detected ({cvResult.mould_confidence !== undefined ? `${cvResult.mould_confidence}%` : `${cvResult.mould_coverage}%`})
                       </span>
                     ) : (
                       <span className="text-emerald-700 dark:text-emerald-400 flex items-center gap-1 text-xs sm:text-sm font-bold">

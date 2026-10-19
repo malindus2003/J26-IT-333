@@ -77,6 +77,7 @@ class FoodQualityVisionEngine:
         self.models_loaded = False
         self.species_classifier = None
         self.spoilage_classifier = None
+        self.mould_detector = None
         self.ripeness_classifier = None
         self.ripeness_regressor = None
         self.feature_scaler = None
@@ -98,6 +99,7 @@ class FoodQualityVisionEngine:
 
             species_path = os.path.join(saved_models_dir, "produce_species_classifier.joblib")
             spoilage_path = os.path.join(saved_models_dir, "cv_spoilage_classifier.joblib")
+            mould_path = os.path.join(saved_models_dir, "cv_mould_detector.joblib")
             ripeness_path = os.path.join(saved_models_dir, "cv_ripeness_classifier.joblib")
             reg_path = os.path.join(saved_models_dir, "cv_ripeness_regressor.joblib")
             scaler_path = os.path.join(saved_models_dir, "cv_feature_scaler.joblib")
@@ -111,6 +113,9 @@ class FoodQualityVisionEngine:
             if os.path.exists(spoilage_path):
                 self.spoilage_classifier = joblib.load(spoilage_path)
                 self.stage_classifier = self.spoilage_classifier
+
+            if os.path.exists(mould_path):
+                self.mould_detector = joblib.load(mould_path)
 
             if os.path.exists(ripeness_path):
                 self.ripeness_classifier = joblib.load(ripeness_path)
@@ -131,7 +136,7 @@ class FoodQualityVisionEngine:
                     self.real_metrics = json.load(f)
 
             if (self.species_classifier and self.spoilage_classifier and 
-                self.ripeness_classifier and self.ripeness_regressor):
+                self.ripeness_classifier and self.ripeness_regressor and self.mould_detector):
                 self.models_loaded = True
                 logger.info(f"Successfully loaded v2.3 calibrated CV models from {saved_models_dir}")
             else:
@@ -164,10 +169,10 @@ class FoodQualityVisionEngine:
         gray = cv2.cvtColor(img_resized, cv2.COLOR_BGR2GRAY)
 
         # Extract 42-dimensional multi-domain visual feature vector
-        feat_vec = extract_multi_domain_features(img_bgr)
+        feat_vec = extract_multi_domain_features(img_bgr, presegmented=(img_resized, fg_mask, fg_pixels))
         x_input = feat_vec.reshape(1, -1)
 
-        browning_percent = round(float(feat_vec[18]), 2)
+        browning_percent = round(float(feat_vec[24]), 2)
         mould_coverage = round(float(feat_vec[22]), 2)
         texture_degradation = min(100.0, round(float(feat_vec[25] * 2.2), 1))
         defect_area_pct = round(float(feat_vec[39]), 2)
@@ -205,12 +210,13 @@ class FoodQualityVisionEngine:
                 margin = float(s_probs[sorted_indices[0]] - s_probs[sorted_indices[1]]) if len(sorted_indices) > 1 else 1.0
 
                 # Physiological Out-of-Distribution Rejection:
-                # 1. Below confidence threshold (50%)
-                # 2. Ambiguous margin (< 8%)
+                # 1. Below confidence threshold (45%)
+                # 2. Ambiguous margin (< 10%)
                 # 3. Achromatic / flat non-produce (S_mean < 12.0 or Laplacian var < 1.0 or FG coverage < 3.0%)
                 is_non_produce = (feat_vec[8] < 12.0) or (feat_vec[29] < 1.0) or (feat_vec[40] < 3.0)
 
-                if conf_pct < rejection_threshold or margin < 0.08 or is_non_produce:
+                rejection_thresh = float(self.produce_metadata.get("rejection_confidence_threshold", 42.0))
+                if conf_pct < rejection_thresh or margin < 0.08 or is_non_produce:
                     identified_produce = FALLBACK_SPECIES
                     is_supported_produce = False
                     produce_confidence = round(conf_pct * 0.5, 1) if is_non_produce else conf_pct
@@ -223,12 +229,17 @@ class FoodQualityVisionEngine:
         # Retrieve metadata for species
         species_meta = self.produce_metadata.get("species_metadata", {}).get(identified_produce, {})
         if not species_meta:
-            info_key_map = {"Apple": "Fresh Apple", "Banana": "Embul Banana (Ambul Kesel)", "Orange": "Orange / Citrus"}
+            info_key_map = {
+                "Apple": "Fresh Apple",
+                "Banana": "Embul Banana (Ambul Kesel)",
+                "Orange": "Orange / Citrus",
+                "Strawberry": "Strawberry"
+            }
             species_meta = PRODUCE_INFO.get(info_key_map.get(identified_produce, ""), {})
 
-        produce_icon = species_meta.get("icon", "🍎" if is_supported_produce else "❓")
-        scientific_name = species_meta.get("scientific", "")
-        baseline_shelf_life = float(species_meta.get("shelf_life_hours", species_meta.get("shelf_life", 168.0 if is_supported_produce else 72.0)))
+        produce_icon = species_meta.get("icon", "🍓" if identified_produce == "Strawberry" else ("🍎" if is_supported_produce else "❓"))
+        scientific_name = species_meta.get("scientific", "Fragaria × ananassa" if identified_produce == "Strawberry" else "")
+        baseline_shelf_life = float(species_meta.get("shelf_life_hours", species_meta.get("shelf_life", 120.0 if identified_produce == "Strawberry" else (168.0 if is_supported_produce else 72.0))))
         detected_category = species_meta.get("category", category)
 
         # -------------------------------------------------------------
@@ -312,33 +323,56 @@ class FoodQualityVisionEngine:
             risk_level = "Critical"
 
         # -------------------------------------------------------------
-        # STAGE 4: DEFECT TYPE IDENTIFICATION
+        # STAGE 2B: DEDICATED VISIBLE-MOULD DETECTOR
+        # -------------------------------------------------------------
+        calibrated_mould_thresh = float(self.produce_metadata.get("calibrated_mould_threshold", 0.46))
+        mould_prob = 0.0
+        if self.mould_detector:
+            try:
+                m_probs = self.mould_detector.predict_proba(x_input)[0]
+                mould_prob = float(m_probs[1]) if len(m_probs) > 1 else float(m_probs[0])
+            except Exception as e:
+                logger.error(f"Mould detector inference error: {e}")
+
+        # Physical mould coverage from feature extractor
+        mould_coverage_feat = float(feat_vec[22])
+        necrotic_ratio = float(feat_vec[23])
+        browning_ratio = float(feat_vec[24])
+
+        # Decoupled Mould Detection Rule:
+        # A specimen is mould-positive if the trained detector predicts >= calibrated threshold (T=0.46)
+        # OR if model probability (>=0.30) is corroborated by physical mould coverage (>=4.0%)
+        is_mould_ml = mould_prob >= calibrated_mould_thresh
+        is_mould_hybrid = (mould_prob >= 0.30) and (mould_coverage_feat >= 4.0)
+        mould_detected = bool(is_mould_ml or is_mould_hybrid)
+
+        # -------------------------------------------------------------
+        # STAGE 4: DEFECT TYPE IDENTIFICATION & ZERO-TOLERANCE MOULD OVERRIDE
         # -------------------------------------------------------------
         detected_defect_types = []
-        mould_detected = False
 
-        if visible_spoilage_category == "No visible spoilage detected":
+        if mould_detected:
+            # ZERO TOLERANCE FOOD SAFETY OVERRIDE:
+            # Active fungal mycelium is a critical biological hazard.
+            # It ALWAYS forces Significant visible spoilage, Critical risk, and zero RSL.
+            visible_spoilage_category = "Significant visible spoilage"
+            risk_level = "Critical"
+            ripeness_stage_legacy = self.LEGACY_STAGE_NAMES[3]  # Grade F
+            detected_defect_types.append("Visible mould")
+            if necrotic_ratio >= 0.04:
+                detected_defect_types.append("Necrotic lesions")
+            if browning_ratio >= 0.12:
+                detected_defect_types.append("Brown spots")
+        elif visible_spoilage_category == "No visible spoilage detected":
             detected_defect_types = ["None"]
             mould_detected = False
         else:
-            mould_ratio = float(feat_vec[22])
-            necrotic_ratio = float(feat_vec[23])
-            browning_ratio = float(feat_vec[18])
-
-            # Mould detection requires both high foreground mould ratio and model spoilage probability
-            if mould_ratio >= 0.04 and spoil_prob >= calibrated_thresh:
-                detected_defect_types.append("Visible mould")
-                mould_detected = True
-
             if necrotic_ratio >= 0.04:
                 detected_defect_types.append("Necrotic lesions")
-
             if browning_ratio >= 0.12:
                 detected_defect_types.append("Brown spots")
-
             if float(feat_vec[38]) < 0.40: # Low peel uniformity
                 detected_defect_types.append("Discoloration")
-
             if not detected_defect_types:
                 detected_defect_types.append("Discoloration")
 
@@ -349,13 +383,13 @@ class FoodQualityVisionEngine:
         if self.ripeness_regressor:
             try:
                 reg_pred = float(self.ripeness_regressor.predict(x_input)[0])
-                if visible_spoilage_category == "No visible spoilage detected":
-                    # Clean produce cannot exceed 22% spoilage score
-                    visual_score = round(float(np.clip(reg_pred, 2.0, 22.0)), 1)
+                if mould_detected or visible_spoilage_category == "Significant visible spoilage":
+                    visual_score = round(float(np.clip(max(reg_pred, 85.0), 68.0, 98.0)), 1)
                 elif visible_spoilage_category == "Localized visible defect":
                     visual_score = round(float(np.clip(reg_pred, 25.0, 58.0)), 1)
-                elif visible_spoilage_category == "Significant visible spoilage":
-                    visual_score = round(float(np.clip(reg_pred, 68.0, 98.0)), 1)
+                elif visible_spoilage_category == "No visible spoilage detected":
+                    # Clean produce cannot exceed 22% spoilage score
+                    visual_score = round(float(np.clip(reg_pred, 2.0, 22.0)), 1)
                 else: # Uncertain
                     visual_score = round(float(np.clip(reg_pred, 20.0, 48.0)), 1)
             except Exception:
@@ -427,6 +461,9 @@ class FoodQualityVisionEngine:
             "species_probabilities": species_probs_dict,
             "spoilage_probability": round(spoil_prob * 100.0, 2),
             "calibrated_threshold": round(calibrated_thresh * 100.0, 2),
+            "mould_probability": round(mould_prob * 100.0, 2),
+            "calibrated_mould_threshold": round(calibrated_mould_thresh * 100.0, 2),
+            "mould_detected": mould_detected,
             "ripeness_probabilities": {
                 "Unripe": round(p_unripe * 100.0, 1),
                 "Ripe / Optimal": round(p_optimal * 100.0, 1),
@@ -440,13 +477,14 @@ class FoodQualityVisionEngine:
                 "species": identified_produce,
                 "ripeness": ripeness_category,
                 "visible_spoilage": visible_spoilage_category,
+                "mould_detected": mould_detected,
                 "rsl_hours": remaining_shelf_life
             }
         }
 
         logger.info(
             f"[CV Diagnostics] hash={img_hash} species={identified_produce} ({produce_confidence}%) "
-            f"ripeness={ripeness_category} spoilage={visible_spoilage_category} (p={spoil_prob:.3f}, T={calibrated_thresh:.2f}) "
+            f"ripeness={ripeness_category} spoilage={visible_spoilage_category} (p={spoil_prob:.3f}, T={calibrated_thresh:.2f}, mould_p={mould_prob:.3f}) "
             f"RSL={remaining_shelf_life}h"
         )
 
@@ -480,6 +518,8 @@ class FoodQualityVisionEngine:
             "detected_defects": detected_defects_text,
             "defect_surface_area_percent": final_defect_area_pct,
             "mould_detected": mould_detected,
+            "mould_confidence": round(mould_prob * 100.0, 1),
+            "calibrated_mould_threshold": round(calibrated_mould_thresh * 100.0, 1),
             "mould_coverage": mould_coverage,
             "discoloration_score": browning_percent,
             "texture_degradation": texture_degradation,
@@ -540,22 +580,23 @@ class FoodQualityVisionEngine:
 
             # Mould Contours
             if mould_detected:
-                raw_mould = (hsv[:, :, 1] < 28) & (hsv[:, :, 2] > 195) & (~is_chlorophyll) & (gray > 190)
+                raw_mould = (hsv[:, :, 1] < 55) & (hsv[:, :, 2] >= 80) & (~is_chlorophyll)
                 mould_mask = (raw_mould & (fg_mask > 0)).astype(np.uint8) * 255
-                mould_mask[:10, :] = 0
-                mould_mask[-10:, :] = 0
-                mould_mask[:, :10] = 0
-                mould_mask[:, -10:] = 0
+                mould_mask[:6, :] = 0
+                mould_mask[-6:, :] = 0
+                mould_mask[:, :6] = 0
+                mould_mask[:, -6:] = 0
 
                 cnts_m, _ = cv2.findContours(mould_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-                for cnt in cnts_m:
+                sorted_m = sorted(cnts_m, key=cv2.contourArea, reverse=True)
+                for cnt in sorted_m[:3]:
                     area = cv2.contourArea(cnt)
-                    if area > 100:
+                    if area >= 35:
                         total_defect_pixels += area
                         x, y, w, h = cv2.boundingRect(cnt)
-                        if w < 225 and h < 225:
+                        if w < 245 and h < 245:
                             boxes.append({
-                                "label": "MOULD SPORE COLONY",
+                                "label": "VISIBLE MOULD COLONY",
                                 "type": "spoilage",
                                 "x": int(x * 100 / 256),
                                 "y": int(y * 100 / 256),

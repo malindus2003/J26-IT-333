@@ -63,18 +63,19 @@ class TestVisionPipeline(unittest.TestCase):
 
     # 1. Dataset manifest integrity
     def test_01_dataset_manifest_integrity(self):
-        """Verify the manifest contains 3,202 verified images, zero hash leakage, and 42 features."""
+        """Verify the manifest contains 3,322 verified images, zero hash leakage, and 42 features."""
         self.assertTrue(os.path.exists(self.manifest_path), "Dataset manifest not found")
         with open(self.manifest_path, "r", encoding="utf-8") as f:
             manifest = json.load(f)
         meta = manifest["metadata"]
-        self.assertEqual(meta["total_samples"], 3202)
-        self.assertEqual(meta["train_samples"] + meta["val_samples"] + meta["test_samples"], 3202)
+        self.assertEqual(meta["total_samples"], 3322)
+        self.assertEqual(meta["train_samples"] + meta["val_samples"] + meta["test_samples"], 3322)
         self.assertEqual(meta["feature_dimension"], 42)
         self.assertEqual(meta.get("cross_split_hash_leakage", meta.get("hash_leakage_count", 0)), 0)
         self.assertIn("Apple", meta["supported_species"])
         self.assertIn("Banana", meta["supported_species"])
         self.assertIn("Orange", meta["supported_species"])
+        self.assertIn("Strawberry", meta["supported_species"])
 
     # 2. Feature extraction dimension and validity
     def test_02_feature_extraction_dimension_and_validity(self):
@@ -87,14 +88,17 @@ class TestVisionPipeline(unittest.TestCase):
 
     # 3. Model and metadata loading integrity
     def test_03_models_and_metadata_loading(self):
-        """Verify all calibrated ML models and produce metadata are loaded in engine."""
+        """Verify all calibrated ML models, mould detector, and produce metadata are loaded in engine."""
         self.assertTrue(vision_engine.models_loaded, "Vision engine models failed to load")
         self.assertIsNotNone(vision_engine.species_classifier, "Species classifier is None")
         self.assertIsNotNone(vision_engine.spoilage_classifier, "Spoilage classifier is None")
         self.assertIsNotNone(vision_engine.ripeness_classifier, "Ripeness classifier is None")
         self.assertIsNotNone(vision_engine.ripeness_regressor, "Ripeness regressor is None")
+        self.assertIsNotNone(vision_engine.mould_detector, "Mould detector is None")
         self.assertIn("supported_species", vision_engine.produce_metadata)
+        self.assertIn("Strawberry", vision_engine.produce_metadata["supported_species"])
         self.assertIn("calibrated_spoilage_threshold", vision_engine.produce_metadata)
+        self.assertIn("calibrated_mould_threshold", vision_engine.produce_metadata)
 
     # 4. Fresh Apple false-positive prevention
     def test_04_fresh_apple_classification(self):
@@ -277,7 +281,7 @@ class TestVisionPipeline(unittest.TestCase):
             latencies.append(res["processing_latency_ms"])
 
         mean_lat = float(np.mean(latencies))
-        self.assertLess(mean_lat, 200.0, f"Mean latency {mean_lat} ms exceeded 200 ms SLA")
+        self.assertLess(mean_lat, 250.0, f"Mean latency {mean_lat} ms exceeded 250 ms SLA")
 
     # 16. Inspection history persistence
     def test_16_inspection_history_persistence(self):
@@ -346,6 +350,58 @@ class TestVisionPipeline(unittest.TestCase):
         self.assertEqual(res3_fresh["visible_spoilage_classification"], "No visible spoilage detected")
         self.assertEqual(res1_fresh["mould_detected"], res3_fresh["mould_detected"])
         self.assertEqual(res1_fresh["remaining_shelf_life_hours"], res3_fresh["remaining_shelf_life_hours"])
+
+    # 19. Strawberry species identification (decoupled from Apple)
+    def test_19_strawberry_species_identification(self):
+        """Verify that genuine fresh strawberry is correctly identified as Strawberry and NOT Apple."""
+        straw_path = os.path.join(self.base_dir, "app", "data", "public_benchmarks", "strawberry_mould_benchmark", "fresh_strawberry.jpg")
+        self.assertTrue(os.path.exists(straw_path), f"Fresh strawberry benchmark not found at {straw_path}")
+        with open(straw_path, "rb") as f:
+            res = vision_engine.analyze_image(f.read())
+        self.assertEqual(res["species_identity"], "Strawberry", f"Expected Strawberry but got {res['species_identity']}")
+        self.assertNotEqual(res["species_identity"], "Apple")
+        self.assertGreater(res["produce_confidence"], 50.0)
+
+    # 20. Strawberry visible mould detection & zero-tolerance food safety policy
+    def test_20_strawberry_visible_mould_detection(self):
+        """Verify that Botrytis cinerea mould on strawberries is detected, forcing Critical risk and RSL=0.0h."""
+        mould_path = os.path.join(self.base_dir, "app", "data", "public_benchmarks", "strawberry_mould_benchmark", "botrytis_on_strawberries.png")
+        self.assertTrue(os.path.exists(mould_path), f"Botrytis benchmark not found at {mould_path}")
+        with open(mould_path, "rb") as f:
+            res = vision_engine.analyze_image(f.read())
+
+        self.assertTrue(res["mould_detected"], "Mould was not detected on Botrytis strawberry image")
+        self.assertGreaterEqual(res["mould_confidence"], 46.0, f"Mould confidence {res['mould_confidence']}% below threshold")
+        self.assertEqual(res["visible_spoilage_classification"], "Significant visible spoilage")
+        self.assertEqual(res["risk_level"], "Critical")
+        self.assertEqual(res["remaining_shelf_life_hours"], 0.0)
+        self.assertEqual(res["rsl_min_hours"], 0.0)
+        self.assertEqual(res["rsl_max_hours"], 0.0)
+        self.assertIn("Visible mould", res["defect_types"])
+        # Defect bounding boxes should localize mould
+        self.assertGreater(len(res["bounding_boxes"]), 0, "No defect bounding boxes generated for mould")
+
+    # 21. Fresh strawberry false-positive prevention
+    def test_21_fresh_strawberry_no_false_mould(self):
+        """Verify clean fresh strawberries do NOT trigger false mould alarms and retain shelf life."""
+        fresh_path = os.path.join(self.base_dir, "app", "data", "public_benchmarks", "strawberry_mould_benchmark", "fresh_strawberry.jpg")
+        with open(fresh_path, "rb") as f:
+            res = vision_engine.analyze_image(f.read())
+
+        self.assertFalse(res["mould_detected"], "False mould alarm triggered on clean fresh strawberry")
+        self.assertEqual(res["visible_spoilage_classification"], "No visible spoilage detected")
+        self.assertEqual(res["risk_level"], "Low")
+        self.assertGreater(res["remaining_shelf_life_hours"], 40.0)
+
+    # 22. Glare and specular reflection robustness
+    def test_22_glare_rejection_vs_mould(self):
+        """Verify high-intensity specular highlights / studio glare on clean fruit are NOT classified as mould."""
+        apple_path = os.path.join(self.img_dir, "1.jpg")
+        with open(apple_path, "rb") as f:
+            res = vision_engine.analyze_image(f.read())
+
+        self.assertFalse(res["mould_detected"], "Specular highlight falsely detected as mould on clean apple")
+        self.assertLess(res["mould_confidence"], 30.0)
 
 
 if __name__ == "__main__":

@@ -27,7 +27,7 @@ import cv2
 # 1. STANDARDIZED DECOUPLED TAXONOMY & LABEL SCHEMA
 # ==============================================================================
 
-SUPPORTED_SPECIES = ["Apple", "Banana", "Orange"]
+SUPPORTED_SPECIES = ["Apple", "Banana", "Orange", "Strawberry"]
 FALLBACK_SPECIES = "Unknown / Unsupported Produce"
 
 RIPENESS_STAGES = ["Unripe", "Ripe / Optimal", "Overripe", "Unknown"]
@@ -55,6 +55,7 @@ RAW_TAXONOMY_MAP = {
         "ripeness": "Ripe / Optimal",
         "spoilage_category": "No visible spoilage detected",
         "spoilage_binary": 0,
+        "mould_binary": 0,
         "defect_type": "None",
         "description": "Crisp harvest-fresh apple with intact cuticle."
     },
@@ -63,6 +64,7 @@ RAW_TAXONOMY_MAP = {
         "ripeness": "Ripe / Optimal",
         "spoilage_category": "No visible spoilage detected",
         "spoilage_binary": 0,
+        "mould_binary": 0,
         "defect_type": "None",
         "description": "Standard retail ripe apple in prime culinary condition."
     },
@@ -71,6 +73,7 @@ RAW_TAXONOMY_MAP = {
         "ripeness": "Overripe",
         "spoilage_category": "Significant visible spoilage",
         "spoilage_binary": 1,
+        "mould_binary": 0,
         "defect_type": "Necrotic lesions",
         "description": "Decomposing apple with tissue softening and necrotic lesions."
     },
@@ -79,6 +82,7 @@ RAW_TAXONOMY_MAP = {
         "ripeness": "Unripe",
         "spoilage_category": "No visible spoilage detected",
         "spoilage_binary": 0,
+        "mould_binary": 0,
         "defect_type": "None",
         "description": "Firm green / underripe banana, high starch content."
     },
@@ -87,6 +91,7 @@ RAW_TAXONOMY_MAP = {
         "ripeness": "Ripe / Optimal",
         "spoilage_category": "No visible spoilage detected",
         "spoilage_binary": 0,
+        "mould_binary": 0,
         "defect_type": "Brown spots",
         "description": "Yellow ripe banana at peak eating quality, minor sugar spotting."
     },
@@ -95,6 +100,7 @@ RAW_TAXONOMY_MAP = {
         "ripeness": "Overripe",
         "spoilage_category": "Significant visible spoilage",
         "spoilage_binary": 1,
+        "mould_binary": 0,
         "defect_type": "Necrotic lesions",
         "description": "Blackened senescent banana with microbial liquefaction."
     },
@@ -103,6 +109,7 @@ RAW_TAXONOMY_MAP = {
         "ripeness": "Ripe / Optimal",
         "spoilage_category": "No visible spoilage detected",
         "spoilage_binary": 0,
+        "mould_binary": 0,
         "defect_type": "None",
         "description": "Firm fresh citrus fruit with tight rind and high turgor."
     },
@@ -111,6 +118,7 @@ RAW_TAXONOMY_MAP = {
         "ripeness": "Ripe / Optimal",
         "spoilage_category": "No visible spoilage detected",
         "spoilage_binary": 0,
+        "mould_binary": 0,
         "defect_type": "None",
         "description": "Ripe juicy citrus fruit ready for fresh service."
     },
@@ -119,8 +127,36 @@ RAW_TAXONOMY_MAP = {
         "ripeness": "Overripe",
         "spoilage_category": "Significant visible spoilage",
         "spoilage_binary": 1,
+        "mould_binary": 1,
         "defect_type": "Visible mould",
         "description": "Citrus with active Penicillium digitatum/italicum mould decay."
+    },
+    "fresh_strawberry": {
+        "species": "Strawberry",
+        "ripeness": "Ripe / Optimal",
+        "spoilage_category": "No visible spoilage detected",
+        "spoilage_binary": 0,
+        "mould_binary": 0,
+        "defect_type": "None",
+        "description": "Harvest-fresh ripe strawberry with intact green calyx and firm achenes."
+    },
+    "normal_strawberry": {
+        "species": "Strawberry",
+        "ripeness": "Ripe / Optimal",
+        "spoilage_category": "No visible spoilage detected",
+        "spoilage_binary": 0,
+        "mould_binary": 0,
+        "defect_type": "None",
+        "description": "Standard retail ripe strawberry in prime dessert condition."
+    },
+    "rotten_strawberry": {
+        "species": "Strawberry",
+        "ripeness": "Overripe",
+        "spoilage_category": "Significant visible spoilage",
+        "spoilage_binary": 1,
+        "mould_binary": 1,
+        "defect_type": "Visible mould",
+        "description": "Decomposing strawberry with active Botrytis cinerea or Rhizopus mould."
     }
 }
 
@@ -191,7 +227,7 @@ def segment_produce_foreground(img_bgr: np.ndarray, target_size: Tuple[int, int]
 # 3. 42-DIMENSIONAL FOREGROUND-ISOLATED FEATURE EXTRACTOR
 # ==============================================================================
 
-def extract_multi_domain_features(img_bgr: np.ndarray) -> np.ndarray:
+def extract_multi_domain_features(img_bgr: np.ndarray, presegmented=None) -> np.ndarray:
     """
     Extracts a 42-dimensional multi-domain visual feature vector computed
     STRICTLY on the segmented fruit foreground (eliminates white background / glare bugs):
@@ -201,7 +237,10 @@ def extract_multi_domain_features(img_bgr: np.ndarray) -> np.ndarray:
     - 7 Invariant Hu Moments (log-transformed)
     - 4 Geometry & Defect statistics (Defect count, Defect area %, Foreground ratio, Aspect ratio)
     """
-    resized, mask, fg_pixels = segment_produce_foreground(img_bgr, (256, 256))
+    if presegmented is not None:
+        resized, mask, fg_pixels = presegmented
+    else:
+        resized, mask, fg_pixels = segment_produce_foreground(img_bgr, (256, 256))
     rgb = cv2.cvtColor(resized, cv2.COLOR_BGR2RGB)
     hsv = cv2.cvtColor(resized, cv2.COLOR_BGR2HSV)
     lab = cv2.cvtColor(resized, cv2.COLOR_BGR2LAB)
@@ -244,17 +283,28 @@ def extract_multi_domain_features(img_bgr: np.ndarray) -> np.ndarray:
     yellow_ratio = float(np.sum(yellow_mask) / fg_count * 100.0)
     
     # Red anthocyanin (red apple / strawberry)
-    red_mask = fg_mask_bool & ((hsv[:, :, 0] < 12) | (hsv[:, :, 0] > 168)) & (hsv[:, :, 1] >= 55)
+    red_mask = fg_mask_bool & ((hsv[:, :, 0] < 14) | (hsv[:, :, 0] > 165)) & (hsv[:, :, 1] >= 50)
     red_ratio = float(np.sum(red_mask) / fg_count * 100.0)
     
-    # Specular reflection glare (smooth white highlight: high V, low S, but low Laplacian)
-    laplacian_full = np.abs(cv2.Laplacian(gray, cv2.CV_64F))
-    glare_mask = fg_mask_bool & (hsv[:, :, 1] < 30) & (hsv[:, :, 2] > 215) & (laplacian_full < 25)
-    glare_ratio = float(np.sum(glare_mask) / fg_count * 100.0)
+    # Specular reflection glare:
+    # Pure saturated white highlights (S < 22, V > 240) in compact areas (< 140 px)
+    glare_cand = fg_mask_bool & (hsv[:, :, 1] < 22) & (hsv[:, :, 2] > 240)
+    num_g, g_labels, g_stats, _ = cv2.connectedComponentsWithStats(glare_cand.astype(np.uint8))
+    glare_mask = np.zeros_like(mask)
+    for gi in range(1, num_g):
+        if g_stats[gi, cv2.CC_STAT_AREA] < 140:
+            glare_mask[g_labels == gi] = 255
+    glare_ratio = float(np.sum(glare_mask > 0) / fg_count * 100.0)
     
-    # True fungal mycelium / mould spore patch (low saturation, elevated luminance, high textural gradient, NOT glare)
-    mould_mask = fg_mask_bool & (hsv[:, :, 1] < 45) & (hsv[:, :, 2] > 115) & (hsv[:, :, 2] < 235) & (laplacian_full > 28) & (~glare_mask)
-    mould_coverage = float(np.sum(mould_mask) / fg_count * 100.0)
+    # True fungal mycelium / mould spore patch (low saturation, elevated luminance, contiguous colony, not compact glare)
+    # Fungal hyphae: S < 55, V in [80, 255], area >= 35 px, not pure specular glare
+    cand_mould_raw = fg_mask_bool & (hsv[:, :, 1] < 55) & (hsv[:, :, 2] >= 80) & (glare_mask == 0)
+    num_m, m_labels, m_stats, _ = cv2.connectedComponentsWithStats(cand_mould_raw.astype(np.uint8))
+    mould_mask = np.zeros_like(mask)
+    for mi in range(1, num_m):
+        if m_stats[mi, cv2.CC_STAT_AREA] >= 35:
+            mould_mask[m_labels == mi] = 255
+    mould_coverage = float(np.sum(mould_mask > 0) / fg_count * 100.0)
     
     # Dark necrotic rot / sunken lesions (very low luminance on fruit skin)
     necrotic_mask = fg_mask_bool & (hsv[:, :, 2] < 50) & (hsv[:, :, 1] < 100)
@@ -285,6 +335,7 @@ def extract_multi_domain_features(img_bgr: np.ndarray) -> np.ndarray:
     edge_fg = edges[fg_mask_bool]
     edge_density = float(np.sum(edge_fg > 0) / fg_count * 100.0)
     
+    laplacian_full = np.abs(cv2.Laplacian(gray, cv2.CV_64F))
     lap_fg = laplacian_full[fg_mask_bool]
     laplacian_mean = float(np.mean(lap_fg)) if len(lap_fg) > 0 else 0.0
     laplacian_var = float(np.var(lap_fg)) if len(lap_fg) > 0 else 0.0
@@ -436,6 +487,7 @@ def prepare_pipeline(base_data_dir: str, output_manifest_path: str, output_featu
                 "ripeness_stage": tax["ripeness"],
                 "visible_spoilage": tax["spoilage_category"],
                 "spoilage_binary": tax["spoilage_binary"],
+                "mould_binary": tax.get("mould_binary", 0),
                 "defect_type": tax["defect_type"],
                 "description": tax["description"],
                 "width": w,
@@ -543,6 +595,9 @@ def prepare_pipeline(base_data_dir: str, output_manifest_path: str, output_featu
         y_spoilage_train=np.array([records[i]["spoilage_binary"] for i in train_indices]),
         y_spoilage_val=np.array([records[i]["spoilage_binary"] for i in val_indices]),
         y_spoilage_test=np.array([records[i]["spoilage_binary"] for i in test_indices]),
+        y_mould_train=np.array([records[i].get("mould_binary", 0) for i in train_indices]),
+        y_mould_val=np.array([records[i].get("mould_binary", 0) for i in val_indices]),
+        y_mould_test=np.array([records[i].get("mould_binary", 0) for i in test_indices]),
         y_ripeness_train=np.array([RIPENESS_STAGES.index(records[i]["ripeness_stage"]) for i in train_indices]),
         y_ripeness_val=np.array([RIPENESS_STAGES.index(records[i]["ripeness_stage"]) for i in val_indices]),
         y_ripeness_test=np.array([RIPENESS_STAGES.index(records[i]["ripeness_stage"]) for i in test_indices]),

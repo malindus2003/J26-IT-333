@@ -88,6 +88,8 @@ def _format_vision_response(results: Dict[str, Any], category: str) -> Dict[str,
         "detected_defects": results.get("detected_defects", []),
         "defect_surface_area_percent": results.get("defect_surface_area_percent", 0.0),
         "mould_detected": results.get("mould_detected", False),
+        "mould_confidence": results.get("mould_confidence", 0.0),
+        "calibrated_mould_threshold": results.get("calibrated_mould_threshold", 46.0),
         "mould_coverage": results.get("mould_coverage", 0.0),
         "discoloration_score": results.get("discoloration_score", 0.0),
         "texture_degradation": results.get("texture_degradation", 0.0),
@@ -153,6 +155,7 @@ async def inspect_food_image(
         "rsl_interval": response_data["rsl_confidence_interval"],
         "risk_level": response_data["risk_level"],
         "mould_detected": response_data["mould_detected"],
+        "mould_confidence": response_data.get("mould_confidence", 0.0),
         "defect_count": len(response_data["bounding_boxes"]),
         "latency_ms": response_data["processing_latency_ms"]
     }
