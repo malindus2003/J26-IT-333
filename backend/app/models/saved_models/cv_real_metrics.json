@@ -1,0 +1,84 @@
+{
+  "dataset_name": "Fruit Freshness Detection Public Benchmark",
+  "model_version": "v2.2-trained",
+  "evaluated_at": "2026-10-19 12:54:41",
+  "total_dataset_samples": 3202,
+  "train_samples": 2561,
+  "val_samples": 320,
+  "test_samples": 321,
+  "produce_species_classifier": {
+    "model_type": "RandomForestClassifier(n_estimators=150, max_depth=14)",
+    "classes": [
+      "Apple",
+      "Banana",
+      "Orange"
+    ],
+    "test_accuracy": 0.838,
+    "macro_precision": 0.8564,
+    "macro_recall": 0.8277,
+    "macro_f1": 0.8375,
+    "confusion_matrix": [
+      [
+        76,
+        15,
+        3
+      ],
+      [
+        5,
+        121,
+        6
+      ],
+      [
+        3,
+        20,
+        72
+      ]
+    ]
+  },
+  "freshness_stage_classifier": {
+    "selected_model": "XGBClassifier",
+    "classes": [
+      "Unripe / Firm",
+      "Ripe / Optimal",
+      "Spoiled / Rotten"
+    ],
+    "test_accuracy": 0.9626,
+    "macro_precision": 0.9606,
+    "macro_recall": 0.9646,
+    "macro_f1": 0.9621,
+    "confusion_matrix": [
+      [
+        108,
+        2,
+        5
+      ],
+      [
+        2,
+        114,
+        2
+      ],
+      [
+        0,
+        1,
+        87
+      ]
+    ]
+  },
+  "spoilage_regressor": {
+    "model_type": "RandomForestRegressor(n_estimators=150, max_depth=12)",
+    "test_r2_score": 0.9644,
+    "test_rmse_percent": 3.06,
+    "test_mae_percent": 0.92
+  },
+  "defect_localization_benchmark": {
+    "total_ground_truth_boxes_in_dataset": 7087,
+    "test_boxes_evaluated": 135,
+    "mean_iou_percent": 67.81
+  },
+  "inference_latency": {
+    "hardware_device": "Intel/AMD x86_64 CPU (No GPU)",
+    "mean_latency_ms": 119.92,
+    "p95_latency_ms": 140.39,
+    "meets_cpu_sla": false
+  }
+}

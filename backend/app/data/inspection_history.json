@@ -1,0 +1,31 @@
+[
+  {
+    "analysis_id": "CV-SCAN-TEST-001",
+    "timestamp": "2026-10-19T13:00:00",
+    "source": "Automated Unit Test",
+    "produce": "Apple",
+    "confidence": 95.0,
+    "stage": "Ripe / Optimal (Grade B)",
+    "rsl_hours": 120.0,
+    "rsl_interval": "95.0 - 145.0 hrs [90% CI]",
+    "risk_level": "Low",
+    "mould_detected": false,
+    "defect_count": 0,
+    "latency_ms": 35.0
+  },
+  {
+    "analysis_id": "CV-SCAN-1792395036-c07b4b",
+    "timestamp": "2026-10-19T13:00:37",
+    "source": "Manual Upload",
+    "produce": "Apple",
+    "produce_icon": "\ud83c\udf4e",
+    "confidence": 100.0,
+    "stage": "Spoiled / Rotten (Grade F)",
+    "rsl_hours": 0.0,
+    "rsl_interval": "0.0 hrs (Quarantine Required)",
+    "risk_level": "Critical",
+    "mould_detected": true,
+    "defect_count": 2,
+    "latency_ms": 434.6
+  }
+]
