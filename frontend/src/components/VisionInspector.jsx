@@ -28,7 +28,11 @@ import {
   Grid,
   List,
   X,
-  Check
+  Check,
+  Cpu,
+  Wifi,
+  Radio,
+  RefreshCw
 } from 'lucide-react';
 import axios from 'axios';
 
@@ -331,6 +335,14 @@ export default function VisionInspector({ onInspectionComplete }) {
   const [isCameraActive, setIsCameraActive] = useState(false);
   const [cameraError, setCameraError] = useState(null);
 
+  // ESP32-CAM Wi-Fi Hardware Node State
+  const [esp32Url, setEsp32Url] = useState(() => localStorage.getItem("esp32_cam_url") || "http://192.168.1.100/capture");
+  const [isEsp32ModalOpen, setIsEsp32ModalOpen] = useState(false);
+  const [esp32Loading, setEsp32Loading] = useState(false);
+  const [esp32Error, setEsp32Error] = useState(null);
+  const [esp32AutoPoll, setEsp32AutoPoll] = useState(false);
+  const [esp32LastCaptureTime, setEsp32LastCaptureTime] = useState(null);
+
   // Interactive Dummy Simulation Slider (0% to 100%)
   const [dummyLevel, setDummyLevel] = useState(92);
   const [isManualOverride, setIsManualOverride] = useState(false);
@@ -499,6 +511,55 @@ export default function VisionInspector({ onInspectionComplete }) {
       setAnalyzing(false);
     }
   };
+
+  const captureFromEsp32 = async (overrideUrl = null) => {
+    const targetUrl = (overrideUrl || esp32Url).trim();
+    if (!targetUrl) return;
+    localStorage.setItem("esp32_cam_url", targetUrl);
+    setEsp32Loading(true);
+    setEsp32Error(null);
+    stopCamera();
+    try {
+      const res = await axios.post("http://localhost:8000/api/vision/esp32/capture", {
+        camera_url: targetUrl,
+        category: cvResult?.category || "Fruits",
+        container_id: "ESP32-CAM Container Node"
+      });
+      const data = res.data;
+      const feat = data.features || data;
+      setCvResult(feat);
+      if (data.image_base64) {
+        setPreviewImage(data.image_base64);
+      }
+      setCurrentContainerName(`ESP32-CAM: ${feat.identified_produce || "Live Capture"} (${feat.category || "Produce"})`);
+      setDummyLevel(feat.visual_spoilage_score || 50);
+      setIsManualOverride(false);
+      setSelectedPresetId(null);
+      setEsp32LastCaptureTime(new Date().toLocaleTimeString());
+      if (onInspectionComplete) {
+        onInspectionComplete(feat);
+      }
+    } catch (err) {
+      console.error("ESP32-CAM fetch error:", err);
+      const msg = err.response?.data?.detail || err.message || "Could not connect to ESP32-CAM module.";
+      setEsp32Error(msg);
+    } finally {
+      setEsp32Loading(false);
+    }
+  };
+
+  useEffect(() => {
+    let interval = null;
+    if (esp32AutoPoll && esp32Url) {
+      captureFromEsp32();
+      interval = setInterval(() => {
+        captureFromEsp32();
+      }, 8000);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [esp32AutoPoll, esp32Url]);
 
   // Dynamic Remaining Shelf-Life & Spoilage Computation
   const computeRemainingShelfLife = (val, category, isMould) => {
@@ -676,19 +737,31 @@ export default function VisionInspector({ onInspectionComplete }) {
 
         {/* Action Buttons */}
         <div className="flex items-center gap-2">
+          <button
+            onClick={() => setIsEsp32ModalOpen(true)}
+            className="px-3.5 py-2 rounded-xl bg-sky-700 hover:bg-sky-800 text-white text-xs font-bold flex items-center gap-1.5 shadow-md shadow-sky-700/20 transition-colors cursor-pointer"
+            title="Connect physical ESP32-CAM Wi-Fi camera node"
+          >
+            <Cpu className="h-4 w-4 text-sky-200" />
+            <span>ESP32-CAM</span>
+            {esp32AutoPoll && (
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            )}
+          </button>
+
           {isCameraActive ? (
             <button
               onClick={stopCamera}
-              className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-md transition-colors"
+              className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-md transition-colors cursor-pointer"
             >
               <VideoOff className="h-4 w-4" /> Stop Live Camera
             </button>
           ) : (
             <button
               onClick={startCamera}
-              className="px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold flex items-center gap-1.5 shadow-md shadow-emerald-700/20 transition-colors"
+              className="px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold flex items-center gap-1.5 shadow-md shadow-emerald-700/20 transition-colors cursor-pointer"
             >
-              <Video className="h-4 w-4" /> Open Container Camera
+              <Video className="h-4 w-4" /> Open Web Camera
             </button>
           )}
         </div>
@@ -1193,7 +1266,7 @@ export default function VisionInspector({ onInspectionComplete }) {
               </div>
 
               {/* High-Visibility Action Buttons */}
-              <div className="w-full grid grid-cols-2 gap-2 mt-2.5">
+              <div className="w-full grid grid-cols-1 sm:grid-cols-3 gap-2 mt-2.5">
                 <button
                   onClick={() => fileInputRef.current.click()}
                   className="w-full py-2 px-3 rounded-xl bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 border border-[#c6d7cd] dark:border-slate-700 text-[11px] sm:text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center justify-center gap-1.5 transition-all shadow-2xs cursor-pointer active:scale-98"
@@ -1206,7 +1279,14 @@ export default function VisionInspector({ onInspectionComplete }) {
                   className="w-full py-2 px-3 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-[11px] sm:text-xs font-bold flex items-center justify-center gap-1.5 shadow-md shadow-emerald-700/20 transition-all cursor-pointer active:scale-98"
                 >
                   <Video className="h-3.5 w-3.5" />
-                  <span>Open Camera</span>
+                  <span>Web Camera</span>
+                </button>
+                <button
+                  onClick={() => setIsEsp32ModalOpen(true)}
+                  className="w-full py-2 px-3 rounded-xl bg-sky-700 hover:bg-sky-800 text-white text-[11px] sm:text-xs font-bold flex items-center justify-center gap-1.5 shadow-md shadow-sky-700/20 transition-all cursor-pointer active:scale-98"
+                >
+                  <Cpu className="h-3.5 w-3.5 text-sky-200" />
+                  <span>ESP32-CAM</span>
                 </button>
               </div>
             </div>
@@ -1548,6 +1628,132 @@ export default function VisionInspector({ onInspectionComplete }) {
 
         </div>
       </div>
+
+      {/* ESP32-CAM Hardware Node Modal */}
+      {isEsp32ModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+          <div className="w-full max-w-lg bg-white dark:bg-slate-900 rounded-2xl border border-sky-500/40 shadow-2xl p-5 space-y-4 animate-in fade-in zoom-in-95 duration-150">
+            
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-sky-100 dark:bg-sky-950/80 text-sky-700 dark:text-sky-400">
+                  <Cpu className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm sm:text-base font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
+                    <span>ESP32-CAM Optical Hardware Node</span>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-sky-100 dark:bg-sky-950 text-sky-800 dark:text-sky-300 font-bold border border-sky-300 dark:border-sky-800">
+                      Component 3
+                    </span>
+                  </h3>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                    Direct Wi-Fi snapshot pull from your AI-Thinker ESP32-CAM module
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsEsp32ModalOpen(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* IP URL Input */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center justify-between">
+                <span>ESP32-CAM Snapshot URL</span>
+                <span className="text-[10px] font-normal text-slate-400">e.g. http://192.168.1.50/capture</span>
+              </label>
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <Wifi className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+                  <input
+                    type="text"
+                    value={esp32Url}
+                    onChange={(e) => setEsp32Url(e.target.value)}
+                    placeholder="http://192.168.1.100/capture"
+                    className="w-full pl-9 pr-3 py-2 text-xs font-mono font-bold rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-none focus:border-sky-600"
+                  />
+                </div>
+                <button
+                  onClick={() => captureFromEsp32()}
+                  disabled={esp32Loading}
+                  className="px-4 py-2 rounded-xl bg-sky-700 hover:bg-sky-800 disabled:opacity-50 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm cursor-pointer"
+                >
+                  {esp32Loading ? (
+                    <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Camera className="h-3.5 w-3.5" />
+                  )}
+                  <span>{esp32Loading ? "Pulling..." : "Snap Frame"}</span>
+                </button>
+              </div>
+              <p className="text-[10px] text-slate-500 dark:text-slate-400">
+                Ensure your laptop and ESP32-CAM are connected to the same Wi-Fi network or mobile phone hotspot.
+              </p>
+            </div>
+
+            {/* Error Message if any */}
+            {esp32Error && (
+              <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-300 dark:border-rose-800 text-rose-900 dark:text-rose-300 text-xs flex items-start gap-2">
+                <AlertTriangle className="h-4 w-4 text-rose-600 flex-shrink-0 mt-0.5" />
+                <div className="space-y-0.5">
+                  <strong className="block font-bold">Connection Failed</strong>
+                  <span>{esp32Error}</span>
+                </div>
+              </div>
+            )}
+
+            {/* Auto-Poll Controls */}
+            <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 flex items-center justify-between">
+              <div className="space-y-0.5">
+                <span className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                  <Radio className={`h-3.5 w-3.5 ${esp32AutoPoll ? 'text-emerald-500 animate-pulse' : 'text-slate-400'}`} />
+                  Continuous Auto-Scan (Every 8s)
+                </span>
+                <span className="text-[10px] text-slate-500 dark:text-slate-400 block">
+                  {esp32LastCaptureTime ? `Last captured: ${esp32LastCaptureTime}` : "Automated periodic container quality assessment"}
+                </span>
+              </div>
+              <button
+                onClick={() => setEsp32AutoPoll(prev => !prev)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  esp32AutoPoll
+                    ? 'bg-emerald-600 text-white shadow-sm'
+                    : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-slate-600'
+                }`}
+              >
+                {esp32AutoPoll ? "Active (Stop)" : "Enable Auto"}
+              </button>
+            </div>
+
+            {/* Firmware & Arduino Sketch Quick Links */}
+            <div className="p-3 rounded-xl bg-emerald-50/60 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/40 text-[11px] text-emerald-950 dark:text-emerald-200 space-y-1">
+              <strong className="block font-bold text-emerald-900 dark:text-emerald-300">
+                📄 Arduino Firmware & Circuit Guide:
+              </strong>
+              <div className="flex flex-col gap-1 text-[10px] text-slate-600 dark:text-slate-400 font-mono">
+                <span>• Sketch: <code>iot_firmware/esp32_cam_spoilage_node.ino</code></span>
+                <span>• Wiring: <code>iot_firmware/ESP32_CAM_SETUP_GUIDE.md</code></span>
+                <span>• Camera: AI-Thinker OV2640 (VGA 640x480 with Flash LED GPIO 4)</span>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="flex justify-end pt-2 border-t border-slate-200 dark:border-slate-800">
+              <button
+                onClick={() => setIsEsp32ModalOpen(false)}
+                className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-xs font-bold text-slate-700 dark:text-slate-300 cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
     </div>
   );
 }
