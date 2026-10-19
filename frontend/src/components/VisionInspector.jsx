@@ -748,22 +748,6 @@ export default function VisionInspector({ onInspectionComplete }) {
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
             )}
           </button>
-
-          {isCameraActive ? (
-            <button
-              onClick={stopCamera}
-              className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-md transition-colors cursor-pointer"
-            >
-              <VideoOff className="h-4 w-4" /> Stop Live Camera
-            </button>
-          ) : (
-            <button
-              onClick={startCamera}
-              className="px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold flex items-center gap-1.5 shadow-md shadow-emerald-700/20 transition-colors cursor-pointer"
-            >
-              <Video className="h-4 w-4" /> Open Web Camera
-            </button>
-          )}
         </div>
       </div>
 
@@ -1266,27 +1250,20 @@ export default function VisionInspector({ onInspectionComplete }) {
               </div>
 
               {/* High-Visibility Action Buttons */}
-              <div className="w-full grid grid-cols-1 sm:grid-cols-3 gap-2 mt-2.5">
+              <div className="w-full grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2.5">
                 <button
                   onClick={() => fileInputRef.current.click()}
-                  className="w-full py-2 px-3 rounded-xl bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 border border-[#c6d7cd] dark:border-slate-700 text-[11px] sm:text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center justify-center gap-1.5 transition-all shadow-2xs cursor-pointer active:scale-98"
+                  className="w-full py-2.5 px-3 rounded-xl bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 border border-[#c6d7cd] dark:border-slate-700 text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center justify-center gap-1.5 transition-all shadow-2xs cursor-pointer active:scale-98"
                 >
-                  <Upload className="h-3.5 w-3.5 text-emerald-700 dark:text-emerald-400" />
+                  <Upload className="h-4 w-4 text-emerald-700 dark:text-emerald-400" />
                   <span>Upload Photo</span>
                 </button>
                 <button
-                  onClick={startCamera}
-                  className="w-full py-2 px-3 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-[11px] sm:text-xs font-bold flex items-center justify-center gap-1.5 shadow-md shadow-emerald-700/20 transition-all cursor-pointer active:scale-98"
-                >
-                  <Video className="h-3.5 w-3.5" />
-                  <span>Web Camera</span>
-                </button>
-                <button
                   onClick={() => setIsEsp32ModalOpen(true)}
-                  className="w-full py-2 px-3 rounded-xl bg-sky-700 hover:bg-sky-800 text-white text-[11px] sm:text-xs font-bold flex items-center justify-center gap-1.5 shadow-md shadow-sky-700/20 transition-all cursor-pointer active:scale-98"
+                  className="w-full py-2.5 px-3 rounded-xl bg-sky-700 hover:bg-sky-800 text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-md shadow-sky-700/20 transition-all cursor-pointer active:scale-98"
                 >
-                  <Cpu className="h-3.5 w-3.5 text-sky-200" />
-                  <span>ESP32-CAM</span>
+                  <Cpu className="h-4 w-4 text-sky-200" />
+                  <span>ESP32-CAM Node</span>
                 </button>
               </div>
             </div>
