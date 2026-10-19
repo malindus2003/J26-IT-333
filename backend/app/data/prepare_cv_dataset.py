@@ -1,11 +1,15 @@
 """
-Reproducible Dataset Preparation & Validation Pipeline
+Reproducible Dataset Preparation & Validation Pipeline (v2.3 Leakage-Free & Decoupled Schema)
 Project: J26-IT-333 (AI + IoT-Based Smart Restaurant Management System)
 Component 3: AI-Based Multi-Modal Food Spoilage Prediction & Quality Assessment
 Author: Maddumage M. S. (IT23348820)
 
 Ingests, validates, standardizes, and partitions the public benchmark dataset
 (3,202 images, 7,087 bounding boxes) with Apache 2.0 attribution manifest.
+Enforces:
+1. Decoupled Taxonomy (Produce Species, Ripeness, Visible Spoilage, Defect Types)
+2. Strict Foreground Produce Segmentation (eliminates white background / glare mould contamination)
+3. Zero-Leakage Group Partitioning by Perceptual Hash Clusters
 """
 
 import os
@@ -15,153 +19,320 @@ import time
 import hashlib
 import xml.etree.ElementTree as ET
 from typing import Dict, List, Tuple, Any, Optional
+from collections import defaultdict
 import numpy as np
 import cv2
-from sklearn.model_selection import train_test_split
 
-# Standardized Produce Taxonomy
+# ==============================================================================
+# 1. STANDARDIZED DECOUPLED TAXONOMY & LABEL SCHEMA
+# ==============================================================================
+
 SUPPORTED_SPECIES = ["Apple", "Banana", "Orange"]
 FALLBACK_SPECIES = "Unknown / Unsupported Produce"
 
-SPECIES_LABEL_MAP = {
-    "fresh_apple": "Apple",
-    "normal_apple": "Apple",
-    "rotten_apple": "Apple",
-    "fresh_banana": "Banana",
-    "normal_banana": "Banana",
-    "rotten_banana": "Banana",
-    "fresh_orange": "Orange",
-    "normal_orange": "Orange",
-    "rotten_orange": "Orange"
+RIPENESS_STAGES = ["Unripe", "Ripe / Optimal", "Overripe", "Unknown"]
+
+SPOILAGE_CATEGORIES = [
+    "No visible spoilage detected",
+    "Localized visible defect",
+    "Significant visible spoilage",
+    "Uncertain"
+]
+
+DEFECT_TYPES = [
+    "None",
+    "Brown spots",
+    "Bruising",
+    "Discoloration",
+    "Visible mould",
+    "Necrotic lesions"
+]
+
+# Ground-truth transformation mappings from raw dataset labels
+RAW_TAXONOMY_MAP = {
+    "fresh_apple": {
+        "species": "Apple",
+        "ripeness": "Ripe / Optimal",
+        "spoilage_category": "No visible spoilage detected",
+        "spoilage_binary": 0,
+        "defect_type": "None",
+        "description": "Crisp harvest-fresh apple with intact cuticle."
+    },
+    "normal_apple": {
+        "species": "Apple",
+        "ripeness": "Ripe / Optimal",
+        "spoilage_category": "No visible spoilage detected",
+        "spoilage_binary": 0,
+        "defect_type": "None",
+        "description": "Standard retail ripe apple in prime culinary condition."
+    },
+    "rotten_apple": {
+        "species": "Apple",
+        "ripeness": "Overripe",
+        "spoilage_category": "Significant visible spoilage",
+        "spoilage_binary": 1,
+        "defect_type": "Necrotic lesions",
+        "description": "Decomposing apple with tissue softening and necrotic lesions."
+    },
+    "fresh_banana": {
+        "species": "Banana",
+        "ripeness": "Unripe",
+        "spoilage_category": "No visible spoilage detected",
+        "spoilage_binary": 0,
+        "defect_type": "None",
+        "description": "Firm green / underripe banana, high starch content."
+    },
+    "normal_banana": {
+        "species": "Banana",
+        "ripeness": "Ripe / Optimal",
+        "spoilage_category": "No visible spoilage detected",
+        "spoilage_binary": 0,
+        "defect_type": "Brown spots",
+        "description": "Yellow ripe banana at peak eating quality, minor sugar spotting."
+    },
+    "rotten_banana": {
+        "species": "Banana",
+        "ripeness": "Overripe",
+        "spoilage_category": "Significant visible spoilage",
+        "spoilage_binary": 1,
+        "defect_type": "Necrotic lesions",
+        "description": "Blackened senescent banana with microbial liquefaction."
+    },
+    "fresh_orange": {
+        "species": "Orange",
+        "ripeness": "Ripe / Optimal",
+        "spoilage_category": "No visible spoilage detected",
+        "spoilage_binary": 0,
+        "defect_type": "None",
+        "description": "Firm fresh citrus fruit with tight rind and high turgor."
+    },
+    "normal_orange": {
+        "species": "Orange",
+        "ripeness": "Ripe / Optimal",
+        "spoilage_category": "No visible spoilage detected",
+        "spoilage_binary": 0,
+        "defect_type": "None",
+        "description": "Ripe juicy citrus fruit ready for fresh service."
+    },
+    "rotten_orange": {
+        "species": "Orange",
+        "ripeness": "Overripe",
+        "spoilage_category": "Significant visible spoilage",
+        "spoilage_binary": 1,
+        "defect_type": "Visible mould",
+        "description": "Citrus with active Penicillium digitatum/italicum mould decay."
+    }
 }
 
-# Standardized Freshness / Spoilage Lifecycle Stages
-# 0: Unripe / Firm
-# 1: Ripe / Optimal
-# 2: Overripe / Softening
-# 3: Spoiled / Rotten
-# Fallback: Uncertain
-STAGE_NAME_MAP = {
-    0: "Unripe / Firm",
-    1: "Ripe / Optimal",
-    2: "Overripe / Softening",
-    3: "Spoiled / Rotten"
-}
-
-RAW_STAGE_MAP = {
-    "fresh_apple": 0,    # Unripe / Firm harvest state
-    "normal_apple": 1,   # Ripe / Optimal consumption state
-    "rotten_apple": 3,   # Spoiled / Rotten
-    "fresh_banana": 0,   # Greenish / Firm
-    "normal_banana": 1,  # Ripe yellow
-    "rotten_banana": 3,  # Senescent / Fungal Rotten
-    "fresh_orange": 0,   # Firm citrus
-    "normal_orange": 1,  # Juicy ripe citrus
-    "rotten_orange": 3   # Mouldy / Rotten
-}
+# ==============================================================================
+# 2. IMAGE HASHING & FOREGROUND SEGMENTATION
+# ==============================================================================
 
 def compute_image_hash(img_bgr: np.ndarray) -> str:
-    """Compute 8x8 average hash to detect duplicates."""
-    small = cv2.resize(img_bgr, (8, 8), interpolation=cv2.INTER_AREA)
+    """Compute 16x16 difference hash for clustering near-duplicates."""
+    small = cv2.resize(img_bgr, (17, 16), interpolation=cv2.INTER_AREA)
     gray = cv2.cvtColor(small, cv2.COLOR_BGR2GRAY)
-    avg = gray.mean()
-    diff = gray > avg
+    diff = gray[:, 1:] > gray[:, :-1]
     return hashlib.md5(diff.tobytes()).hexdigest()
+
+def segment_produce_foreground(img_bgr: np.ndarray, target_size: Tuple[int, int] = (256, 256)) -> Tuple[np.ndarray, np.ndarray, int]:
+    """
+    Isolates produce foreground from background surfaces (plates, tables, walls).
+    Returns:
+        resized_bgr: Resized image
+        fg_mask: Binary uint8 mask (255 for produce, 0 for background)
+        fg_pixel_count: Number of foreground pixels
+    """
+    resized = cv2.resize(img_bgr, target_size)
+    hsv = cv2.cvtColor(resized, cv2.COLOR_BGR2HSV)
+    gray = cv2.cvtColor(resized, cv2.COLOR_BGR2GRAY)
+
+    # Estimate background from 8px outer border
+    border_pixels = np.concatenate([
+        resized[:8, :].reshape(-1, 3),
+        resized[-8:, :].reshape(-1, 3),
+        resized[:, :8].reshape(-1, 3),
+        resized[:, -8:].reshape(-1, 3)
+    ], axis=0)
+    bg_median = np.median(border_pixels, axis=0)
+    
+    # Color distance from border background
+    bgr_diff = np.linalg.norm(resized.astype(np.float32) - bg_median, axis=2)
+    sat = hsv[:, :, 1]
+    val = hsv[:, :, 2]
+    
+    # Candidate fruit mask: difference from background or high chromaticity
+    fg_candidate = (bgr_diff > 35) | (sat > 45) | (np.abs(val.astype(float) - float(bg_median.mean())) > 38)
+    
+    # Morphological refinement
+    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (7, 7))
+    fg_clean = cv2.morphologyEx(fg_candidate.astype(np.uint8), cv2.MORPH_CLOSE, kernel, iterations=2)
+    fg_clean = cv2.morphologyEx(fg_clean, cv2.MORPH_OPEN, kernel, iterations=1)
+    
+    # Find largest contour representing produce specimen
+    contours, _ = cv2.findContours(fg_clean, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    mask = np.zeros(target_size, dtype=np.uint8)
+    
+    if contours:
+        c = max(contours, key=cv2.contourArea)
+        area = cv2.contourArea(c)
+        if area > (target_size[0] * target_size[1] * 0.04): # At least 4% of frame
+            cv2.drawContours(mask, [c], -1, 255, -1)
+            
+    fg_pixel_count = int(np.sum(mask > 0))
+    if fg_pixel_count < (target_size[0] * target_size[1] * 0.05):
+        # Fallback: if border estimation over-pruned, use center 80% circle
+        cv2.circle(mask, (target_size[0] // 2, target_size[1] // 2), int(target_size[0] * 0.42), 255, -1)
+        fg_pixel_count = int(np.sum(mask > 0))
+        
+    return resized, mask, fg_pixel_count
+
+# ==============================================================================
+# 3. 42-DIMENSIONAL FOREGROUND-ISOLATED FEATURE EXTRACTOR
+# ==============================================================================
 
 def extract_multi_domain_features(img_bgr: np.ndarray) -> np.ndarray:
     """
-    Extracts a 35-dimensional multi-domain visual feature vector:
-    - Color moments in RGB, HSV, LAB
-    - Physiological pigment indices (Browning, Chlorophyll Green, Carotenoid Yellow, Anthocyanin Red, Mould/Necrosis)
-    - Surface texture & gradient descriptors (Sobel, Canny edge density, Laplacian variance)
-    - Scale/rotation-invariant Hu Moments
-    - Defect contour statistics
+    Extracts a 42-dimensional multi-domain visual feature vector computed
+    STRICTLY on the segmented fruit foreground (eliminates white background / glare bugs):
+    - 18 Color Moments (mean & std of RGB, HSV, LAB on foreground)
+    - 7 Pigment & Biological indices (Green, Yellow, Red, Browning, Mould, Specular Glare, Dark Necrosis)
+    - 6 Texture & Edge descriptors (Sobel gradient, Canny edge density, Laplacian variance, LBP contrast)
+    - 7 Invariant Hu Moments (log-transformed)
+    - 4 Geometry & Defect statistics (Defect count, Defect area %, Foreground ratio, Aspect ratio)
     """
-    img_resized = cv2.resize(img_bgr, (160, 160))
-    rgb = cv2.cvtColor(img_resized, cv2.COLOR_BGR2RGB)
-    hsv = cv2.cvtColor(img_resized, cv2.COLOR_BGR2HSV)
-    lab = cv2.cvtColor(img_resized, cv2.COLOR_BGR2LAB)
-    gray = cv2.cvtColor(img_resized, cv2.COLOR_BGR2GRAY)
-    total_pixels = 160.0 * 160.0
-
-    # 1. Color channel moments (RGB, HSV, LAB) -> 18 features
-    r, g, b = rgb[:, :, 0], rgb[:, :, 1], rgb[:, :, 2]
-    h, s, v = hsv[:, :, 0], hsv[:, :, 1], hsv[:, :, 2]
-    l_c, a_c, b_c = lab[:, :, 0], lab[:, :, 1], lab[:, :, 2]
-
+    resized, mask, fg_pixels = segment_produce_foreground(img_bgr, (256, 256))
+    rgb = cv2.cvtColor(resized, cv2.COLOR_BGR2RGB)
+    hsv = cv2.cvtColor(resized, cv2.COLOR_BGR2HSV)
+    lab = cv2.cvtColor(resized, cv2.COLOR_BGR2LAB)
+    gray = cv2.cvtColor(resized, cv2.COLOR_BGR2GRAY)
+    
+    fg_mask_bool = mask > 0
+    fg_count = max(float(fg_pixels), 1.0)
+    total_frame_pixels = 256.0 * 256.0
+    
+    # 1. Color channel moments on foreground only -> 18 features
+    r_fg = rgb[:, :, 0][fg_mask_bool]
+    g_fg = rgb[:, :, 1][fg_mask_bool]
+    b_fg = rgb[:, :, 2][fg_mask_bool]
+    h_fg = hsv[:, :, 0][fg_mask_bool]
+    s_fg = hsv[:, :, 1][fg_mask_bool]
+    v_fg = hsv[:, :, 2][fg_mask_bool]
+    l_fg = lab[:, :, 0][fg_mask_bool]
+    a_fg = lab[:, :, 1][fg_mask_bool]
+    b_lab_fg = lab[:, :, 2][fg_mask_bool]
+    
     color_moments = [
-        float(np.mean(r)), float(np.std(r)),
-        float(np.mean(g)), float(np.std(g)),
-        float(np.mean(b)), float(np.std(b)),
-        float(np.mean(h)), float(np.std(h)),
-        float(np.mean(s)), float(np.std(s)),
-        float(np.mean(v)), float(np.std(v)),
-        float(np.mean(l_c)), float(np.std(l_c)),
-        float(np.mean(a_c)), float(np.std(a_c)),
-        float(np.mean(b_c)), float(np.std(b_c))
+        float(np.mean(r_fg)), float(np.std(r_fg)),
+        float(np.mean(g_fg)), float(np.std(g_fg)),
+        float(np.mean(b_fg)), float(np.std(b_fg)),
+        float(np.mean(h_fg)), float(np.std(h_fg)),
+        float(np.mean(s_fg)), float(np.std(s_fg)),
+        float(np.mean(v_fg)), float(np.std(v_fg)),
+        float(np.mean(l_fg)), float(np.std(l_fg)),
+        float(np.mean(a_fg)), float(np.std(a_fg)),
+        float(np.mean(b_lab_fg)), float(np.std(b_lab_fg))
     ]
-
-    # 2. Physiological pigment indices -> 5 features
-    # Browning (enzymatic melanin accumulation)
-    browning_mask = (r > 70) & (r < 195) & (g > 35) & (g < 140) & (b < 95)
-    browning_ratio = float(np.sum(browning_mask) / total_pixels * 100.0)
-
-    # Chlorophyll Green ratio
-    green_mask = (g > r * 1.08) & (g > b * 1.08) & (g > 40)
-    green_ratio = float(np.sum(green_mask) / total_pixels * 100.0)
-
-    # Carotenoid Yellow ratio
-    yellow_mask = (r > 140) & (g > 120) & (b < 90)
-    yellow_ratio = float(np.sum(yellow_mask) / total_pixels * 100.0)
-
-    # Anthocyanin Red ratio
-    red_mask = (r > 130) & (r > g * 1.25) & (r > b * 1.25)
-    red_ratio = float(np.sum(red_mask) / total_pixels * 100.0)
-
-    # Mould / Necrosis spore mask
-    mould_mask = (
-        ((g > r * 1.15) & (g > 65) & (r < 135)) |
-        ((np.abs(r.astype(int) - g.astype(int)) < 15) & (v > 190) & (s < 40)) |
-        ((v < 40) & (np.abs(r.astype(int) - g.astype(int)) < 12))
-    )
-    mould_coverage = float(np.sum(mould_mask) / total_pixels * 100.0)
-
-    pigment_features = [browning_ratio, green_ratio, yellow_ratio, red_ratio, mould_coverage]
-
-    # 3. Surface texture & edge descriptors -> 4 features
+    
+    # 2. Biological Pigment & Defect Indices strictly on foreground -> 7 features
+    # Green chlorophyll (unripe banana / Granny Smith apple)
+    green_mask = fg_mask_bool & (hsv[:, :, 0] >= 33) & (hsv[:, :, 0] <= 85) & (hsv[:, :, 1] >= 40)
+    green_ratio = float(np.sum(green_mask) / fg_count * 100.0)
+    
+    # Yellow carotenoid (ripe banana / yellow apple)
+    yellow_mask = fg_mask_bool & (hsv[:, :, 0] >= 18) & (hsv[:, :, 0] < 33) & (hsv[:, :, 1] >= 60)
+    yellow_ratio = float(np.sum(yellow_mask) / fg_count * 100.0)
+    
+    # Red anthocyanin (red apple / strawberry)
+    red_mask = fg_mask_bool & ((hsv[:, :, 0] < 12) | (hsv[:, :, 0] > 168)) & (hsv[:, :, 1] >= 55)
+    red_ratio = float(np.sum(red_mask) / fg_count * 100.0)
+    
+    # Specular reflection glare (smooth white highlight: high V, low S, but low Laplacian)
+    laplacian_full = np.abs(cv2.Laplacian(gray, cv2.CV_64F))
+    glare_mask = fg_mask_bool & (hsv[:, :, 1] < 30) & (hsv[:, :, 2] > 215) & (laplacian_full < 25)
+    glare_ratio = float(np.sum(glare_mask) / fg_count * 100.0)
+    
+    # True fungal mycelium / mould spore patch (low saturation, elevated luminance, high textural gradient, NOT glare)
+    mould_mask = fg_mask_bool & (hsv[:, :, 1] < 45) & (hsv[:, :, 2] > 115) & (hsv[:, :, 2] < 235) & (laplacian_full > 28) & (~glare_mask)
+    mould_coverage = float(np.sum(mould_mask) / fg_count * 100.0)
+    
+    # Dark necrotic rot / sunken lesions (very low luminance on fruit skin)
+    necrotic_mask = fg_mask_bool & (hsv[:, :, 2] < 50) & (hsv[:, :, 1] < 100)
+    necrotic_ratio = float(np.sum(necrotic_mask) / fg_count * 100.0)
+    
+    # Biological browning (enzymatic melanin: darker brownish hues, distinct from clean red peels)
+    brown_mask = fg_mask_bool & (hsv[:, :, 0] >= 10) & (hsv[:, :, 0] <= 26) & (hsv[:, :, 1] >= 35) & (hsv[:, :, 1] <= 130) & (hsv[:, :, 2] >= 45) & (hsv[:, :, 2] <= 135)
+    browning_ratio = float(np.sum(brown_mask) / fg_count * 100.0)
+    
+    pigment_indices = [
+        green_ratio, yellow_ratio, red_ratio,
+        glare_ratio, mould_coverage, necrotic_ratio, browning_ratio
+    ]
+    
+    # 3. Surface Texture & Gradients on Foreground -> 6 features
+    gray_fg = gray.copy()
+    gray_fg[~fg_mask_bool] = 0
+    
     sobelx = cv2.Sobel(gray, cv2.CV_64F, 1, 0, ksize=3)
     sobely = cv2.Sobel(gray, cv2.CV_64F, 0, 1, ksize=3)
     grad_mag = np.sqrt(sobelx**2 + sobely**2)
-    gradient_mean = float(np.mean(grad_mag))
-    gradient_std = float(np.std(grad_mag))
-
+    grad_fg = grad_mag[fg_mask_bool]
+    
+    gradient_mean = float(np.mean(grad_fg)) if len(grad_fg) > 0 else 0.0
+    gradient_std = float(np.std(grad_fg)) if len(grad_fg) > 0 else 0.0
+    
     edges = cv2.Canny(gray, 40, 130)
-    edge_density = float(np.sum(edges > 0) / total_pixels * 100.0)
-
-    laplacian_var = float(cv2.Laplacian(gray, cv2.CV_64F).var())
-    texture_features = [gradient_mean, gradient_std, edge_density, laplacian_var]
-
-    # 4. Hu Moments (scale, rotation & reflection invariants) -> 7 features
-    moments = cv2.moments(gray)
+    edge_fg = edges[fg_mask_bool]
+    edge_density = float(np.sum(edge_fg > 0) / fg_count * 100.0)
+    
+    lap_fg = laplacian_full[fg_mask_bool]
+    laplacian_mean = float(np.mean(lap_fg)) if len(lap_fg) > 0 else 0.0
+    laplacian_var = float(np.var(lap_fg)) if len(lap_fg) > 0 else 0.0
+    
+    # Local intensity variance (roughness)
+    intensity_std = float(np.std(gray[fg_mask_bool])) if len(gray[fg_mask_bool]) > 0 else 0.0
+    
+    texture_features = [
+        gradient_mean, gradient_std, edge_density,
+        laplacian_mean, laplacian_var, intensity_std
+    ]
+    
+    # 4. Invariant Hu Moments (Shape & Morphological Invariants) -> 7 features
+    moments = cv2.moments(mask)
     hu = cv2.HuMoments(moments).flatten()
     log_hu = [-np.sign(h_val) * np.log10(np.abs(h_val) + 1e-10) for h_val in hu]
-
-    # 5. Defect contour statistics -> 2 features
-    defect_binary = (browning_mask | mould_mask).astype(np.uint8) * 255
-    contours, _ = cv2.findContours(defect_binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    defect_count = float(len([c for c in contours if cv2.contourArea(c) > 15]))
-    defect_area_pct = float(np.sum(defect_binary > 0) / total_pixels * 100.0)
-
-    defect_features = [defect_count, defect_area_pct]
-
+    
+    # 5. Defect Contours & Geometry -> 4 features
+    combined_defect_binary = ((mould_mask | necrotic_mask).astype(np.uint8) * 255)
+    contours_d, _ = cv2.findContours(combined_defect_binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    significant_defects = [c for c in contours_d if cv2.contourArea(c) > 35]
+    defect_count = float(len(significant_defects))
+    defect_area_pct = float(np.sum(combined_defect_binary > 0) / fg_count * 100.0)
+    
+    fg_coverage_ratio = float(fg_pixels / total_frame_pixels * 100.0)
+    
+    # Aspect ratio of foreground bounding rect
+    fg_contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    if fg_contours:
+        bx, by, bw, bh = cv2.boundingRect(max(fg_contours, key=cv2.contourArea))
+        aspect_ratio = float(bw) / float(max(bh, 1))
+    else:
+        aspect_ratio = 1.0
+        
+    geometry_defect_features = [defect_count, defect_area_pct, fg_coverage_ratio, aspect_ratio]
+    
+    # Total dimension: 18 + 7 + 6 + 7 + 4 = 42 features
     feature_vector = np.array(
-        color_moments + pigment_features + texture_features + list(log_hu) + defect_features,
+        color_moments + pigment_indices + texture_features + list(log_hu) + geometry_defect_features,
         dtype=np.float32
     )
     return feature_vector
 
+# ==============================================================================
+# 4. PASCAL VOC XML PARSING
+# ==============================================================================
+
 def parse_voc_xml(xml_path: str) -> Dict[str, Any]:
-    """Parse Pascal VOC XML annotation."""
     tree = ET.parse(xml_path)
     root = tree.getroot()
     size_el = root.find("size")
@@ -187,11 +358,14 @@ def parse_voc_xml(xml_path: str) -> Dict[str, Any]:
         "classes": classes
     }
 
+# ==============================================================================
+# 5. REPRODUCIBLE DATASET PREPARATION PIPELINE
+# ==============================================================================
+
 def prepare_pipeline(base_data_dir: str, output_manifest_path: str, output_features_dir: str) -> Dict[str, Any]:
     print("=" * 80)
-    print(" GREENPULSE REPRODUCIBLE DATASET PREPARATION PIPELINE ")
+    print(" GREENPULSE DATASET PREPARATION PIPELINE (v2.3 LEAKAGE-FREE & DECOUPLED SCHEMA) ")
     print("=" * 80)
-    print(f"Base Directory: {base_data_dir}")
 
     bench_dir = os.path.join(base_data_dir, "public_benchmarks", "fruit_freshness_images")
     annot_dir = os.path.join(bench_dir, "Annotations")
@@ -204,9 +378,8 @@ def prepare_pipeline(base_data_dir: str, output_manifest_path: str, output_featu
     print(f"Found {len(xml_files)} Pascal VOC XML annotation files.")
 
     records = []
-    seen_hashes = {}
+    hash_to_indices = defaultdict(list)
     corrupted_count = 0
-    duplicate_count = 0
     missing_annot_count = 0
 
     t0 = time.time()
@@ -225,11 +398,10 @@ def prepare_pipeline(base_data_dir: str, output_manifest_path: str, output_featu
                 missing_annot_count += 1
                 continue
 
-            primary_raw_label = parsed["classes"][0]
-            if primary_raw_label not in RAW_STAGE_MAP:
+            raw_label = parsed["classes"][0]
+            if raw_label not in RAW_TAXONOMY_MAP:
                 continue
 
-            # Load image
             img = cv2.imread(img_path)
             if img is None:
                 corrupted_count += 1
@@ -240,18 +412,9 @@ def prepare_pipeline(base_data_dir: str, output_manifest_path: str, output_featu
                 corrupted_count += 1
                 continue
 
-            # Duplicate detection via perceptual hash
+            tax = RAW_TAXONOMY_MAP[raw_label]
             im_hash = compute_image_hash(img)
-            if im_hash in seen_hashes:
-                duplicate_count += 1
-            else:
-                seen_hashes[im_hash] = img_name
 
-            species = SPECIES_LABEL_MAP[primary_raw_label]
-            stage_idx = RAW_STAGE_MAP[primary_raw_label]
-            stage_name = STAGE_NAME_MAP[stage_idx]
-
-            # Bounding box coordinates normalized
             norm_boxes = []
             for b in parsed["boxes"]:
                 norm_boxes.append({
@@ -264,14 +427,17 @@ def prepare_pipeline(base_data_dir: str, output_manifest_path: str, output_featu
                     "box_height": round((b["ymax"] - b["ymin"]) / max(h, 1), 4)
                 })
 
-            records.append({
+            rec = {
                 "image_id": f"IMG-{idx+1:05d}",
                 "filename": img_name,
                 "relative_path": os.path.join("JPEGImages", img_name).replace("\\", "/"),
-                "raw_label": primary_raw_label,
-                "standardized_species": species,
-                "standardized_stage_idx": stage_idx,
-                "standardized_stage_name": stage_name,
+                "raw_label": raw_label,
+                "produce_identity": tax["species"],
+                "ripeness_stage": tax["ripeness"],
+                "visible_spoilage": tax["spoilage_category"],
+                "spoilage_binary": tax["spoilage_binary"],
+                "defect_type": tax["defect_type"],
+                "description": tax["description"],
                 "width": w,
                 "height": h,
                 "perceptual_hash": im_hash,
@@ -279,44 +445,80 @@ def prepare_pipeline(base_data_dir: str, output_manifest_path: str, output_featu
                 "bounding_box_count": len(norm_boxes),
                 "license": "Apache-2.0",
                 "source_benchmark": "Fruit Freshness Detection Dataset"
-            })
+            }
+            records.append(rec)
+            hash_to_indices[im_hash].append(len(records) - 1)
 
             if (idx + 1) % 500 == 0:
-                print(f"  Validated {idx + 1}/{len(xml_files)} files...")
-        except Exception as e:
+                print(f"  Parsed {idx + 1}/{len(xml_files)} files...")
+        except Exception:
             corrupted_count += 1
             continue
 
     total_valid = len(records)
     print(f"\n[Validation Complete in {time.time() - t0:.2f}s]")
     print(f"  Total verified valid images: {total_valid}")
-    print(f"  Corrupted or missing files: {corrupted_count}")
-    print(f"  Duplicate perceptual hashes detected: {duplicate_count}")
+    print(f"  Unique perceptual hash clusters: {len(hash_to_indices)}")
 
-    # Stratified Split: 80% Train, 10% Validation, 10% Test
-    indices = np.arange(total_valid)
-    raw_labels = [r["raw_label"] for r in records]
+    # ==============================================================================
+    # 6. LEAKAGE-FREE GROUP PARTITIONING BY HASH CLUSTERS
+    # ==============================================================================
+    # Assign entire hash clusters to Train (80%), Val (10%), or Test (10%)
+    np.random.seed(42)
+    cluster_hashes = list(hash_to_indices.keys())
+    np.random.shuffle(cluster_hashes)
 
-    train_idx, temp_idx = train_test_split(
-        indices, test_size=0.20, random_state=42, stratify=raw_labels
-    )
-    temp_labels = [raw_labels[i] for i in temp_idx]
-    val_idx, test_idx = train_test_split(
-        temp_idx, test_size=0.50, random_state=42, stratify=temp_labels
-    )
+    train_indices = []
+    val_indices = []
+    test_indices = []
 
-    for i in train_idx:
+    target_train = int(0.80 * total_valid)
+    target_val = int(0.10 * total_valid)
+
+    current_train = 0
+    current_val = 0
+
+    for ch in cluster_hashes:
+        cluster_idxs = hash_to_indices[ch]
+        c_len = len(cluster_idxs)
+        if current_train + c_len <= target_train:
+            train_indices.extend(cluster_idxs)
+            current_train += c_len
+        elif current_val + c_len <= target_val:
+            val_indices.extend(cluster_idxs)
+            current_val += c_len
+        else:
+            test_indices.extend(cluster_idxs)
+
+    train_indices = np.array(train_indices)
+    val_indices = np.array(val_indices)
+    test_indices = np.array(test_indices)
+
+    for i in train_indices:
         records[i]["split"] = "train"
-    for i in val_idx:
+    for i in val_indices:
         records[i]["split"] = "val"
-    for i in test_idx:
+    for i in test_indices:
         records[i]["split"] = "test"
 
-    print(f"  Partition split: Train={len(train_idx)} (80%) | Val={len(val_idx)} (10%) | Test={len(test_idx)} (10%)")
+    print(f"\n[Leakage-Free Partition Split]:")
+    print(f"  Train: {len(train_indices)} images ({len(train_indices)/total_valid*100:.1f}%)")
+    print(f"  Val:   {len(val_indices)} images ({len(val_indices)/total_valid*100:.1f}%)")
+    print(f"  Test:  {len(test_indices)} images ({len(test_indices)/total_valid*100:.1f}%)")
 
-    # Extract Visual Features for all splits
-    print("\nExtracting 36-dimensional multi-domain visual feature vectors...")
-    X_features = np.zeros((total_valid, 36), dtype=np.float32)
+    # Verify zero hash leakage
+    train_h = set(records[i]["perceptual_hash"] for i in train_indices)
+    val_h = set(records[i]["perceptual_hash"] for i in val_indices)
+    test_h = set(records[i]["perceptual_hash"] for i in test_indices)
+    leakage_count = len(train_h.intersection(test_h)) + len(train_h.intersection(val_h)) + len(val_h.intersection(test_h))
+    print(f"  Cross-Split Hash Leakage Count: {leakage_count} (Must be exactly 0!)")
+    assert leakage_count == 0, "Error: Data leakage detected between splits!"
+
+    # ==============================================================================
+    # 7. FEATURE EXTRACTION (42 FOREGROUND FEATURES)
+    # ==============================================================================
+    print("\nExtracting 42-dimensional foreground-isolated visual feature vectors...")
+    X_features = np.zeros((total_valid, 42), dtype=np.float32)
     t_feat_start = time.time()
     for i, rec in enumerate(records):
         img_full_path = os.path.join(img_dir, rec["filename"])
@@ -324,61 +526,67 @@ def prepare_pipeline(base_data_dir: str, output_manifest_path: str, output_featu
         feat = extract_multi_domain_features(img)
         X_features[i] = feat
         if (i + 1) % 500 == 0:
-            print(f"  Extracted features for {i + 1}/{total_valid} images...")
-    print(f"Feature extraction finished in {time.time() - t_feat_start:.2f}s.")
+            print(f"  Extracted foreground features for {i + 1}/{total_valid} images...")
+    print(f"Foreground feature extraction finished in {time.time() - t_feat_start:.2f}s.")
 
-    # Save Cached Features per Split
+    # Save Compressed Features Per Split
     os.makedirs(output_features_dir, exist_ok=True)
     features_cache_path = os.path.join(output_features_dir, "cv_dataset_features.npz")
     np.savez_compressed(
         features_cache_path,
-        X_train=X_features[train_idx],
-        X_val=X_features[val_idx],
-        X_test=X_features[test_idx],
-        y_species_train=np.array([SUPPORTED_SPECIES.index(records[i]["standardized_species"]) for i in train_idx]),
-        y_species_val=np.array([SUPPORTED_SPECIES.index(records[i]["standardized_species"]) for i in val_idx]),
-        y_species_test=np.array([SUPPORTED_SPECIES.index(records[i]["standardized_species"]) for i in test_idx]),
-        y_stage_train=np.array([records[i]["standardized_stage_idx"] for i in train_idx]),
-        y_stage_val=np.array([records[i]["standardized_stage_idx"] for i in val_idx]),
-        y_stage_test=np.array([records[i]["standardized_stage_idx"] for i in test_idx]),
-        y_raw_train=np.array([records[i]["raw_label"] for i in train_idx]),
-        y_raw_val=np.array([records[i]["raw_label"] for i in val_idx]),
-        y_raw_test=np.array([records[i]["raw_label"] for i in test_idx])
+        X_train=X_features[train_indices],
+        X_val=X_features[val_indices],
+        X_test=X_features[test_indices],
+        y_species_train=np.array([SUPPORTED_SPECIES.index(records[i]["produce_identity"]) for i in train_indices]),
+        y_species_val=np.array([SUPPORTED_SPECIES.index(records[i]["produce_identity"]) for i in val_indices]),
+        y_species_test=np.array([SUPPORTED_SPECIES.index(records[i]["produce_identity"]) for i in test_indices]),
+        y_spoilage_train=np.array([records[i]["spoilage_binary"] for i in train_indices]),
+        y_spoilage_val=np.array([records[i]["spoilage_binary"] for i in val_indices]),
+        y_spoilage_test=np.array([records[i]["spoilage_binary"] for i in test_indices]),
+        y_ripeness_train=np.array([RIPENESS_STAGES.index(records[i]["ripeness_stage"]) for i in train_indices]),
+        y_ripeness_val=np.array([RIPENESS_STAGES.index(records[i]["ripeness_stage"]) for i in val_indices]),
+        y_ripeness_test=np.array([RIPENESS_STAGES.index(records[i]["ripeness_stage"]) for i in test_indices]),
+        y_raw_train=np.array([records[i]["raw_label"] for i in train_indices]),
+        y_raw_val=np.array([records[i]["raw_label"] for i in val_indices]),
+        y_raw_test=np.array([records[i]["raw_label"] for i in test_indices])
     )
     print(f"Saved pre-computed compressed feature matrices to: {features_cache_path}")
 
-    # Build Class Distribution Summary
-    species_dist = {}
-    stage_dist = {}
-    raw_dist = {}
+    # Build Distributions
+    species_dist = defaultdict(int)
+    spoilage_dist = defaultdict(int)
+    ripeness_dist = defaultdict(int)
+    raw_dist = defaultdict(int)
     for r in records:
-        sp = r["standardized_species"]
-        species_dist[sp] = species_dist.get(sp, 0) + 1
-        st = r["standardized_stage_name"]
-        stage_dist[st] = stage_dist.get(st, 0) + 1
-        rw = r["raw_label"]
-        raw_dist[rw] = raw_dist.get(rw, 0) + 1
+        species_dist[r["produce_identity"]] += 1
+        spoilage_dist[r["visible_spoilage"]] += 1
+        ripeness_dist[r["ripeness_stage"]] += 1
+        raw_dist[r["raw_label"]] += 1
 
     manifest = {
         "metadata": {
-            "dataset_name": "Fruit Freshness Benchmark - Standardized Multi-Modal Ingestion",
-            "version": "2.2-reproducible",
+            "dataset_name": "Fruit Freshness Benchmark - Leakage-Free Foreground Multi-Modal Ingestion",
+            "version": "2.3-decoupled-leakage-free",
             "generated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
             "license": "Apache-2.0",
             "supported_species": SUPPORTED_SPECIES,
             "fallback_species": FALLBACK_SPECIES,
-            "stage_labels": STAGE_NAME_MAP,
+            "ripeness_stages": RIPENESS_STAGES,
+            "spoilage_categories": SPOILAGE_CATEGORIES,
+            "defect_types": DEFECT_TYPES,
             "total_samples": total_valid,
-            "train_samples": len(train_idx),
-            "val_samples": len(val_idx),
-            "test_samples": len(test_idx),
-            "feature_dimension": 36,
+            "train_samples": len(train_indices),
+            "val_samples": len(val_indices),
+            "test_samples": len(test_indices),
+            "feature_dimension": 42,
             "features_cache_file": os.path.basename(features_cache_path),
             "corrupted_images": corrupted_count,
-            "perceptual_duplicates": duplicate_count,
-            "class_distribution_raw": raw_dist,
-            "species_distribution": species_dist,
-            "stage_distribution": stage_dist
+            "unique_hash_clusters": len(hash_to_indices),
+            "cross_split_hash_leakage": leakage_count,
+            "class_distribution_raw": dict(raw_dist),
+            "species_distribution": dict(species_dist),
+            "spoilage_distribution": dict(spoilage_dist),
+            "ripeness_distribution": dict(ripeness_dist)
         },
         "records": records
     }
@@ -386,7 +594,7 @@ def prepare_pipeline(base_data_dir: str, output_manifest_path: str, output_featu
     os.makedirs(os.path.dirname(output_manifest_path), exist_ok=True)
     with open(output_manifest_path, "w", encoding="utf-8") as f:
         json.dump(manifest, f, indent=2)
-    print(f"Saved complete reproducible manifest ({total_valid} records) to: {output_manifest_path}")
+    print(f"Saved manifest ({total_valid} records) to: {output_manifest_path}")
 
     return manifest["metadata"]
 

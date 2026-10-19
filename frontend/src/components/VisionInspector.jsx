@@ -1375,31 +1375,31 @@ export default function VisionInspector({ onInspectionComplete }) {
           </div>
         </div>
 
-        {/* 3-Column Diagnostic Telemetry Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        {/* 4-Column Decoupled Diagnostic Telemetry Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           
           {/* Diagnostic 1: Species Identification */}
           <div className="p-3.5 rounded-xl bg-[#f8faf9] dark:bg-slate-800/60 border border-[#e1eae4] dark:border-slate-700/80 space-y-2">
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                1. Species Classification
+                1. Species Identity
               </span>
               <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
                 cvResult?.is_supported_produce !== false 
                   ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-900 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700'
                   : 'bg-amber-100 dark:bg-amber-950 text-amber-900 dark:text-amber-300 border-amber-300 dark:border-amber-700'
               }`}>
-                {cvResult?.is_supported_produce !== false ? 'Calibrated Class' : 'Out-of-Distribution'}
+                {cvResult?.is_supported_produce !== false ? 'Supported Class' : 'Out-of-Distribution'}
               </span>
             </div>
 
             <div className="flex items-center gap-2.5">
               <span className="text-2xl">{cvResult?.produce_icon || "🍎"}</span>
-              <div>
-                <div className="text-sm font-extrabold text-slate-900 dark:text-white">
-                  {cvResult?.identified_produce || "Fruit / Vegetable"}
+              <div className="min-w-0">
+                <div className="text-sm font-extrabold text-slate-900 dark:text-white truncate">
+                  {cvResult?.species_identity || cvResult?.identified_produce || "Fruit / Vegetable"}
                 </div>
-                <div className="text-[10px] text-slate-500 dark:text-slate-400 italic">
+                <div className="text-[10px] text-slate-500 dark:text-slate-400 italic truncate">
                   {cvResult?.scientific_name || "Biological specimen"}
                 </div>
               </div>
@@ -1407,7 +1407,7 @@ export default function VisionInspector({ onInspectionComplete }) {
 
             <div className="space-y-1 pt-1">
               <div className="flex justify-between text-[11px] font-bold">
-                <span className="text-slate-600 dark:text-slate-400">Model Confidence:</span>
+                <span className="text-slate-600 dark:text-slate-400">Confidence:</span>
                 <span className="text-emerald-800 dark:text-emerald-400">{cvResult?.produce_confidence || 85.0}%</span>
               </div>
               <div className="w-full bg-slate-200 dark:bg-slate-700 h-2 rounded-full overflow-hidden">
@@ -1420,9 +1420,9 @@ export default function VisionInspector({ onInspectionComplete }) {
 
             {cvResult?.alternative_predictions && cvResult.alternative_predictions.length > 1 && (
               <div className="text-[10px] text-slate-600 dark:text-slate-400 pt-1 border-t border-slate-200 dark:border-slate-700">
-                <span className="font-bold">Top Alternatives: </span>
+                <span className="font-bold">Alternatives: </span>
                 {cvResult.alternative_predictions.slice(1, 3).map((alt, idx) => (
-                  <span key={idx} className="mr-2">
+                  <span key={idx} className="mr-1.5">
                     {alt.produce} ({alt.confidence}%)
                   </span>
                 ))}
@@ -1430,19 +1430,19 @@ export default function VisionInspector({ onInspectionComplete }) {
             )}
           </div>
 
-          {/* Diagnostic 2: Freshness & Lifecycle Stage */}
+          {/* Diagnostic 2: Ripeness Stage (Physiological) */}
           <div className="p-3.5 rounded-xl bg-[#f8faf9] dark:bg-slate-800/60 border border-[#e1eae4] dark:border-slate-700/80 space-y-2">
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                2. Lifecycle Freshness Stage
+                2. Ripeness Stage
               </span>
-              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${levelTheme.badge}`}>
-                {levelTheme.label}
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border bg-emerald-100 dark:bg-emerald-950 text-emerald-900 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700">
+                Physiological
               </span>
             </div>
 
             <div className="text-sm font-extrabold text-slate-900 dark:text-white flex items-center gap-1.5">
-              <span>{cvResult?.ripeness_stage || "Ripe / Optimal (Grade B)"}</span>
+              <span>{cvResult?.ripeness_classification || cvResult?.ripeness_stage || "Ripe / Optimal"}</span>
             </div>
 
             {/* Stage Probabilities Bar */}
@@ -1458,47 +1458,112 @@ export default function VisionInspector({ onInspectionComplete }) {
                     <div>Optimal</div>
                     <div>{cvResult.stage_probabilities["Ripe / Optimal"] || 0}%</div>
                   </div>
-                  <div className="p-1 rounded-md bg-rose-100 dark:bg-rose-950/60 text-rose-950 dark:text-rose-300 border border-rose-300 dark:border-rose-800">
-                    <div>Spoiled</div>
-                    <div>{cvResult.stage_probabilities["Spoiled / Rotten"] || 0}%</div>
+                  <div className="p-1 rounded-md bg-amber-100 dark:bg-amber-950/60 text-amber-950 dark:text-amber-300 border border-amber-300 dark:border-amber-800">
+                    <div>Overripe</div>
+                    <div>{cvResult.stage_probabilities["Overripe"] || 0}%</div>
                   </div>
                 </div>
               </div>
             )}
 
-            {cvResult?.is_uncertain && (
-              <div className="text-[10px] text-amber-700 dark:text-amber-300 flex items-center gap-1 font-semibold pt-1">
-                <AlertTriangle className="h-3 w-3" />
-                <span>Transition zone; secondary sensor validation recommended.</span>
-              </div>
-            )}
+            <div className="text-[10px] text-slate-500 dark:text-slate-400 pt-1 border-t border-slate-200 dark:border-slate-700 flex justify-between">
+              <span>Sugar Spotting:</span>
+              <span className="font-semibold text-slate-700 dark:text-slate-300">
+                {cvResult?.ripeness_classification === 'Overripe' ? 'Senescent Sugar Spots' : 'Normal Cuticle'}
+              </span>
+            </div>
           </div>
 
-          {/* Diagnostic 3: Defect Localization & Ground-Truth SLA */}
+          {/* Diagnostic 3: Visible Spoilage Classification (Calibrated) */}
           <div className="p-3.5 rounded-xl bg-[#f8faf9] dark:bg-slate-800/60 border border-[#e1eae4] dark:border-slate-700/80 space-y-2">
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                3. Defect & Localization SLA
+                3. Visible Spoilage
               </span>
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300">
-                {cvResult?.processing_latency_ms ? `${cvResult.processing_latency_ms} ms CPU` : "< 100 ms CPU"}
+              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                cvResult?.visible_spoilage_classification === 'No visible spoilage detected' 
+                  ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                  : cvResult?.visible_spoilage_classification === 'Localized visible defect'
+                  ? 'bg-amber-100 text-amber-800 border-amber-300'
+                  : cvResult?.visible_spoilage_classification === 'Uncertain'
+                  ? 'bg-purple-100 text-purple-800 border-purple-300'
+                  : 'bg-rose-100 text-rose-800 border-rose-300'
+              }`}>
+                {cvResult?.risk_level || 'Low'} Risk
               </span>
             </div>
 
-            <div className="grid grid-cols-2 gap-2 pt-1 text-xs">
-              <div className="p-2 rounded-lg bg-white dark:bg-slate-900 border border-[#e1eae4] dark:border-slate-700">
-                <div className="text-[10px] text-slate-500 dark:text-slate-400">Defect Regions</div>
+            <div className={`text-sm font-extrabold flex items-center gap-1.5 ${
+              cvResult?.visible_spoilage_classification === 'No visible spoilage detected'
+                ? 'text-emerald-700 dark:text-emerald-400'
+                : cvResult?.visible_spoilage_classification === 'Localized visible defect'
+                ? 'text-amber-700 dark:text-amber-400'
+                : cvResult?.visible_spoilage_classification === 'Uncertain'
+                ? 'text-purple-700 dark:text-purple-400'
+                : 'text-rose-700 dark:text-rose-400'
+            }`}>
+              <span>{cvResult?.visible_spoilage_classification || 'No visible spoilage detected'}</span>
+            </div>
+
+            <div className="space-y-1 pt-1 text-xs">
+              <div className="flex justify-between text-[11px] font-bold">
+                <span className="text-slate-600 dark:text-slate-400">Spoilage Probability:</span>
+                <span className="font-mono text-slate-800 dark:text-slate-200">
+                  {cvResult?.spoilage_probability !== undefined ? `${cvResult.spoilage_probability}%` : '0.0%'}
+                </span>
+              </div>
+              <div className="w-full bg-slate-200 dark:bg-slate-700 h-2 rounded-full overflow-hidden relative">
+                <div
+                  className={`h-2 rounded-full transition-all duration-300 ${
+                    (cvResult?.spoilage_probability || 0) >= 41.0 ? 'bg-rose-600' : 'bg-emerald-600'
+                  }`}
+                  style={{ width: `${Math.min(100, cvResult?.spoilage_probability || 0)}%` }}
+                />
+              </div>
+            </div>
+
+            <div className="text-[10px] text-slate-500 dark:text-slate-400 pt-1 border-t border-slate-200 dark:border-slate-700 flex justify-between">
+              <span>Decision Threshold:</span>
+              <span className="font-mono font-bold text-slate-700 dark:text-slate-300">
+                T = {cvResult?.calibrated_threshold || 41.0}%
+              </span>
+            </div>
+          </div>
+
+          {/* Diagnostic 4: Defect Types & Localization SLA */}
+          <div className="p-3.5 rounded-xl bg-[#f8faf9] dark:bg-slate-800/60 border border-[#e1eae4] dark:border-slate-700/80 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                4. Defect Types & SLA
+              </span>
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300">
+                {cvResult?.processing_latency_ms ? `${cvResult.processing_latency_ms} ms CPU` : "< 100 ms"}
+              </span>
+            </div>
+
+            <div className="text-xs">
+              <div className="text-[10px] text-slate-500 dark:text-slate-400">Identified Defect Types</div>
+              <div className="font-bold text-slate-800 dark:text-slate-200 truncate">
+                {cvResult?.defect_types && cvResult.defect_types.length > 0
+                  ? cvResult.defect_types.join(", ")
+                  : "None (Intact Cuticle)"}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-1.5 pt-0.5 text-xs">
+              <div className="p-1.5 rounded-lg bg-white dark:bg-slate-900 border border-[#e1eae4] dark:border-slate-700">
+                <div className="text-[9px] text-slate-500 dark:text-slate-400">Bounding Boxes</div>
                 <div className="font-extrabold text-slate-800 dark:text-slate-200">
-                  {cvResult?.bounding_boxes ? `${cvResult.bounding_boxes.length} Bounding Boxes` : "None"}
+                  {cvResult?.bounding_boxes ? `${cvResult.bounding_boxes.length}` : "0"}
                 </div>
               </div>
 
-              <div className="p-2 rounded-lg bg-white dark:bg-slate-900 border border-[#e1eae4] dark:border-slate-700">
-                <div className="text-[10px] text-slate-500 dark:text-slate-400">Defect Surface</div>
+              <div className="p-1.5 rounded-lg bg-white dark:bg-slate-900 border border-[#e1eae4] dark:border-slate-700">
+                <div className="text-[9px] text-slate-500 dark:text-slate-400">Defect Area</div>
                 <div className="font-extrabold text-slate-800 dark:text-slate-200">
                   {cvResult?.defect_surface_area_percent !== undefined 
-                    ? `${cvResult.defect_surface_area_percent}% Area` 
-                    : `${cvResult?.discoloration_score || 0}% Area`}
+                    ? `${cvResult.defect_surface_area_percent}%` 
+                    : "0.0%"}
                 </div>
               </div>
             </div>
@@ -1506,7 +1571,7 @@ export default function VisionInspector({ onInspectionComplete }) {
             <div className="text-[10px] text-slate-600 dark:text-slate-400 pt-1 flex items-center justify-between border-t border-slate-200 dark:border-slate-700">
               <span className="font-bold">Mould Status:</span>
               <span className={`font-bold ${cvResult?.mould_detected ? 'text-rose-600 dark:text-rose-400 animate-pulse' : 'text-emerald-700 dark:text-emerald-400'}`}>
-                {cvResult?.mould_detected ? `Mould Spores Detected (${cvResult.mould_coverage}%)` : "Clean Epidermal Cuticle"}
+                {cvResult?.mould_detected ? `Mould Spores Detected` : "Clean Cuticle"}
               </span>
             </div>
           </div>

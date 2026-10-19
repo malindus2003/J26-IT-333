@@ -1,84 +1,141 @@
 {
-  "dataset_name": "Fruit Freshness Detection Public Benchmark",
-  "model_version": "v2.2-trained",
-  "evaluated_at": "2026-10-19 12:54:41",
+  "dataset_name": "Fruit Freshness Detection Public Benchmark (Zero-Leakage Ingestion)",
+  "model_version": "v2.3-calibrated",
+  "evaluated_at": "2026-10-19 13:38:59",
   "total_dataset_samples": 3202,
   "train_samples": 2561,
   "val_samples": 320,
   "test_samples": 321,
+  "spoilage_decision_threshold": 0.41,
   "produce_species_classifier": {
-    "model_type": "RandomForestClassifier(n_estimators=150, max_depth=14)",
+    "model_type": "RandomForestClassifier(n_estimators=160, max_depth=14)",
     "classes": [
       "Apple",
       "Banana",
       "Orange"
     ],
-    "test_accuracy": 0.838,
-    "macro_precision": 0.8564,
-    "macro_recall": 0.8277,
-    "macro_f1": 0.8375,
+    "test_accuracy": 0.7539,
+    "macro_precision": 0.7573,
+    "macro_recall": 0.7479,
+    "macro_f1": 0.751,
     "confusion_matrix": [
       [
-        76,
-        15,
-        3
+        70,
+        11,
+        11
       ],
       [
-        5,
-        121,
-        6
+        8,
+        111,
+        23
       ],
       [
         3,
-        20,
-        72
+        23,
+        61
       ]
     ]
   },
-  "freshness_stage_classifier": {
-    "selected_model": "XGBClassifier",
+  "spoilage_classifier": {
+    "model_type": "XGBClassifier(n_estimators=150, max_depth=5)",
     "classes": [
-      "Unripe / Firm",
-      "Ripe / Optimal",
-      "Spoiled / Rotten"
+      "No visible spoilage detected (Fresh/Normal)",
+      "Significant visible spoilage (Rotten)"
     ],
-    "test_accuracy": 0.9626,
-    "macro_precision": 0.9606,
-    "macro_recall": 0.9646,
-    "macro_f1": 0.9621,
+    "test_accuracy": 0.9688,
+    "roc_auc": 0.997,
+    "precision": 0.9041,
+    "recall": 0.9565,
+    "f1": 0.9296,
     "confusion_matrix": [
       [
-        108,
-        2,
+        245,
+        7
+      ],
+      [
+        3,
+        66
+      ]
+    ]
+  },
+  "ripeness_classifier": {
+    "model_type": "RandomForestClassifier(n_estimators=150, max_depth=10)",
+    "classes": [
+      "Unripe",
+      "Ripe / Optimal",
+      "Overripe"
+    ],
+    "test_accuracy": 0.9439,
+    "macro_f1": 0.9203,
+    "confusion_matrix": [
+      [
+        34,
+        5,
+        1
+      ],
+      [
+        1,
+        206,
         5
       ],
       [
         2,
-        114,
-        2
-      ],
-      [
-        0,
-        1,
-        87
+        4,
+        63
       ]
     ]
   },
   "spoilage_regressor": {
-    "model_type": "RandomForestRegressor(n_estimators=150, max_depth=12)",
-    "test_r2_score": 0.9644,
-    "test_rmse_percent": 3.06,
-    "test_mae_percent": 0.92
+    "model_type": "RandomForestRegressor(n_estimators=150, max_depth=10)",
+    "test_r2_score": 0.944,
+    "test_rmse_percent": 7.85,
+    "test_mae_percent": 3.32
+  },
+  "fresh_produce_false_positive_evaluation": {
+    "total_fresh_normal_test_samples": 252,
+    "correct_fresh_predictions": 245,
+    "false_positive_spoilage_predictions": 7,
+    "false_positive_spoilage_rate_percent": 2.78,
+    "total_rotten_test_samples": 69,
+    "correct_rotten_predictions": 66,
+    "false_negative_missed_rot_predictions": 3,
+    "rotten_recall_percent": 95.65,
+    "per_species_breakdown": {
+      "Apple": {
+        "fresh_samples": 78,
+        "false_positives": 2,
+        "false_positive_rate": 2.56,
+        "rotten_samples": 14,
+        "true_positives": 14,
+        "rotten_recall": 100.0
+      },
+      "Banana": {
+        "fresh_samples": 111,
+        "false_positives": 2,
+        "false_positive_rate": 1.8,
+        "rotten_samples": 31,
+        "true_positives": 28,
+        "rotten_recall": 90.32
+      },
+      "Orange": {
+        "fresh_samples": 63,
+        "false_positives": 3,
+        "false_positive_rate": 4.76,
+        "rotten_samples": 24,
+        "true_positives": 24,
+        "rotten_recall": 100.0
+      }
+    }
   },
   "defect_localization_benchmark": {
     "total_ground_truth_boxes_in_dataset": 7087,
-    "test_boxes_evaluated": 135,
-    "mean_iou_percent": 67.81
+    "test_boxes_evaluated": 176,
+    "mean_iou_percent": 38.11
   },
   "inference_latency": {
     "hardware_device": "Intel/AMD x86_64 CPU (No GPU)",
-    "mean_latency_ms": 119.92,
-    "p95_latency_ms": 140.39,
+    "mean_latency_ms": 122.72,
+    "p95_latency_ms": 149.07,
     "meets_cpu_sla": false
   }
 }

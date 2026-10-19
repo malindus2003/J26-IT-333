@@ -1,21 +1,35 @@
 {
-  "model_version": "v2.2-trained",
-  "training_date": "2026-10-19 12:54:41",
+  "model_version": "v2.3-calibrated",
+  "training_date": "2026-10-19 13:38:59",
   "supported_species": [
     "Apple",
     "Banana",
     "Orange"
   ],
   "fallback_species": "Unknown / Unsupported Produce",
-  "rejection_confidence_threshold": 48.0,
-  "uncertain_margin_threshold": 0.12,
-  "feature_dimension": 36,
-  "stage_labels": {
-    "0": "Unripe / Firm",
-    "1": "Ripe / Optimal",
-    "2": "Overripe / Softening",
-    "3": "Spoiled / Rotten"
-  },
+  "rejection_confidence_threshold": 50.0,
+  "calibrated_spoilage_threshold": 0.41,
+  "feature_dimension": 42,
+  "ripeness_stages": [
+    "Unripe",
+    "Ripe / Optimal",
+    "Overripe",
+    "Unknown"
+  ],
+  "spoilage_categories": [
+    "No visible spoilage detected",
+    "Localized visible defect",
+    "Significant visible spoilage",
+    "Uncertain"
+  ],
+  "defect_types": [
+    "None",
+    "Brown spots",
+    "Bruising",
+    "Discoloration",
+    "Visible mould",
+    "Necrotic lesions"
+  ],
   "species_metadata": {
     "Apple": {
       "icon": "\ud83c\udf4e",

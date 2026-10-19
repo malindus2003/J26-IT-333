@@ -1,85 +1,123 @@
 """
-GreenPulse Computer Vision Inference Engine (v2.2-trained)
+GreenPulse Computer Vision Inference Engine (v2.3-calibrated)
 Project: J26-IT-333 (AI + IoT-Based Smart Restaurant Management System)
 Component 3: AI-Based Multi-Modal Food Spoilage Prediction & Quality Assessment
 Author: Maddumage M. S. (IT23348820)
 
 Multi-stage CPU-optimized inference pipeline backed by genuine machine learning models:
-1. Multi-domain Visual Feature Extractor (36 features)
+1. Multi-Domain Visual Feature Extractor (42-dimensional foreground features)
 2. Produce Species Identifier with Rejection Threshold (Apple, Banana, Orange, fallback Unknown)
-3. Freshness & Spoilage Classifier (Unripe, Ripe/Optimal, Overripe, Spoiled/Rotten, Uncertain)
-4. Continuous Defect Severity Regressor (0-100%)
-5. Multi-Cue Defect Contour Localization (Bounding Boxes with severity & area)
-6. Scientifically Grounded Remaining Shelf-Life (RSL) with 90% Prediction Intervals
+3. Calibrated Visible Spoilage Classifier (Fresh/Normal vs Spoilage, with calibrated threshold T=0.41)
+4. Ripeness Stage Classifier (Unripe, Ripe / Optimal, Overripe)
+5. Continuous Defect Severity Regressor (Physically grounded 0-100%)
+6. Defect Localization & Bounding Boxes (Zero false-positive defect boxes on fresh produce)
+7. Scientifically Grounded Remaining Shelf-Life (RSL) with 90% Prediction Intervals
+8. Structured Diagnostic Logging for Auditing and Quality Assurance
 """
 
 import io
 import os
+import sys
 import time
 import uuid
 import json
+import hashlib
+import logging
 import joblib
 import numpy as np
 import cv2
 from PIL import Image
 from typing import Dict, Any, Tuple, List, Optional
 
-from ..data.prepare_cv_dataset import (
+# Ensure project root is in sys.path
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
+
+from backend.app.data.prepare_cv_dataset import (
     extract_multi_domain_features,
+    segment_produce_foreground,
     SUPPORTED_SPECIES,
     FALLBACK_SPECIES,
-    STAGE_NAME_MAP
+    RIPENESS_STAGES,
+    SPOILAGE_CATEGORIES,
+    DEFECT_TYPES
 )
-from .train_cv_models import (
-    segment_produce_foreground,
-    PRODUCE_INFO
-)
+from backend.app.models.train_cv_models import PRODUCE_INFO
+
+# Configure structured diagnostic logger
+logger = logging.getLogger("GreenPulseVisionEngine")
+if not logger.handlers:
+    ch = logging.StreamHandler(sys.stdout)
+    formatter = logging.Formatter("[%(asctime)s] %(levelname)s %(name)s: %(message)s")
+    ch.setFormatter(formatter)
+    logger.addHandler(ch)
+logger.setLevel(logging.INFO)
+
 
 class FoodQualityVisionEngine:
     """
-    Production Computer Vision Engine for Produce Identification,
-    Defect Localization, Freshness Assessment, and Remaining Shelf-Life Estimation.
+    Production Computer Vision Engine with Decoupled Architecture:
+    - Produce Species Identification
+    - Ripeness Stage Assessment
+    - Visible Spoilage Classification (Calibrated)
+    - Defect Type Localization
+    - Remaining Shelf-Life Estimation with Prediction Intervals
     """
 
-    STAGE_NAMES = {
+    # Backward compatibility stage names
+    LEGACY_STAGE_NAMES = {
         0: "Unripe / Firm (Grade A)",
         1: "Ripe / Optimal (Grade B)",
         2: "Overripe / Softening (Use Today)",
         3: "Spoiled / Rotten (Grade F)"
     }
 
-    CONTIGUOUS_TO_STAGE = {0: 0, 1: 1, 2: 3}
-
     def __init__(self):
         self.models_loaded = False
-        self.produce_classifier = None
-        self.stage_classifier = None
-        self.spoilage_regressor = None
+        self.species_classifier = None
+        self.spoilage_classifier = None
+        self.ripeness_classifier = None
+        self.ripeness_regressor = None
         self.feature_scaler = None
         self.produce_metadata = {}
         self.real_metrics = {}
+
+        # Backward compatibility aliases
+        self.produce_classifier = None
+        self.stage_classifier = None
+        self.spoilage_regressor = None
+
         self.load_trained_cv_models()
 
     def load_trained_cv_models(self):
+        """Loads all calibrated model artifacts from backend/app/models/saved_models."""
         try:
             base_dir = os.path.dirname(os.path.abspath(__file__))
             saved_models_dir = os.path.join(base_dir, "saved_models")
 
             species_path = os.path.join(saved_models_dir, "produce_species_classifier.joblib")
-            stage_path = os.path.join(saved_models_dir, "cv_spoilage_classifier.joblib")
+            spoilage_path = os.path.join(saved_models_dir, "cv_spoilage_classifier.joblib")
+            ripeness_path = os.path.join(saved_models_dir, "cv_ripeness_classifier.joblib")
             reg_path = os.path.join(saved_models_dir, "cv_ripeness_regressor.joblib")
             scaler_path = os.path.join(saved_models_dir, "cv_feature_scaler.joblib")
             meta_path = os.path.join(saved_models_dir, "produce_metadata.json")
             metrics_path = os.path.join(saved_models_dir, "cv_real_metrics.json")
 
             if os.path.exists(species_path):
-                self.produce_classifier = joblib.load(species_path)
+                self.species_classifier = joblib.load(species_path)
+                self.produce_classifier = self.species_classifier
 
-            if os.path.exists(stage_path):
-                self.stage_classifier = joblib.load(stage_path)
+            if os.path.exists(spoilage_path):
+                self.spoilage_classifier = joblib.load(spoilage_path)
+                self.stage_classifier = self.spoilage_classifier
+
+            if os.path.exists(ripeness_path):
+                self.ripeness_classifier = joblib.load(ripeness_path)
 
             if os.path.exists(reg_path):
-                self.spoilage_regressor = joblib.load(reg_path)
+                self.ripeness_regressor = joblib.load(reg_path)
+                self.spoilage_regressor = self.ripeness_regressor
 
             if os.path.exists(scaler_path):
                 self.feature_scaler = joblib.load(scaler_path)
@@ -92,22 +130,24 @@ class FoodQualityVisionEngine:
                 with open(metrics_path, "r", encoding="utf-8") as f:
                     self.real_metrics = json.load(f)
 
-            if self.produce_classifier and self.stage_classifier and self.spoilage_regressor:
+            if (self.species_classifier and self.spoilage_classifier and 
+                self.ripeness_classifier and self.ripeness_regressor):
                 self.models_loaded = True
-                print(f"[FoodQualityVisionEngine] Successfully loaded v2.2 trained models from {saved_models_dir}")
+                logger.info(f"Successfully loaded v2.3 calibrated CV models from {saved_models_dir}")
             else:
-                print("[FoodQualityVisionEngine] One or more trained models missing; will use heuristic fallbacks.")
+                logger.warning("One or more trained models missing from saved_models directory.")
         except Exception as e:
-            print(f"[FoodQualityVisionEngine] Error loading models: {e}")
+            logger.error(f"Error loading models: {e}")
             self.models_loaded = False
 
     def analyze_image(self, image_bytes: bytes, category: str = "Fruits") -> Dict[str, Any]:
         """
         Executes end-to-end multi-stage inference on an uploaded or camera-captured image.
-        Returns detailed diagnostics with calibrated confidence, defect localization, and RSL.
+        Returns decoupled classifications, legacy fields, and structured diagnostics.
         """
         t_start = time.perf_counter()
         analysis_id = f"CV-SCAN-{int(time.time())}-{uuid.uuid4().hex[:6]}"
+        img_hash = hashlib.md5(image_bytes).hexdigest()[:12] if image_bytes else "unknown"
 
         try:
             nparr = np.frombuffer(image_bytes, np.uint8)
@@ -116,218 +156,371 @@ class FoodQualityVisionEngine:
                 pil_img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
                 img_bgr = cv2.cvtColor(np.array(pil_img), cv2.COLOR_RGB2BGR)
         except Exception:
-            return self._default_features(category, analysis_id)
+            return self._default_features(category, analysis_id, img_hash)
 
         orig_h, orig_w = img_bgr.shape[:2]
-        img_resized = cv2.resize(img_bgr, (256, 256))
+        img_resized, fg_mask, fg_pixels = segment_produce_foreground(img_bgr, target_size=(256, 256))
         rgb = cv2.cvtColor(img_resized, cv2.COLOR_BGR2RGB)
         gray = cv2.cvtColor(img_resized, cv2.COLOR_BGR2GRAY)
 
-        # 1. Multi-Cue Foreground Produce Segmentation
-        mask, primary_contour, fg_pixels, _ = segment_produce_foreground(img_bgr)
-
-        # 2. Extract 36-dimensional multi-domain feature vector
+        # Extract 42-dimensional multi-domain visual feature vector
         feat_vec = extract_multi_domain_features(img_bgr)
-        r_mean, g_mean, b_mean = float(feat_vec[0]), float(feat_vec[2]), float(feat_vec[4])
-        avg_brightness = float(feat_vec[10]) # V mean
-        browning_percent = round(float(feat_vec[18]), 2)
-        green_ratio = round(float(feat_vec[19]), 2)
-        carotenoid_ratio = round(float(feat_vec[20]), 2)
-        mould_coverage = round(float(feat_vec[22]), 2)
-        mould_detected = mould_coverage >= 2.0
-        texture_degradation = min(100.0, round(float(feat_vec[25] * 2.2), 1))
-
         x_input = feat_vec.reshape(1, -1)
 
-        # 3. Stage 1: Produce Species Identification with Rejection Threshold
+        browning_percent = round(float(feat_vec[18]), 2)
+        mould_coverage = round(float(feat_vec[22]), 2)
+        texture_degradation = min(100.0, round(float(feat_vec[25] * 2.2), 1))
+        defect_area_pct = round(float(feat_vec[39]), 2)
+
+        # -------------------------------------------------------------
+        # STAGE 1: PRODUCE SPECIES IDENTIFICATION
+        # -------------------------------------------------------------
         supported_species = self.produce_metadata.get("supported_species", SUPPORTED_SPECIES)
         identified_produce = "Produce"
         is_supported_produce = True
         produce_confidence = 85.0
         alternative_predictions = []
-        rejection_threshold = self.produce_metadata.get("rejection_confidence_threshold", 48.0)
+        species_probs_dict = {}
+        rejection_threshold = self.produce_metadata.get("rejection_confidence_threshold", 50.0)
 
-        if self.produce_classifier:
+        if self.species_classifier:
             try:
-                probs = self.produce_classifier.predict_proba(x_input)[0]
-                best_idx = int(np.argmax(probs))
-                max_prob = float(probs[best_idx])
-                conf_pct = round(max_prob * 100.0, 1)
+                s_probs = self.species_classifier.predict_proba(x_input)[0]
+                best_s_idx = int(np.argmax(s_probs))
+                max_s_prob = float(s_probs[best_s_idx])
+                conf_pct = round(max_s_prob * 100.0, 1)
 
-                # Build ranked alternatives
-                sorted_indices = np.argsort(probs)[::-1]
+                for idx, p in enumerate(s_probs):
+                    if idx < len(supported_species):
+                        species_probs_dict[supported_species[idx]] = round(float(p) * 100.0, 1)
+
+                sorted_indices = np.argsort(s_probs)[::-1]
                 for idx in sorted_indices:
                     if idx < len(supported_species):
                         alternative_predictions.append({
                             "produce": supported_species[idx],
-                            "confidence": round(float(probs[idx]) * 100.0, 1)
+                            "confidence": round(float(s_probs[idx]) * 100.0, 1)
                         })
 
-                if conf_pct < rejection_threshold:
+                margin = float(s_probs[sorted_indices[0]] - s_probs[sorted_indices[1]]) if len(sorted_indices) > 1 else 1.0
+
+                # Physiological Out-of-Distribution Rejection:
+                # 1. Below confidence threshold (50%)
+                # 2. Ambiguous margin (< 8%)
+                # 3. Achromatic / flat non-produce (S_mean < 12.0 or Laplacian var < 1.0 or FG coverage < 3.0%)
+                is_non_produce = (feat_vec[8] < 12.0) or (feat_vec[29] < 1.0) or (feat_vec[40] < 3.0)
+
+                if conf_pct < rejection_threshold or margin < 0.08 or is_non_produce:
                     identified_produce = FALLBACK_SPECIES
                     is_supported_produce = False
-                    produce_confidence = conf_pct
+                    produce_confidence = round(conf_pct * 0.5, 1) if is_non_produce else conf_pct
                 else:
-                    identified_produce = supported_species[best_idx]
+                    identified_produce = supported_species[best_s_idx]
                     produce_confidence = conf_pct
             except Exception as e:
-                print(f"[FoodQualityVisionEngine] Species inference error: {e}")
+                logger.error(f"Species inference error: {e}")
 
-        # Retrieve metadata for identified species
-        info = PRODUCE_INFO.get(identified_produce, {})
-        if not info and identified_produce in ["Apple", "Banana", "Orange"]:
+        # Retrieve metadata for species
+        species_meta = self.produce_metadata.get("species_metadata", {}).get(identified_produce, {})
+        if not species_meta:
             info_key_map = {"Apple": "Fresh Apple", "Banana": "Embul Banana (Ambul Kesel)", "Orange": "Orange / Citrus"}
-            info = PRODUCE_INFO.get(info_key_map.get(identified_produce, ""), {})
+            species_meta = PRODUCE_INFO.get(info_key_map.get(identified_produce, ""), {})
 
-        produce_icon = info.get("icon", "🍎" if is_supported_produce else "❓")
-        scientific_name = info.get("scientific", "")
-        baseline_shelf_life = info.get("shelf_life", 168.0 if is_supported_produce else 72.0)
-        detected_category = info.get("category", category)
+        produce_icon = species_meta.get("icon", "🍎" if is_supported_produce else "❓")
+        scientific_name = species_meta.get("scientific", "")
+        baseline_shelf_life = float(species_meta.get("shelf_life_hours", species_meta.get("shelf_life", 168.0 if is_supported_produce else 72.0)))
+        detected_category = species_meta.get("category", category)
 
-        # 4. Stage 2: Freshness & Spoilage Stage Classification
-        stage_probs_dict = {"Unripe / Firm": 0.0, "Ripe / Optimal": 0.0, "Spoiled / Rotten": 0.0}
-        ripeness_stage = "Ripe / Optimal (Grade B)"
+        # -------------------------------------------------------------
+        # STAGE 2: VISIBLE SPOILAGE CLASSIFICATION (Calibrated)
+        # -------------------------------------------------------------
+        calibrated_thresh = float(self.produce_metadata.get("calibrated_spoilage_threshold", 0.41))
+        spoil_prob = 0.0
+        visible_spoilage_category = "No visible spoilage detected"
         risk_level = "Low"
-        is_uncertain = False
+        is_spoilage_uncertain = False
 
-        if self.stage_classifier:
+        if self.spoilage_classifier:
             try:
-                s_probs = self.stage_classifier.predict_proba(x_input)[0]
-                # Classes correspond to contiguous 0: Unripe, 1: Ripe/Optimal, 2: Spoiled
-                p_unripe = float(s_probs[0])
-                p_optimal = float(s_probs[1]) if len(s_probs) > 1 else 0.0
-                p_spoiled = float(s_probs[2]) if len(s_probs) > 2 else 0.0
+                spoil_probs = self.spoilage_classifier.predict_proba(x_input)[0]
+                spoil_prob = float(spoil_probs[1]) if len(spoil_probs) > 1 else float(spoil_probs[0])
 
+                # Evidence-based Decision Policy:
+                # 1. Spoilage Probability < Calibrated Threshold: No visible spoilage
+                if spoil_prob < calibrated_thresh:
+                    visible_spoilage_category = "No visible spoilage detected"
+                    risk_level = "Low"
+                # 2. Borderline / Low-Confidence Region: Uncertain
+                elif abs(spoil_prob - calibrated_thresh) < 0.04 and defect_area_pct < 5.0:
+                    visible_spoilage_category = "Uncertain"
+                    risk_level = "Medium"
+                    is_spoilage_uncertain = True
+                # 3. Localized Defect (< 10% defect area and prob < 0.70)
+                elif spoil_prob < 0.70 and defect_area_pct < 10.0:
+                    visible_spoilage_category = "Localized visible defect"
+                    risk_level = "Medium"
+                # 4. Significant Spoilage
+                else:
+                    visible_spoilage_category = "Significant visible spoilage"
+                    risk_level = "Critical"
+            except Exception as e:
+                logger.error(f"Spoilage classifier inference error: {e}")
+
+        # -------------------------------------------------------------
+        # STAGE 3: RIPENESS STAGE CLASSIFICATION (Decoupled)
+        # -------------------------------------------------------------
+        ripeness_category = "Ripe / Optimal"
+        ripeness_stage_legacy = "Ripe / Optimal (Grade B)"
+        stage_probs_dict = {"Unripe / Firm": 0.0, "Ripe / Optimal": 100.0, "Spoiled / Rotten": 0.0}
+        p_unripe, p_optimal, p_overripe = 0.05, 0.90, 0.05
+
+        if self.ripeness_classifier:
+            try:
+                r_probs = self.ripeness_classifier.predict_proba(x_input)[0]
+                p_unripe = float(r_probs[0])
+                p_optimal = float(r_probs[1]) if len(r_probs) > 1 else 0.0
+                p_overripe = float(r_probs[2]) if len(r_probs) > 2 else 0.0
+
+                if not is_supported_produce and max(r_probs) < 0.45:
+                    ripeness_category = "Unknown"
+                    ripeness_stage_legacy = "Uncertain"
+                else:
+                    best_r_idx = int(np.argmax(r_probs))
+                    if best_r_idx == 0:
+                        ripeness_category = "Unripe"
+                        ripeness_stage_legacy = self.LEGACY_STAGE_NAMES[0]
+                    elif best_r_idx == 1:
+                        ripeness_category = "Ripe / Optimal"
+                        ripeness_stage_legacy = self.LEGACY_STAGE_NAMES[1]
+                    else:
+                        ripeness_category = "Overripe"
+                        ripeness_stage_legacy = self.LEGACY_STAGE_NAMES[2]
+
+                # Map legacy stage probabilities
                 stage_probs_dict = {
                     "Unripe / Firm": round(p_unripe * 100.0, 1),
                     "Ripe / Optimal": round(p_optimal * 100.0, 1),
-                    "Spoiled / Rotten": round(p_spoiled * 100.0, 1)
+                    "Spoiled / Rotten": round(spoil_prob * 100.0, 1)
                 }
-
-                sorted_s = np.sort(s_probs)[::-1]
-                top_prob = float(sorted_s[0])
-                margin = float(sorted_s[0] - sorted_s[1]) if len(sorted_s) > 1 else 1.0
-
-                if margin < 0.12 or top_prob < 0.40:
-                    ripeness_stage = "Uncertain (Borderline Transition)"
-                    is_uncertain = True
-                    risk_level = "Medium"
-                else:
-                    best_stage_idx = int(np.argmax(s_probs))
-                    if best_stage_idx == 2 or mould_detected:
-                        ripeness_stage = self.STAGE_NAMES[3]
-                        risk_level = "Critical"
-                    elif best_stage_idx == 0:
-                        ripeness_stage = self.STAGE_NAMES[0]
-                        risk_level = "Low"
-                    else:
-                        # Check physiological signs of overripeness (senescence softening)
-                        if (browning_percent >= 14.0 or texture_degradation >= 35.0) and not mould_detected:
-                            ripeness_stage = self.STAGE_NAMES[2] # Overripe / Softening
-                            risk_level = "High"
-                        else:
-                            ripeness_stage = self.STAGE_NAMES[1] # Ripe / Optimal
-                            risk_level = "Low"
             except Exception as e:
-                print(f"[FoodQualityVisionEngine] Stage inference error: {e}")
+                logger.error(f"Ripeness inference error: {e}")
 
-        # 5. Stage 3: Continuous Spoilage Regressor
-        if self.spoilage_regressor:
-            try:
-                reg_val = float(self.spoilage_regressor.predict(x_input)[0])
-                visual_score = round(float(np.clip(reg_val, 2.0, 98.0)), 1)
-            except Exception:
-                visual_score = round(float(np.clip(browning_percent * 1.6 + mould_coverage * 4.5, 5.0, 95.0)), 1)
+        # Backward compatibility override for legacy dashboard widgets:
+        # If significant visible spoilage is detected, legacy stage shows Grade F
+        if visible_spoilage_category == "Significant visible spoilage":
+            ripeness_stage_legacy = self.LEGACY_STAGE_NAMES[3]
+            risk_level = "Critical"
+
+        # -------------------------------------------------------------
+        # STAGE 4: DEFECT TYPE IDENTIFICATION
+        # -------------------------------------------------------------
+        detected_defect_types = []
+        mould_detected = False
+
+        if visible_spoilage_category == "No visible spoilage detected":
+            detected_defect_types = ["None"]
+            mould_detected = False
         else:
-            visual_score = round(float(np.clip(browning_percent * 1.6 + mould_coverage * 4.5, 5.0, 95.0)), 1)
+            mould_ratio = float(feat_vec[22])
+            necrotic_ratio = float(feat_vec[23])
+            browning_ratio = float(feat_vec[18])
 
-        # Ripeness index percentage (100% = harvest peak prime, decaying towards 0%)
-        ripeness_percent = round(max(2.0, min(98.0, 100.0 - visual_score)), 1)
-        if "Unripe" in ripeness_stage:
-            ripeness_percent = max(88.0, ripeness_percent)
-        elif "Spoiled" in ripeness_stage:
-            ripeness_percent = min(15.0, ripeness_percent)
-            visual_score = max(82.0, visual_score)
+            # Mould detection requires both high foreground mould ratio and model spoilage probability
+            if mould_ratio >= 0.04 and spoil_prob >= calibrated_thresh:
+                detected_defect_types.append("Visible mould")
+                mould_detected = True
 
-        # 6. Stage 4: Remaining Shelf-Life (RSL) & 90% Prediction Interval
-        decay_factor = max(0.0, (100.0 - visual_score) / 100.0)
-        remaining_shelf_life = round(baseline_shelf_life * (decay_factor ** 1.3), 1)
+            if necrotic_ratio >= 0.04:
+                detected_defect_types.append("Necrotic lesions")
 
-        # Food Safety Boundary Constraints
-        if visual_score >= 78.0 or mould_detected or "Spoiled" in ripeness_stage or risk_level == "Critical":
+            if browning_ratio >= 0.12:
+                detected_defect_types.append("Brown spots")
+
+            if float(feat_vec[38]) < 0.40: # Low peel uniformity
+                detected_defect_types.append("Discoloration")
+
+            if not detected_defect_types:
+                detected_defect_types.append("Discoloration")
+
+        # -------------------------------------------------------------
+        # STAGE 5: GROUNDED CONTINUOUS SPOILAGE REGRESSOR
+        # -------------------------------------------------------------
+        visual_score = 10.0
+        if self.ripeness_regressor:
+            try:
+                reg_pred = float(self.ripeness_regressor.predict(x_input)[0])
+                if visible_spoilage_category == "No visible spoilage detected":
+                    # Clean produce cannot exceed 22% spoilage score
+                    visual_score = round(float(np.clip(reg_pred, 2.0, 22.0)), 1)
+                elif visible_spoilage_category == "Localized visible defect":
+                    visual_score = round(float(np.clip(reg_pred, 25.0, 58.0)), 1)
+                elif visible_spoilage_category == "Significant visible spoilage":
+                    visual_score = round(float(np.clip(reg_pred, 68.0, 98.0)), 1)
+                else: # Uncertain
+                    visual_score = round(float(np.clip(reg_pred, 20.0, 48.0)), 1)
+            except Exception:
+                visual_score = 10.0 if visible_spoilage_category == "No visible spoilage detected" else 75.0
+        else:
+            visual_score = 10.0 if visible_spoilage_category == "No visible spoilage detected" else 75.0
+
+        ripeness_percent = round(float(np.clip(100.0 - visual_score, 2.0, 98.0)), 1)
+
+        # -------------------------------------------------------------
+        # STAGE 6: REMAINING SHELF-LIFE (RSL) & PREDICTION INTERVALS
+        # -------------------------------------------------------------
+        decay_factor = max(0.05, (100.0 - visual_score) / 100.0)
+
+        if visible_spoilage_category == "Significant visible spoilage" or risk_level == "Critical":
+            # Immediate Quarantine & Food Safety Boundary
             remaining_shelf_life = 0.0
             rsl_min = 0.0
             rsl_max = 0.0
-            rsl_interval_str = "0.0 hrs (Quarantine Required)"
-        elif "Overripe" in ripeness_stage or risk_level == "High":
-            # Overripe produce must be consumed or diverted today (maximum 24h)
-            remaining_shelf_life = round(min(remaining_shelf_life, 24.0), 1)
+            rsl_interval_str = "0.0 hrs (Quarantine / Discard Required)"
+        elif visible_spoilage_category == "Localized visible defect":
+            # Localized defect: shelf life is discounted proportionally, not zeroed
+            discounted_baseline = baseline_shelf_life * 0.30
+            remaining_shelf_life = round(min(36.0, discounted_baseline * decay_factor), 1)
             remaining_shelf_life = max(2.0, remaining_shelf_life)
-            sigma = 0.15 * remaining_shelf_life
+            sigma = 0.20 * remaining_shelf_life
             rsl_min = max(0.0, round(remaining_shelf_life - 1.645 * sigma, 1))
             rsl_max = round(remaining_shelf_life + 1.645 * sigma, 1)
-            rsl_interval_str = f"{rsl_min} - {rsl_max} hrs [90% CI]"
+            rsl_interval_str = f"{rsl_min} - {rsl_max} hrs [90% CI] (Trim / Process Soon)"
         else:
-            sigma = 0.15 * remaining_shelf_life
+            # Fresh / Normal produce: RSL depends on species baseline and ripeness
+            if ripeness_category == "Unripe":
+                remaining_shelf_life = round(baseline_shelf_life * 1.25 * (decay_factor ** 1.1), 1)
+            elif ripeness_category == "Overripe":
+                # Overripe produce has short shelf-life (max 24h)
+                remaining_shelf_life = round(min(24.0, baseline_shelf_life * 0.18 * decay_factor), 1)
+                remaining_shelf_life = max(4.0, remaining_shelf_life)
+            else: # Ripe / Optimal
+                remaining_shelf_life = round(baseline_shelf_life * (decay_factor ** 1.1), 1)
+
+            sigma = 0.12 * remaining_shelf_life
             rsl_min = max(0.0, round(remaining_shelf_life - 1.645 * sigma, 1))
             rsl_max = round(remaining_shelf_life + 1.645 * sigma, 1)
             rsl_interval_str = f"{rsl_min} - {rsl_max} hrs [90% CI]"
 
-        # 7. Stage 5: Multi-Cue Defect Localization & Bounding Boxes
-        bounding_boxes, detected_defects, defect_area_pct = self._extract_defect_contours(
-            img_resized, rgb, gray, mask, primary_contour, mould_detected, browning_percent, texture_degradation, ripeness_stage, identified_produce
+        # -------------------------------------------------------------
+        # STAGE 7: DEFECT LOCALIZATION & BOUNDING BOXES
+        # -------------------------------------------------------------
+        bounding_boxes, detected_defects_text, final_defect_area_pct = self._extract_defect_contours(
+            img_resized, rgb, gray, fg_mask, visible_spoilage_category, mould_detected, 
+            browning_percent, texture_degradation, identified_produce
         )
 
         latency_ms = round((time.perf_counter() - t_start) * 1000.0, 1)
 
+        # -------------------------------------------------------------
+        # STAGE 8: STRUCTURED DIAGNOSTIC LOGGING
+        # -------------------------------------------------------------
+        diagnostic_log = {
+            "image_hash": img_hash,
+            "preprocessing": {
+                "target_size": [256, 256],
+                "color_spaces": ["RGB", "HSV", "Lab"],
+                "foreground_segmented": True,
+                "foreground_pixels": int(fg_pixels)
+            },
+            "feature_dimensions": len(feat_vec),
+            "model_version": self.produce_metadata.get("model_version", "v2.3-calibrated"),
+            "species_probabilities": species_probs_dict,
+            "spoilage_probability": round(spoil_prob * 100.0, 2),
+            "calibrated_threshold": round(calibrated_thresh * 100.0, 2),
+            "ripeness_probabilities": {
+                "Unripe": round(p_unripe * 100.0, 1),
+                "Ripe / Optimal": round(p_optimal * 100.0, 1),
+                "Overripe": round(p_overripe * 100.0, 1)
+            },
+            "defect_types": detected_defect_types,
+            "defect_area_pct": final_defect_area_pct,
+            "spoilage_score": visual_score,
+            "lifecycle_stage": ripeness_category,
+            "final_decision": {
+                "species": identified_produce,
+                "ripeness": ripeness_category,
+                "visible_spoilage": visible_spoilage_category,
+                "rsl_hours": remaining_shelf_life
+            }
+        }
+
+        logger.info(
+            f"[CV Diagnostics] hash={img_hash} species={identified_produce} ({produce_confidence}%) "
+            f"ripeness={ripeness_category} spoilage={visible_spoilage_category} (p={spoil_prob:.3f}, T={calibrated_thresh:.2f}) "
+            f"RSL={remaining_shelf_life}h"
+        )
+
         return {
             "analysis_id": analysis_id,
             "timestamp": time.strftime("%Y-%m-%dT%H:%M:%S"),
-            "model_version": self.produce_metadata.get("model_version", "v2.2-trained"),
+            "model_version": self.produce_metadata.get("model_version", "v2.3-calibrated"),
+            "image_hash": img_hash,
+
+            # Decoupled Core Fields
+            "species_identity": identified_produce,
             "identified_produce": identified_produce,
             "is_supported_produce": is_supported_produce,
             "produce_confidence": produce_confidence,
             "alternative_predictions": alternative_predictions,
-            "produce_icon": produce_icon,
-            "scientific_name": scientific_name,
-            "category": detected_category,
-            "baseline_shelf_life_hours": baseline_shelf_life,
+            "species_probabilities": species_probs_dict,
+
+            "ripeness_classification": ripeness_category,
+            "ripeness_stage": ripeness_stage_legacy, # Legacy composite name
+            "is_uncertain": is_spoilage_uncertain,
+            "stage_probabilities": stage_probs_dict,
+            "ripeness_percent": ripeness_percent,
+
+            "visible_spoilage_classification": visible_spoilage_category,
+            "spoilage_probability": round(spoil_prob * 100.0, 2),
+            "calibrated_threshold": round(calibrated_thresh * 100.0, 2),
+            "visual_spoilage_score": visual_score,
+            "risk_level": risk_level,
+
+            "defect_types": detected_defect_types,
+            "detected_defects": detected_defects_text,
+            "defect_surface_area_percent": final_defect_area_pct,
+            "mould_detected": mould_detected,
+            "mould_coverage": mould_coverage,
+            "discoloration_score": browning_percent,
+            "texture_degradation": texture_degradation,
+
             "remaining_shelf_life_hours": remaining_shelf_life,
+            "baseline_shelf_life_hours": baseline_shelf_life,
             "rsl_min_hours": rsl_min,
             "rsl_max_hours": rsl_max,
             "rsl_confidence_interval": rsl_interval_str,
-            "ripeness_stage": ripeness_stage,
-            "is_uncertain": is_uncertain,
-            "stage_probabilities": stage_probs_dict,
-            "ripeness_percent": ripeness_percent,
-            "visual_spoilage_score": visual_score,
-            "risk_level": risk_level,
-            "discoloration_score": browning_percent,
-            "mould_detected": mould_detected,
-            "mould_coverage": mould_coverage,
-            "texture_degradation": texture_degradation,
-            "defect_surface_area_percent": defect_area_pct,
-            "detected_defects": detected_defects,
+
+            "produce_icon": produce_icon,
+            "scientific_name": scientific_name,
+            "category": detected_category,
             "bounding_boxes": bounding_boxes,
             "image_width": orig_w,
             "image_height": orig_h,
             "processing_latency_ms": latency_ms,
+            "diagnostic_log": diagnostic_log,
             "scientific_disclaimer": "RSL prediction intervals reflect postharvest biological decay models. Visual sensors assess exterior tissue only; comply with HACCP food safety standards."
         }
 
     def _extract_defect_contours(
-        self, img_resized, rgb, gray, produce_mask, primary_contour, mould_detected, browning_percent, texture, ripeness_stage, produce_name
+        self, img_resized: np.ndarray, rgb: np.ndarray, gray: np.ndarray, fg_mask: np.ndarray,
+        visible_spoilage_category: str, mould_detected: bool, browning_percent: float, 
+        texture: float, produce_name: str
     ) -> Tuple[List[Dict[str, Any]], List[str], float]:
+        """
+        Localizes produce boundary and defects.
+        CRITICAL: Never draws red defect or mould boxes on fresh produce.
+        """
         boxes = []
         defects = []
-        hsv = cv2.cvtColor(img_resized, cv2.COLOR_BGR2HSV)
         total_pixels = 256.0 * 256.0
         total_defect_pixels = 0
 
-        # 1. Produce Object Localization Box (Identified Produce)
-        if primary_contour is not None and len(primary_contour) >= 4:
-            px, py, pw, ph = cv2.boundingRect(primary_contour)
-            if pw < 248 or ph < 248: # Exclude full background
+        # 1. Produce Object Bounding Box
+        contours, _ = cv2.findContours(fg_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        if contours:
+            primary_c = max(contours, key=cv2.contourArea)
+            px, py, pw, ph = cv2.boundingRect(primary_c)
+            if pw < 250 or ph < 250:
                 boxes.append({
                     "label": f"IDENTIFIED: {produce_name.upper()}",
                     "type": "produce_object",
@@ -340,77 +533,74 @@ class FoodQualityVisionEngine:
                     "area_percent": round((pw * ph) / total_pixels * 100.0, 1)
                 })
 
-        # 2. Mould Contours (STRICTLY inside produce_mask)
-        is_chlorophyll = (hsv[:, :, 0] >= 32) & (hsv[:, :, 0] <= 88) & (hsv[:, :, 1] >= 28)
-        raw_mould_mask = ((hsv[:, :, 1] < 28) & (hsv[:, :, 2] > 195) & (~is_chlorophyll) & (gray > 190))
-        mould_mask = (raw_mould_mask & (produce_mask > 0)).astype(np.uint8) * 255
-        
-        # Border suppression
-        mould_mask[:10, :] = 0
-        mould_mask[-10:, :] = 0
-        mould_mask[:, :10] = 0
-        mould_mask[:, -10:] = 0
+        # 2. Defect Contours (ONLY if visible spoilage was detected by classifier)
+        if visible_spoilage_category in ["Localized visible defect", "Significant visible spoilage"]:
+            hsv = cv2.cvtColor(img_resized, cv2.COLOR_BGR2HSV)
+            is_chlorophyll = (hsv[:, :, 0] >= 32) & (hsv[:, :, 0] <= 88) & (hsv[:, :, 1] >= 28)
 
-        if mould_detected:
-            contours_m, _ = cv2.findContours(mould_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-            for cnt in contours_m:
+            # Mould Contours
+            if mould_detected:
+                raw_mould = (hsv[:, :, 1] < 28) & (hsv[:, :, 2] > 195) & (~is_chlorophyll) & (gray > 190)
+                mould_mask = (raw_mould & (fg_mask > 0)).astype(np.uint8) * 255
+                mould_mask[:10, :] = 0
+                mould_mask[-10:, :] = 0
+                mould_mask[:, :10] = 0
+                mould_mask[:, -10:] = 0
+
+                cnts_m, _ = cv2.findContours(mould_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+                for cnt in cnts_m:
+                    area = cv2.contourArea(cnt)
+                    if area > 100:
+                        total_defect_pixels += area
+                        x, y, w, h = cv2.boundingRect(cnt)
+                        if w < 225 and h < 225:
+                            boxes.append({
+                                "label": "MOULD SPORE COLONY",
+                                "type": "spoilage",
+                                "x": int(x * 100 / 256),
+                                "y": int(y * 100 / 256),
+                                "width": int(w * 100 / 256),
+                                "height": int(h * 100 / 256),
+                                "color": "#ef4444",
+                                "severity": "critical",
+                                "area_percent": round(area / total_pixels * 100.0, 2)
+                            })
+                defects.append("Fungal Mycelium / Mould Colony Detected")
+
+            # Necrotic / Browning Contours
+            raw_brown = (
+                (((rgb[:, :, 0] < 120) & (rgb[:, :, 1] < 100) & (rgb[:, :, 2] < 75) & (gray < 95)) |
+                 ((rgb[:, :, 0] > 70) & (rgb[:, :, 0] < 180) & (rgb[:, :, 1] > 40) & (rgb[:, :, 1] < 130) & (rgb[:, :, 2] < 80)))
+                & (~is_chlorophyll)
+            )
+            brown_mask = (raw_brown & (fg_mask > 0)).astype(np.uint8) * 255
+            cnts_b, _ = cv2.findContours(brown_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            sorted_b = sorted(cnts_b, key=cv2.contourArea, reverse=True)
+
+            for cnt in sorted_b[:3]:
                 area = cv2.contourArea(cnt)
-                if area > 100:
+                if area > 120:
                     total_defect_pixels += area
                     x, y, w, h = cv2.boundingRect(cnt)
                     if w < 225 and h < 225:
+                        is_crit = visible_spoilage_category == "Significant visible spoilage"
                         boxes.append({
-                            "label": "MOULD SPORE COLONY",
-                            "type": "spoilage",
+                            "label": "NECROTIC ROT LESION" if is_crit else "LOCALIZED DEFECT BLEMISH",
+                            "type": "discoloration",
                             "x": int(x * 100 / 256),
                             "y": int(y * 100 / 256),
                             "width": int(w * 100 / 256),
                             "height": int(h * 100 / 256),
-                            "color": "#ef4444",
-                            "severity": "critical",
+                            "color": "#ef4444" if is_crit else "#f59e0b",
+                            "severity": "critical" if is_crit else "medium",
                             "area_percent": round(area / total_pixels * 100.0, 2)
                         })
-            defects.append("Fungal Mycelium / Mould Colony Detected")
 
-        # 3. Enzymatic Browning / Necrotic Softening (STRICTLY inside produce_mask)
-        raw_brown_mask = (
-            (((rgb[:, :, 0] < 125) & (rgb[:, :, 1] < 110) & (rgb[:, :, 2] < 85) & (gray < 100)) |
-             ((rgb[:, :, 0] > 70) & (rgb[:, :, 0] < 190) & (rgb[:, :, 1] > 40) & (rgb[:, :, 1] < 140) & (rgb[:, :, 2] < 90)))
-            & (~is_chlorophyll)
-        )
-        brown_mask = (raw_brown_mask & (produce_mask > 0)).astype(np.uint8) * 255
-        contours_b, _ = cv2.findContours(brown_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        
-        sorted_b_contours = sorted(contours_b, key=cv2.contourArea, reverse=True)
-        for cnt in sorted_b_contours[:3]:
-            area = cv2.contourArea(cnt)
-            if area > 120:
-                total_defect_pixels += area
-                x, y, w, h = cv2.boundingRect(cnt)
-                if w < 225 and h < 225:
-                    is_overripe = "overripe" in ripeness_stage.lower() or browning_percent >= 14.0
-                    is_spoiled = "spoiled" in ripeness_stage.lower()
-                    label = "NECROTIC ROT LESION" if is_spoiled else ("SENESCENCE BROWNING" if is_overripe else "PEEL DISCOLORATION")
-                    color = "#ef4444" if is_spoiled else ("#f59e0b" if is_overripe else "#eab308")
-                    severity = "critical" if is_spoiled else ("high" if is_overripe else "medium")
-                    boxes.append({
-                        "label": label,
-                        "type": "discoloration",
-                        "x": int(x * 100 / 256),
-                        "y": int(y * 100 / 256),
-                        "width": int(w * 100 / 256),
-                        "height": int(h * 100 / 256),
-                        "color": color,
-                        "severity": severity,
-                        "area_percent": round(area / total_pixels * 100.0, 2)
-                    })
-
-        if browning_percent >= 14.0:
-            defects.append(f"Surface Enzymatic Browning & Discoloration ({browning_percent}%)")
-            defects.append(f"Epidermal Texture Breakdown & Softening ({texture}%)")
-            defects.append("Senescent Anthracnose / Sunken Necrotic Softening")
-        elif browning_percent >= 5.0:
-            defects.append(f"Mild Surface Lenticel Spotting ({browning_percent}%)")
+            if browning_percent >= 14.0:
+                defects.append(f"Surface Enzymatic Browning & Discoloration ({browning_percent}%)")
+                defects.append(f"Epidermal Texture Breakdown & Softening ({texture}%)")
+            elif browning_percent >= 5.0:
+                defects.append(f"Mild Surface Lenticel Spotting ({browning_percent}%)")
 
         if not defects:
             defects.append("Intact Epidermal Cuticle (No Fungal Lesions or Senescent Browning)")
@@ -418,41 +608,51 @@ class FoodQualityVisionEngine:
         defect_area_pct = round(total_defect_pixels / total_pixels * 100.0, 2)
         return boxes[:5], defects, defect_area_pct
 
-    def _default_features(self, category: str, analysis_id: str) -> Dict[str, Any]:
+    def _default_features(self, category: str, analysis_id: str, img_hash: str) -> Dict[str, Any]:
         return {
             "analysis_id": analysis_id,
             "timestamp": time.strftime("%Y-%m-%dT%H:%M:%S"),
-            "model_version": "v2.2-fallback",
+            "model_version": "v2.3-fallback",
+            "image_hash": img_hash,
+            "species_identity": FALLBACK_SPECIES,
             "identified_produce": FALLBACK_SPECIES,
             "is_supported_produce": False,
             "produce_confidence": 0.0,
             "alternative_predictions": [],
-            "produce_icon": "❓",
-            "scientific_name": "",
-            "category": category,
-            "baseline_shelf_life_hours": 72.0,
-            "remaining_shelf_life_hours": 0.0,
-            "rsl_min_hours": 0.0,
-            "rsl_max_hours": 0.0,
-            "rsl_confidence_interval": "0.0 hrs (Input Error)",
+            "species_probabilities": {},
+            "ripeness_classification": "Unknown",
             "ripeness_stage": "Uncertain",
             "is_uncertain": True,
             "stage_probabilities": {"Unripe / Firm": 0.0, "Ripe / Optimal": 0.0, "Spoiled / Rotten": 0.0},
             "ripeness_percent": 0.0,
+            "visible_spoilage_classification": "Uncertain",
+            "spoilage_probability": 0.0,
+            "calibrated_threshold": 41.0,
             "visual_spoilage_score": 0.0,
             "risk_level": "Medium",
-            "discoloration_score": 0.0,
+            "defect_types": ["Invalid or corrupted image stream"],
+            "detected_defects": ["Invalid or corrupted image stream"],
+            "defect_surface_area_percent": 0.0,
             "mould_detected": False,
             "mould_coverage": 0.0,
+            "discoloration_score": 0.0,
             "texture_degradation": 0.0,
-            "defect_surface_area_percent": 0.0,
-            "detected_defects": ["Invalid or corrupted image stream"],
+            "remaining_shelf_life_hours": 0.0,
+            "baseline_shelf_life_hours": 72.0,
+            "rsl_min_hours": 0.0,
+            "rsl_max_hours": 0.0,
+            "rsl_confidence_interval": "0.0 hrs (Input Error)",
+            "produce_icon": "❓",
+            "scientific_name": "",
+            "category": category,
             "bounding_boxes": [],
             "image_width": 256,
             "image_height": 256,
             "processing_latency_ms": 0.0,
+            "diagnostic_log": {"error": "Failed to decode valid image stream."},
             "scientific_disclaimer": "Failed to decode valid image stream."
         }
+
 
 food_vision_engine = FoodQualityVisionEngine()
 vision_engine = food_vision_engine
