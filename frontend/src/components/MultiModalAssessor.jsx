@@ -259,7 +259,7 @@ const generateCulinaryDirective = (produceName, category, spoilageScore, rslHour
   }
 };
 
-export default function MultiModalAssessor({ currentVisionFeatures, selectedZone }) {
+export default function MultiModalAssessor({ currentVisionFeatures, selectedZone, isDarkMode, targetProduce }) {
   // Storages State - loaded from localStorage to reflect Storage 1, Storage 2, etc.
   const [storages, setStorages] = useState(() => {
     try {
@@ -298,6 +298,27 @@ export default function MultiModalAssessor({ currentVisionFeatures, selectedZone
     window.addEventListener('storage', handleStorageChange);
     return () => window.removeEventListener('storage', handleStorageChange);
   }, []);
+
+  // Auto-switch to storage or produce matching targetProduce when routed from Inventory
+  useEffect(() => {
+    if (!targetProduce) return;
+    const term = targetProduce.toLowerCase().trim();
+    const matched = storages.find(s => {
+      const pn = (s.assignedProduce?.produceName || "").toLowerCase();
+      return pn.includes(term) || term.includes(pn) ||
+        (term.includes("banana") && pn.includes("banana")) ||
+        (term.includes("mango") && pn.includes("mango")) ||
+        (term.includes("papaya") && (pn.includes("papaya") || pn.includes("fruit"))) ||
+        (term.includes("spinach") && pn.includes("spinach")) ||
+        (term.includes("kankun") && pn.includes("spinach")) ||
+        (term.includes("gotukola") && pn.includes("spinach")) ||
+        (term.includes("lettuce") && pn.includes("lettuce")) ||
+        (term.includes("tomato") && pn.includes("tomato"));
+    });
+    if (matched) {
+      setSelectedStorageId(matched.id);
+    }
+  }, [targetProduce, storages]);
 
   // Active Storage Object
   const activeStorage = storages.find(s => s.id === selectedStorageId) || storages[0] || DEFAULT_FALLBACK_STORAGES[0];

@@ -406,7 +406,7 @@ const getStorageInspection = (storage) => {
   };
 };
 
-export default function VisionInspector({ zones = [], onRefreshTelemetry, onInspectionComplete, isDarkMode }) {
+export default function VisionInspector({ zones = [], onRefreshTelemetry, onInspectionComplete, isDarkMode, targetProduce }) {
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState("all");
   const [selectedRiskFilter, setSelectedRiskFilter] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
@@ -661,6 +661,34 @@ const activeStorage = storages.find(s => s?.id === selectedStorageId) || storage
   const [cvResult, setCvResult] = useState(SAMPLE_PRESETS[0]);
   const [isCameraActive, setIsCameraActive] = useState(false);
   const [cameraError, setCameraError] = useState(null);
+
+  // Auto-select specimen preset when navigating from Inventory or Executive hub
+  useEffect(() => {
+    if (!targetProduce) return;
+    const term = targetProduce.toLowerCase().trim();
+    const matchedPreset = SAMPLE_PRESETS.find(p => {
+      const pn = p.name.toLowerCase();
+      const pi = (p.identified_produce || "").toLowerCase();
+      const pid = p.id.toLowerCase();
+      return pn.includes(term) || term.includes(pn) || pi.includes(term) || term.includes(pi) ||
+        (term.includes("banana") && pid.includes("banana")) ||
+        (term.includes("mango") && pid.includes("mango")) ||
+        (term.includes("papaya") && (pid.includes("peach") || pid.includes("banana"))) ||
+        (term.includes("strawberr") && pid.includes("strawberr")) ||
+        (term.includes("tomato") && pid.includes("tomato")) ||
+        (term.includes("spinach") && pid.includes("spinach")) ||
+        (term.includes("kankun") && pid.includes("spinach")) ||
+        (term.includes("gotukola") && pid.includes("spinach")) ||
+        (term.includes("lettuce") && pid.includes("lettuce")) ||
+        (term.includes("avocado") && pid.includes("avocado"));
+    });
+    if (matchedPreset) {
+      setSelectedPresetId(matchedPreset.id);
+      setPreviewImage(matchedPreset.imageUrl);
+      setCvResult(matchedPreset);
+      if (onInspectionComplete) onInspectionComplete(matchedPreset);
+    }
+  }, [targetProduce]);
 
   // Unified Multi-Modal Simulation Override for testing Fresh vs ~75% Spoilage
   const [simulationSpoilageOverride, setSimulationSpoilageOverride] = useState(null);

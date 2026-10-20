@@ -52,10 +52,10 @@ def root():
 def get_dashboard_summary():
     """Aggregated cross-component KPIs for Executive Overview."""
     total_batches = len(inventory_db)
-    critical_items = sum(1 for i in inventory_db if i["risk_level"] == "Critical")
-    high_risk_items = sum(1 for i in inventory_db if i["risk_level"] == "High")
-    safe_items = sum(1 for i in inventory_db if i["risk_level"] in ["Low", "Medium"])
-    avg_spoilage_prob = round(sum(i["spoilage_prob"] for i in inventory_db) / max(1, total_batches), 1)
+    critical_items = sum(1 for i in inventory_db if i.get("risk_level") == "Critical" or i.get("is_quarantine"))
+    high_risk_items = sum(1 for i in inventory_db if i.get("is_smart_fifo_target") or i.get("risk_level") == "High")
+    safe_items = sum(1 for i in inventory_db if not i.get("is_quarantine") and not i.get("is_smart_fifo_target"))
+    avg_spoilage_prob = round(sum(i.get("spoilage_prob", 0.0) for i in inventory_db) / max(1, total_batches), 1)
 
     # Active Orders metrics
     active_orders_count = sum(1 for o in orders_db if o["status"] in ["pending", "in_prep"])

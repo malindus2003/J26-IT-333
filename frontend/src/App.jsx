@@ -104,7 +104,14 @@ export default function App() {
   // Spoilage Sub-Tabs: 'vision', 'assessor', 'sensors', 'simulator'
   const [spoilageSubTab, setSpoilageSubTab] = useState('vision');
   const [spoilageDropdownOpen, setSpoilageDropdownOpen] = useState(false);
+  const [targetProduceToInspect, setTargetProduceToInspect] = useState(null);
   const spoilageDropdownRef = useRef(null);
+
+  const handleNavigateToSpoilage = (produceName, subTab = 'vision') => {
+    setTargetProduceToInspect(produceName);
+    setSpoilageSubTab(subTab);
+    setActiveModule('spoilage');
+  };
   
   const [currentVisionFeatures, setCurrentVisionFeatures] = useState(null);
   const [showAlertsCenter, setShowAlertsCenter] = useState(false);
@@ -256,6 +263,7 @@ export default function App() {
             stats={stats}
             recommendations={recommendations}
             onNavigateModule={setActiveModule}
+            onNavigateToSpoilage={handleNavigateToSpoilage}
             onOpenAlertsCenter={() => setShowAlertsCenter(true)}
             onRefresh={fetchAllData}
             isDarkMode={isDarkMode}
@@ -336,6 +344,8 @@ export default function App() {
               onRefresh={fetchAllData}
               isDarkMode={isDarkMode}
               onUpdateItems={setInventoryItems}
+              onNavigateToSpoilage={handleNavigateToSpoilage}
+              onNavigateModule={setActiveModule}
             />
           </div>
         )}
@@ -447,6 +457,7 @@ export default function App() {
                     onRefreshTelemetry={fetchAllData}
                     onInspectionComplete={handleVisionInspectionComplete} 
                     isDarkMode={isDarkMode} 
+                    targetProduce={targetProduceToInspect}
                   />
                 </ErrorBoundary>
               </div>
@@ -460,6 +471,7 @@ export default function App() {
                   currentVisionFeatures={currentVisionFeatures}
                   selectedZone={selectedZone}
                   isDarkMode={isDarkMode}
+                  targetProduce={targetProduceToInspect}
                 />
               </div>
             )}

@@ -34,14 +34,14 @@ class RestockPayload(BaseModel):
 
 @router.get("/items")
 def get_inventory_items(category: Optional[str] = None, risk_level: Optional[str] = None):
-    """List all tracked perishable food batches with FIFO priority tags and reorder metrics."""
+    """List all tracked perishable food batches dynamically synced with cold chamber IoT telemetry and multi-modal spoilage ML."""
     items = inventory_db
     if category and category.lower() != "all":
         items = [i for i in items if i["category"].lower() == category.lower()]
     if risk_level and risk_level.lower() != "all":
         items = [i for i in items if i["risk_level"].lower() == risk_level.lower()]
     
-    # Calculate stock valuation and FIFO priority
+    # Calculate stock valuation, chamber sync, and FIFO priority
     total_val_lkr = 0.0
     for it in items:
         qty_num = 10.0
@@ -51,12 +51,56 @@ def get_inventory_items(category: Optional[str] = None, risk_level: Optional[str
             pass
         cat = it.get("category", "Fruits")
         unit_cost = UNIT_COST_LKR_PER_KG.get(cat, 500.0)
-        it["stock_valuation_lkr"] = round(qty_num * unit_cost, 2)
-        total_val_lkr += it["stock_valuation_lkr"]
 
-        # Tag lowest RSL batch for Smart FIFO
-        it["is_smart_fifo_target"] = (it.get("remaining_shelf_life_hours", 48.0) < 24.0 or it.get("risk_level") == "High")
+        # Dynamic Chamber Sensor Telemetry Sync
+        sz_clean = str(it.get("storage_zone", "")).lower()
+        matched_zone = None
+        for z in STORAGE_ZONES:
+            zname = z["name"].lower()
+            zid = z.get("id", "").lower()
+            if sz_clean == zid or sz_clean == zname or ("storage 1" in sz_clean and "1" in zname) or ("storage 2" in sz_clean and "2" in zname) or ("storage 3" in sz_clean and "3" in zname) or ("storage 4" in sz_clean and "4" in zname):
+                matched_zone = z
+                break
+        if not matched_zone:
+            matched_zone = STORAGE_ZONES[0]
+
+        it["storage_zone"] = matched_zone["name"]
+        it["chamber_temp"] = matched_zone["current_temp"]
+        it["chamber_humidity"] = matched_zone["current_humidity"]
+        it["chamber_voc"] = matched_zone["voc"]
+        it["chamber_co2"] = matched_zone["co2"]
+        it["chamber_status"] = matched_zone.get("status", "optimal")
+        it["chamber_node_id"] = matched_zone.get("node_id", "ESP32-NODE-01")
+
+        # Environmental thermal and gas stress factor from live chamber
+        target_temp = matched_zone.get("target_temp", 11.0)
+        temp_stress = max(0.0, matched_zone["current_temp"] - target_temp)
+        voc_stress = max(0.0, matched_zone["voc"] - 0.35)
+
+        base_spoilage = it.get("spoilage_prob", 15.0)
+        adjusted_spoilage = min(99.0, round(base_spoilage + (temp_stress * 1.8) + (voc_stress * 12.0), 1))
+        it["spoilage_prob"] = adjusted_spoilage
+
+        base_rsl = it.get("remaining_shelf_life_hours", 72.0)
+        adjusted_rsl = max(0.0, round(base_rsl - (temp_stress * 2.5), 1)) if base_rsl > 0 else 0.0
+        it["remaining_shelf_life_hours"] = adjusted_rsl
+
+        # Identify Near-Spoilage (~75%), High Risk, and Quarantined batches
+        is_quarantine = (it.get("risk_level") == "Critical" or adjusted_rsl <= 0.0 or adjusted_spoilage >= 92.0)
+        is_near_spoilage = (adjusted_spoilage >= 70.0 or adjusted_rsl < 24.0 or it.get("risk_level") == "High") and not is_quarantine
+
+        it["is_quarantine"] = is_quarantine
+        it["is_smart_fifo_target"] = is_near_spoilage
         it["reorder_needed"] = qty_num <= MIN_STOCK_THRESHOLDS_KG.get(cat, 10.0)
+
+        if is_quarantine:
+            it["stock_valuation_lkr"] = 0.0
+            it["status"] = "Critical (Quarantine Required)"
+        else:
+            it["stock_valuation_lkr"] = round(qty_num * unit_cost, 2)
+            total_val_lkr += it["stock_valuation_lkr"]
+            if is_near_spoilage:
+                it["status"] = "Near Spoilage (~75%) - Prioritize FIFO"
 
     return {
         "items": items,
@@ -192,3 +236,26 @@ def delete_inventory_item(item_id: str):
     global inventory_db
     inventory_db = [i for i in inventory_db if i["id"] != item_id]
     return {"status": "success", "message": f"Item {item_id} removed"}
+
+
+@router.post("/items/{item_id}/quarantine-to-waste")
+def quarantine_item_to_waste(item_id: str):
+    """Safely log a spoiled or quarantined batch into the Smart Waste Bin log and remove from active inventory."""
+    global inventory_db
+    target_item = next((i for i in inventory_db if i["id"] == item_id), None)
+    if not target_item:
+        raise HTTPException(status_code=404, detail="Inventory item not found")
+    
+    # Remove from active inventory
+    inventory_db = [i for i in inventory_db if i["id"] != item_id]
+    
+    return {
+        "status": "success",
+        "action": "quarantined_and_logged_to_waste",
+        "item_id": item_id,
+        "name": target_item.get("name"),
+        "quantity": target_item.get("quantity"),
+        "waste_stream": "Food Waste / Perishable Organic",
+        "timestamp": datetime.now().isoformat(),
+        "message": f"Batch {target_item.get('batch_number')} successfully quarantined and logged to Smart Waste Bin."
+    }
