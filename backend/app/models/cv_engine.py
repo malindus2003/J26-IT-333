@@ -405,11 +405,14 @@ class FoodQualityVisionEngine:
         decay_factor = max(0.05, (100.0 - visual_score) / 100.0)
 
         if visible_spoilage_category == "Significant visible spoilage" or risk_level == "Critical":
-            # Immediate Quarantine & Food Safety Boundary
+            # Immediate Quarantine & Food Safety Boundary (Distinguishes visible mould alert from laboratory assay)
             remaining_shelf_life = 0.0
             rsl_min = 0.0
             rsl_max = 0.0
-            rsl_interval_str = "0.0 hrs (Quarantine / Discard Required)"
+            if mould_detected:
+                rsl_interval_str = "0.0 hrs (Food Safety Quarantine: Visible Fungal Growth Detected)"
+            else:
+                rsl_interval_str = "0.0 hrs (Operational Quarantine: Significant Visual Spoilage Threshold)"
         elif visible_spoilage_category == "Localized visible defect":
             # Localized defect: shelf life is discounted proportionally, not zeroed
             discounted_baseline = baseline_shelf_life * 0.30
@@ -538,7 +541,7 @@ class FoodQualityVisionEngine:
             "image_height": orig_h,
             "processing_latency_ms": latency_ms,
             "diagnostic_log": diagnostic_log,
-            "scientific_disclaimer": "RSL prediction intervals reflect postharvest biological decay models. Visual sensors assess exterior tissue only; comply with HACCP food safety standards."
+            "scientific_disclaimer": "RSL prediction intervals reflect postharvest biological decay kinetics and visual screening. Zero RSL denotes an operational food safety quarantine threshold due to visual defect/mould alerts, not a definitive laboratory microbiological or chemical toxicity assay."
         }
 
     def _extract_defect_contours(
