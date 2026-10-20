@@ -37,6 +37,7 @@ import {
   ArrowUpRight,
   TrendingDown
 } from 'lucide-react';
+import axios from 'axios';
 const DEFAULT_MENU = [
   {
     id: "menu-01",

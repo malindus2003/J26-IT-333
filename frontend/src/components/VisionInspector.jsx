@@ -2013,7 +2013,9 @@ const activeStorage = storages.find(s => s?.id === selectedStorageId) || storage
         const isNearSpoilState = !isSpoiledState && (fusedScore >= 50.0 || fusedRsl <= 24.0 || cvResult?.risk_level === 'High');
         const isFreshState = !isSpoiledState && !isNearSpoilState;
 
-        const directive = getProduceRecipeDirective(activeProduce?.produceName, activeProduce?.category, fusedScore);
+        const activeProduceName = cvResult?.identified_produce || cvResult?.name || activeStorage?.assignedProduce?.name || 'Produce';
+        const activeProduceCategory = cvResult?.category || activeStorage?.assignedProduce?.category || 'Fruits';
+        const directive = getProduceRecipeDirective(activeProduceName, activeProduceCategory, fusedScore);
 
         return (
           <div className="p-5 sm:p-6 rounded-2xl bg-white dark:bg-slate-900 border-2 border-emerald-500/80 dark:border-emerald-500/60 shadow-lg space-y-5 animate-fade-in">
