@@ -1,5 +1,75 @@
 [
   {
+    "analysis_id": "CV-SCAN-1792491701-a6cc9b",
+    "timestamp": "2026-10-20T15:51:42",
+    "source": "Manual Upload",
+    "produce": "Apple",
+    "species_identity": "Apple",
+    "produce_icon": "\ud83c\udf4e",
+    "confidence": 59.4,
+    "stage": "Overripe / Softening (Use Today)",
+    "ripeness_classification": "Overripe",
+    "visible_spoilage_classification": "No visible spoilage detected",
+    "spoilage_probability": 30.3,
+    "defect_types": [
+      "None"
+    ],
+    "rsl_hours": 24.0,
+    "rsl_interval": "19.3 - 28.7 hrs [90% CI]",
+    "risk_level": "Low",
+    "mould_detected": false,
+    "mould_confidence": 24.1,
+    "defect_count": 1,
+    "latency_ms": 561.6
+  },
+  {
+    "analysis_id": "CV-SCAN-1792491605-2b19b2",
+    "timestamp": "2026-10-20T15:50:05",
+    "source": "Manual Upload",
+    "produce": "Orange",
+    "species_identity": "Orange",
+    "produce_icon": "\ud83c\udf4a",
+    "confidence": 56.9,
+    "stage": "Spoiled / Rotten (Grade F)",
+    "ripeness_classification": "Overripe",
+    "visible_spoilage_classification": "Significant visible spoilage",
+    "spoilage_probability": 99.89,
+    "defect_types": [
+      "Visible mould",
+      "Brown spots"
+    ],
+    "rsl_hours": 0.0,
+    "rsl_interval": "0.0 hrs (Food Safety Quarantine: Visible Fungal Growth Detected)",
+    "risk_level": "Critical",
+    "mould_detected": true,
+    "mould_confidence": 42.1,
+    "defect_count": 5,
+    "latency_ms": 274.4
+  },
+  {
+    "analysis_id": "CV-SCAN-1792491587-e6a253",
+    "timestamp": "2026-10-20T15:49:47",
+    "source": "Manual Upload",
+    "produce": "Orange",
+    "species_identity": "Orange",
+    "produce_icon": "\ud83c\udf4a",
+    "confidence": 51.9,
+    "stage": "Spoiled / Rotten (Grade F)",
+    "ripeness_classification": "Overripe",
+    "visible_spoilage_classification": "Significant visible spoilage",
+    "spoilage_probability": 70.01,
+    "defect_types": [
+      "Discoloration"
+    ],
+    "rsl_hours": 0.0,
+    "rsl_interval": "0.0 hrs (Operational Quarantine: Significant Visual Spoilage Threshold)",
+    "risk_level": "Critical",
+    "mould_detected": false,
+    "mould_confidence": 19.4,
+    "defect_count": 2,
+    "latency_ms": 298.7
+  },
+  {
     "analysis_id": "CV-SCAN-1792491460-1030e9",
     "timestamp": "2026-10-20T15:47:40",
     "source": "Manual Upload",

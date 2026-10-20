@@ -18,7 +18,7 @@ import SmartWasteBinDashboard from './components/SmartWasteBinDashboard';
 import CentralExecutiveDashboard from './components/CentralExecutiveDashboard';
 import OrderManagementDashboard from './components/OrderManagementDashboard';
 import LoginScreen, { DEMO_CREDENTIALS } from './components/LoginScreen';
-import { Activity, LayoutDashboard, Camera, Cpu, ListFilter, AlertTriangle, Sparkles, X, TrendingUp, Users, Trash2, Layers, Check, ShoppingBag, Package, Truck, ShieldCheck, DollarSign, ChevronDown } from 'lucide-react';
+import { ChefHat, Activity, LayoutDashboard, Camera, Cpu, ListFilter, AlertTriangle, Sparkles, X, TrendingUp, Users, Trash2, Layers, Check, ShoppingBag, Package, Truck, ShieldCheck, DollarSign, ChevronDown } from 'lucide-react';
 import { DEFAULT_ZONES, DEFAULT_INVENTORY, DEFAULT_RECOMMENDATIONS, DEFAULT_DASHBOARD_STATS } from './data/mockData';
 
 // 4 Subparts of the Food Spoilage & Quality System for Dropdown Navigation
@@ -34,12 +34,12 @@ const SPOILAGE_SUBPARTS = [
   },
   {
     id: 'assessor',
-    title: 'Multi-Modal Sensor Fusion Assessor',
-    shortTitle: 'AI Fusion Assessor',
-    description: 'XAI multi-modal fusion combining gas telemetry, thermal data & remaining shelf-life (RSL)',
-    icon: Cpu,
-    badge: 'XAI Predictive Model',
-    badgeColor: 'bg-blue-100 dark:bg-blue-950/60 text-blue-900 dark:text-blue-300 border-blue-300 dark:border-blue-700'
+    title: 'AI Culinary Divert & Recipe Directives',
+    shortTitle: 'AI Recipe Directives',
+    description: 'Zero-waste recipe recommendations, kitchen prep directives, and culinary divert for near-spoilage produce',
+    icon: ChefHat,
+    badge: 'Zero-Waste Chef AI',
+    badgeColor: 'bg-amber-100 dark:bg-amber-950/60 text-amber-900 dark:text-amber-300 border-amber-300 dark:border-amber-700'
   },
   {
     id: 'sensors',
