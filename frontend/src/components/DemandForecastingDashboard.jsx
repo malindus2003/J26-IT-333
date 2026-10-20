@@ -48,6 +48,9 @@ export default function DemandForecastingDashboard({ isDarkMode, currentRole = '
   const [showPrepSheetModal, setShowPrepSheetModal] = useState(false);
   const [selectedItemIngredients, setSelectedItemIngredients] = useState(null);
 
+  // Multi-Horizon Planning (today | tomorrow | day_after)
+  const [selectedHorizon, setSelectedHorizon] = useState('today');
+
   // Simulation State
   const [simWeather, setSimWeather] = useState('Thunderstorm Monsoon');
   const [simTemp, setSimTemp] = useState(24);
@@ -294,8 +297,41 @@ export default function DemandForecastingDashboard({ isDarkMode, currentRole = '
     );
   }
 
-  const categories = ['All', ...new Set(data.items.map(i => i.category))];
-  const filteredItems = data.items.filter(item => {
+  const currentHorizonData = data.daily_item_forecasts?.[selectedHorizon] || {
+    formatted_label: selectedHorizon === 'tomorrow' ? 'Tomorrow' : selectedHorizon === 'day_after' ? 'Day After Tomorrow' : 'Today',
+    date: data.contextual_factors?.date || new Date().toISOString().slice(0, 10),
+    day_name: selectedHorizon === 'tomorrow' ? 'Tomorrow' : selectedHorizon === 'day_after' ? 'Day After' : 'Today',
+    weather: data.contextual_factors ? {
+      weather_condition: data.contextual_factors.weather_condition,
+      weather_impact: data.contextual_factors.weather_impact,
+      rainfall_mm: data.contextual_factors.rainfall_mm || 0,
+      temperature_c: data.contextual_factors.temperature_c || 25,
+      is_live_api: data.contextual_factors.weather_live
+    } : {},
+    calendar: {
+      local_events: data.contextual_factors?.local_events,
+      event_impact: data.contextual_factors?.event_impact
+    },
+    reservations: {
+      reservations_booked: data.contextual_factors?.reservations_booked || 0,
+      total_pax: data.contextual_factors?.reservations_pax || 0,
+      status_text: data.contextual_factors?.reservations_text,
+      impact_text: data.contextual_factors?.reservations_impact,
+      is_live_db: data.contextual_factors?.reservations_live
+    },
+    kpi_summary: data.kpi_summary,
+    items: data.items
+  };
+
+  const activeItems = currentHorizonData.items || data.items || [];
+  const activeKpis = currentHorizonData.kpi_summary || data.kpi_summary || {};
+  const activeWeather = currentHorizonData.weather || data.contextual_factors || {};
+  const activeCalendar = currentHorizonData.calendar || data.contextual_factors || {};
+  const activeReservations = currentHorizonData.reservations || data.contextual_factors || {};
+  const activeCategoryBreakdown = currentHorizonData.category_breakdown || data.category_breakdown || [];
+
+  const categories = ['All', ...new Set(activeItems.map(i => i.category))];
+  const filteredItems = activeItems.filter(item => {
     const matchesCat = selectedCategory === 'All' || item.category === selectedCategory;
     const matchesSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase()) || item.category.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesCat && matchesSearch;
@@ -516,72 +552,74 @@ export default function DemandForecastingDashboard({ isDarkMode, currentRole = '
       )}
 
       {/* Multi-Source Live Contextual Drivers Bar (Always visible for quick situational awareness) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4">
         
         {/* Weather Driver */}
-        <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-[#cbdad0] dark:border-slate-800 shadow-sm flex items-center gap-3.5">
-          <div className="p-2.5 rounded-xl bg-sky-50 text-sky-700 dark:bg-sky-500/10 dark:text-sky-400 border border-sky-200 dark:border-sky-500/20 flex-shrink-0">
+        <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-slate-900 border border-[#cbdad0] dark:border-slate-800 shadow-sm flex items-start gap-3.5 min-h-[110px]">
+          <div className="p-2.5 rounded-xl bg-sky-50 text-sky-700 dark:bg-sky-500/10 dark:text-sky-400 border border-sky-200 dark:border-sky-500/20 flex-shrink-0 mt-0.5">
             <CloudRain className="h-5 w-5" />
           </div>
           <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-1.5">
-              <span className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400">Weather Intelligence</span>
+            <div className="flex items-center gap-1.5 mb-1">
+              <span className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400 tracking-wider">Weather Intelligence</span>
               {data.contextual_factors?.weather_live }
             </div>
-            <div className="text-xs font-extrabold text-slate-900 dark:text-white truncate">{data.contextual_factors.weather_condition}</div>
-            <div className="text-[11px] text-sky-700 dark:text-sky-400 font-bold truncate">{data.contextual_factors.weather_impact}</div>
+            <div className="text-xs font-extrabold text-slate-900 dark:text-white leading-snug break-words">{data.contextual_factors.weather_condition}</div>
+            <div className="text-[11px] text-sky-700 dark:text-sky-400 font-bold leading-snug mt-1 break-words">{data.contextual_factors.weather_impact}</div>
           </div>
         </div>
 
         {/* Reservations Driver */}
-        <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-[#cbdad0] dark:border-slate-800 shadow-sm flex items-center gap-3.5">
-          <div className="p-2.5 rounded-xl bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400 border border-amber-200 dark:border-amber-500/20 flex-shrink-0">
+        <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-slate-900 border border-[#cbdad0] dark:border-slate-800 shadow-sm flex items-start gap-3.5 min-h-[110px]">
+          <div className="p-2.5 rounded-xl bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400 border border-amber-200 dark:border-amber-500/20 flex-shrink-0 mt-0.5">
             <Calendar className="h-5 w-5" />
           </div>
           <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-1.5">
-              <span className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400">Customer Bookings</span>
+            <div className="flex items-center gap-1.5 mb-1">
+              <span className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400 tracking-wider">Customer Bookings</span>
               {data.contextual_factors?.reservations_live 
                 
               }
             </div>
-            <div className="text-xs font-extrabold text-slate-900 dark:text-white truncate">
+            <div className="text-xs font-extrabold text-slate-900 dark:text-white leading-snug break-words">
               {data.contextual_factors.reservations_text || `${data.contextual_factors.reservations_booked ?? 0} Table Reservations`}
             </div>
-            <div className="text-[11px] text-amber-700 dark:text-amber-400 font-bold truncate">
+            <div className="text-[11px] text-amber-700 dark:text-amber-400 font-bold leading-snug mt-1 break-words">
               {data.contextual_factors.reservations_impact || "Standard walk-in customer flow"}
             </div>
           </div>
         </div>
 
         {/* Local Events Driver */}
-        <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-[#cbdad0] dark:border-slate-800 shadow-sm flex items-center gap-3.5">
-          <div className="p-2.5 rounded-xl bg-purple-50 text-purple-700 dark:bg-purple-500/10 dark:text-purple-400 border border-purple-200 dark:border-purple-500/20 flex-shrink-0">
+        <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-slate-900 border border-[#cbdad0] dark:border-slate-800 shadow-sm flex items-start gap-3.5 min-h-[110px]">
+          <div className="p-2.5 rounded-xl bg-purple-50 text-purple-700 dark:bg-purple-500/10 dark:text-purple-400 border border-purple-200 dark:border-purple-500/20 flex-shrink-0 mt-0.5">
             <Award className="h-5 w-5" />
           </div>
           <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-1.5">
-              <span className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400">Local Event Radar</span>
+            <div className="flex items-center gap-1.5 mb-1">
+              <span className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400 tracking-wider">Local Event Radar</span>
               {data.contextual_factors?.calendar_live && (
                 <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300">
                   Live Calendar
                 </span>
               )}
             </div>
-            <div className="text-xs font-extrabold text-slate-900 dark:text-white truncate">{data.contextual_factors.local_events}</div>
-            <div className="text-[11px] text-purple-700 dark:text-purple-400 font-bold truncate">{data.contextual_factors.event_impact || "Standard regular dining (0% surge)"}</div>
+            <div className="text-xs font-extrabold text-slate-900 dark:text-white leading-snug break-words">{data.contextual_factors.local_events}</div>
+            <div className="text-[11px] text-purple-700 dark:text-purple-400 font-bold leading-snug mt-1 break-words">{data.contextual_factors.event_impact || "Standard regular dining (0% surge)"}</div>
           </div>
         </div>
 
         {/* Active Promotions Driver */}
-        <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-[#cbdad0] dark:border-slate-800 shadow-sm flex items-center gap-3.5">
-          <div className="p-2.5 rounded-xl bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20 flex-shrink-0">
+        <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-slate-900 border border-[#cbdad0] dark:border-slate-800 shadow-sm flex items-start gap-3.5 min-h-[110px]">
+          <div className="p-2.5 rounded-xl bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20 flex-shrink-0 mt-0.5">
             <ShoppingBag className="h-5 w-5" />
           </div>
           <div className="min-w-0 flex-1">
-            <span className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400">Active Campaign</span>
-            <div className="text-xs font-extrabold text-slate-900 dark:text-white truncate">{data.contextual_factors.active_promotions}</div>
-            <div className="text-[11px] text-emerald-700 dark:text-emerald-400 font-bold truncate">
+            <div className="flex items-center gap-1.5 mb-1">
+              <span className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400 tracking-wider">Active Campaign</span>
+            </div>
+            <div className="text-xs font-extrabold text-slate-900 dark:text-white leading-snug break-words">{data.contextual_factors.active_promotions}</div>
+            <div className="text-[11px] text-emerald-700 dark:text-emerald-400 font-bold leading-snug mt-1 break-words">
               {data.contextual_factors.promo_impact || (data.contextual_factors.has_active_promo ? "+10% dining surge" : "Standard regular pricing (0% surge)")}
             </div>
           </div>
@@ -595,32 +633,128 @@ export default function DemandForecastingDashboard({ isDarkMode, currentRole = '
       {activeTab === 'overview' && (
         <div className="space-y-6">
           
+          {/* 3-Day Planning Horizon Switcher Bar */}
+          <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-[#cbdad0] dark:border-slate-800 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <Calendar className="h-5 w-5 text-emerald-700 dark:text-emerald-400" />
+                <h4 className="text-sm font-black text-slate-900 dark:text-white">
+                  Multi-Horizon Forecasting Horizon
+                </h4>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/70 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800">
+                  Open-Meteo & Firebase Live
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                Switch planning horizon to preview dynamic item-level demand, kitchen prep guidance, and ingredient requirements
+              </p>
+            </div>
+
+            {/* 3 Horizon Buttons */}
+            <div className="flex items-center gap-1.5 p-1 rounded-xl bg-slate-100 dark:bg-slate-800/90 border border-[#d5e2d9] dark:border-slate-700 self-start md:self-auto">
+              <button
+                onClick={() => setSelectedHorizon('today')}
+                className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                  selectedHorizon === 'today'
+                    ? 'bg-emerald-700 text-white shadow-sm'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                }`}
+              >
+                <span>Today</span>
+                {data.daily_item_forecasts?.today?.date && (
+                  <span className="text-[10px] opacity-80 font-mono font-normal">
+                    {data.daily_item_forecasts.today.date.slice(5)}
+                  </span>
+                )}
+              </button>
+
+              <button
+                onClick={() => setSelectedHorizon('tomorrow')}
+                className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                  selectedHorizon === 'tomorrow'
+                    ? 'bg-emerald-700 text-white shadow-sm'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                }`}
+              >
+                <span>Tomorrow</span>
+                {data.daily_item_forecasts?.tomorrow?.date && (
+                  <span className="text-[10px] opacity-80 font-mono font-normal">
+                    {data.daily_item_forecasts.tomorrow.date.slice(5)}
+                  </span>
+                )}
+              </button>
+
+              <button
+                onClick={() => setSelectedHorizon('day_after')}
+                className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                  selectedHorizon === 'day_after'
+                    ? 'bg-emerald-700 text-white shadow-sm'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                }`}
+              >
+                <span>Day After</span>
+                {data.daily_item_forecasts?.day_after?.date && (
+                  <span className="text-[10px] opacity-80 font-mono font-normal">
+                    {data.daily_item_forecasts.day_after.date.slice(5)}
+                  </span>
+                )}
+              </button>
+            </div>
+          </div>
+
+          {/* Dynamic Horizon Context Banner */}
+          <div className="p-3.5 rounded-xl bg-gradient-to-r from-emerald-50 via-sky-50 to-amber-50 dark:from-emerald-950/30 dark:via-sky-950/30 dark:to-amber-950/30 border border-emerald-200 dark:border-emerald-800/50 flex flex-wrap items-center justify-between gap-3 text-xs">
+            <div className="flex items-center gap-2">
+              <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-emerald-700 text-white">
+                {currentHorizonData.formatted_label || selectedHorizon.toUpperCase()}
+              </span>
+              <span className="font-extrabold text-slate-800 dark:text-slate-200">
+                {currentHorizonData.date} ({currentHorizonData.day_name})
+              </span>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="flex items-center gap-1 font-semibold text-sky-800 dark:text-sky-300">
+                <CloudRain className="h-3.5 w-3.5 text-sky-600" />
+                {activeWeather.weather_condition || "Live Meteorological Context"}
+              </span>
+              <span className="text-slate-400">•</span>
+              <span className="font-semibold text-amber-800 dark:text-amber-300">
+                {activeReservations.status_text || `${activeReservations.reservations_booked || 0} Bookings`}
+              </span>
+              <span className="text-slate-400">•</span>
+              <span className="font-semibold text-purple-800 dark:text-purple-300">
+                {activeCalendar.local_events || "Regular Service"}
+              </span>
+            </div>
+          </div>
+
           {/* Quick Sizing Metric KPIs */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-[#cbdad0] dark:border-slate-800 shadow-sm">
               <span className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400">Total Projected Demand</span>
-              <div className="text-xl font-black text-slate-900 dark:text-white mt-1">{data.kpi_summary.total_projected_orders} Orders</div>
+              <div className="text-xl font-black text-slate-900 dark:text-white mt-1">{activeKpis.total_projected_orders ?? data.kpi_summary.total_projected_orders} Orders</div>
               <span className="text-[11px] text-emerald-700 dark:text-emerald-400 font-bold flex items-center gap-1 mt-0.5">
-                <ArrowUpRight className="h-3.5 w-3.5" /> +24% vs weekday avg
+                <ArrowUpRight className="h-3.5 w-3.5" /> For {currentHorizonData.day_name || 'Selected Day'}
               </span>
             </div>
 
             <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-[#cbdad0] dark:border-slate-800 shadow-sm">
               <span className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400">Recommended Prep Target</span>
-              <div className="text-xl font-black text-emerald-700 dark:text-emerald-400 mt-1">{data.kpi_summary.total_prep_recommended} Portions</div>
+              <div className="text-xl font-black text-emerald-700 dark:text-emerald-400 mt-1">{activeKpis.total_prep_recommended ?? data.kpi_summary.total_prep_recommended} Portions</div>
               <span className="text-[11px] text-slate-600 dark:text-slate-400 font-medium mt-0.5">Includes meal shift split</span>
             </div>
 
             <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-[#cbdad0] dark:border-slate-800 shadow-sm">
               <span className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400">Dynamic Safety Buffer</span>
-              <div className="text-xl font-black text-amber-600 dark:text-amber-400 mt-1">+{data.kpi_summary.total_safety_buffer} Portions</div>
+              <div className="text-xl font-black text-amber-600 dark:text-amber-400 mt-1">+{activeKpis.total_safety_buffer ?? data.kpi_summary.total_safety_buffer} Portions</div>
               <span className="text-[11px] text-amber-700 dark:text-amber-400 font-bold mt-0.5">Prevents mid-shift stockouts</span>
             </div>
 
             <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-[#cbdad0] dark:border-slate-800 shadow-sm">
               <span className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400">Waste Prevented Today</span>
-              <div className="text-xl font-black text-emerald-700 dark:text-emerald-400 mt-1">{data.kpi_summary.waste_prevented_est_kg} kg</div>
-              <span className="text-[11px] text-emerald-700 dark:text-emerald-400 font-bold mt-0.5">~ LKR 14,200 saved</span>
+              <div className="text-xl font-black text-emerald-700 dark:text-emerald-400 mt-1">{activeKpis.waste_prevented_est_kg ?? data.kpi_summary.waste_prevented_est_kg} kg</div>
+              <span className="text-[11px] text-emerald-700 dark:text-emerald-400 font-bold mt-0.5">~ LKR {activeKpis.cost_saved_today_lkr ? activeKpis.cost_saved_today_lkr.toLocaleString() : '14,200'} saved</span>
             </div>
           </div>
 
@@ -633,7 +767,7 @@ export default function DemandForecastingDashboard({ isDarkMode, currentRole = '
                   Item-Level Kitchen Preparation Sizing Table
                 </h3>
                 <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
-                  Exact shift prep volumes and safety buffers calculated to optimize batch preparation and eliminate food waste
+                  Batch prep guidance and safety buffers calibrated for {currentHorizonData.formatted_label || 'Today'}
                 </p>
               </div>
 
@@ -902,7 +1036,7 @@ export default function DemandForecastingDashboard({ isDarkMode, currentRole = '
                   <ResponsiveContainer width="100%" height="100%">
                     <RechartsPie>
                       <Pie
-                        data={data.category_breakdown}
+                        data={activeCategoryBreakdown}
                         dataKey="projected_orders"
                         nameKey="category"
                         cx="50%"
@@ -911,7 +1045,7 @@ export default function DemandForecastingDashboard({ isDarkMode, currentRole = '
                         innerRadius={45}
                         paddingAngle={4}
                       >
-                        {data.category_breakdown.map((entry, index) => (
+                        {activeCategoryBreakdown.map((entry, index) => (
                           <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                         ))}
                       </Pie>
@@ -921,7 +1055,7 @@ export default function DemandForecastingDashboard({ isDarkMode, currentRole = '
                 </div>
 
                 <div className="space-y-2">
-                  {data.category_breakdown.map((cat, idx) => (
+                  {activeCategoryBreakdown.map((cat, idx) => (
                     <div key={cat.category} className="flex items-center justify-between p-2 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700">
                       <div className="flex items-center gap-2">
                         <span className="h-3 w-3 rounded-full" style={{ backgroundColor: COLORS[idx % COLORS.length] }}></span>
@@ -1074,7 +1208,7 @@ export default function DemandForecastingDashboard({ isDarkMode, currentRole = '
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pt-2">
-              {data.items.map((item) => (
+              {activeItems.map((item) => (
                 <div key={item.id} className="p-5 rounded-2xl bg-slate-50 dark:bg-slate-800/70 border border-[#cbdad0] dark:border-slate-700 space-y-3 shadow-sm">
                   
                   <div className="flex items-start justify-between">
@@ -1393,7 +1527,9 @@ export default function DemandForecastingDashboard({ isDarkMode, currentRole = '
                   <FileText className="h-4 w-4 text-emerald-600" />
                   Official Kitchen Preparation Sizing Sheet
                 </h3>
-                <span className="text-[11px] text-slate-500">Date: Friday Shift • Generated by AI Food Demand Prediction Module</span>
+                <span className="text-[11px] text-slate-500">
+                  Target Planning Window: <strong className="text-emerald-700 dark:text-emerald-400 font-bold">{currentHorizonData.formatted_label || 'Today'}</strong> • {currentHorizonData.date || 'Today'} ({currentHorizonData.day_name || ''}) • Generated by AI Food Demand Module
+                </span>
               </div>
               <button onClick={() => setShowPrepSheetModal(false)} className="p-1 rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800">
                 <X className="h-4 w-4" />
@@ -1401,13 +1537,15 @@ export default function DemandForecastingDashboard({ isDarkMode, currentRole = '
             </div>
 
             <div className="space-y-3 text-xs">
-              <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 flex justify-between">
+              <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 flex flex-col sm:flex-row justify-between gap-2">
                 <div>
                   <span className="font-bold text-slate-800 dark:text-slate-200">Shift Window: Lunch (11:30) & Dinner (18:30)</span>
-                  <p className="text-[11px] text-slate-500 mt-0.5">Special Note: Monsoon rain forecast (+18% comfort food surge)</p>
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    Live Context: {activeWeather.condition || activeWeather.weather_condition || 'Normal Weather'} ({activeWeather.precipitation_mm ?? 0}mm rain, {activeWeather.temperature_c ?? activeWeather.temperature_max ?? 26}°C) • {activeCalendar.holiday_name ? `${activeCalendar.holiday_name} Holiday` : 'Standard Trading Day'}
+                  </p>
                 </div>
-                <div className="text-right">
-                  <span className="font-black text-emerald-700 dark:text-emerald-400 text-sm">{data.kpi_summary.total_prep_recommended} Total Portions</span>
+                <div className="sm:text-right">
+                  <span className="font-black text-emerald-700 dark:text-emerald-400 text-sm">{activeKpis.total_prep_recommended ?? data.kpi_summary?.total_prep_recommended} Total Portions</span>
                 </div>
               </div>
 
@@ -1422,12 +1560,12 @@ export default function DemandForecastingDashboard({ isDarkMode, currentRole = '
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                    {data.items.filter(i => i.status === 'Available').map(item => (
+                    {activeItems.filter(i => i.status === 'Available').map(item => (
                       <tr key={item.id}>
                         <td className="py-2.5 px-3 font-bold text-slate-800 dark:text-slate-200">{item.name}</td>
                         <td className="py-2.5 px-3 font-mono font-black text-emerald-700 dark:text-emerald-400">{item.prep_recommendation} portions</td>
                         <td className="py-2.5 px-3 font-mono text-amber-600 font-bold">+{item.buffer_quantity} ready</td>
-                        <td className="py-2.5 px-3 text-slate-500">{item.key_drivers[0]}</td>
+                        <td className="py-2.5 px-3 text-slate-500">{item.key_drivers?.[0] || 'Standard baseline sizing'}</td>
                       </tr>
                     ))}
                   </tbody>
