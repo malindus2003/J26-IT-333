@@ -442,7 +442,12 @@ export default function App() {
             {spoilageSubTab === 'vision' && (
               <div className="space-y-4 sm:space-y-6 animate-fade-in">
                 <ErrorBoundary fallbackTitle="Optical Camera CV Scanner Issue">
-                  <VisionInspector onInspectionComplete={handleVisionInspectionComplete} isDarkMode={isDarkMode} />
+                  <VisionInspector 
+                    zones={zones}
+                    onRefreshTelemetry={fetchAllData}
+                    onInspectionComplete={handleVisionInspectionComplete} 
+                    isDarkMode={isDarkMode} 
+                  />
                 </ErrorBoundary>
               </div>
             )}

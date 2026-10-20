@@ -46,9 +46,19 @@ def ingest_esp32_telemetry(payload: SensorReading):
     Ingest real-time telemetry from ESP32 IoT microcontroller or hardware simulator.
     Updates the target zone's live sensor state.
     """
+    target_clean = payload.storage_zone.lower().strip()
     zone_match = None
     for zone in STORAGE_ZONES:
-        if zone["name"].lower() == payload.storage_zone.lower() or zone["id"] == payload.storage_zone:
+        zid = zone.get("id", "").lower()
+        zname = zone.get("name", "").lower()
+        if (target_clean == zid or 
+            target_clean == zname or 
+            target_clean in zname or 
+            zname in target_clean or
+            ("1" in target_clean and ("zone 1" in zname or "storage 1" in zname or "fruit" in zname)) or
+            ("2" in target_clean and ("zone 2" in zname or "storage 2" in zname or "veg" in zname)) or
+            ("3" in target_clean and ("zone 3" in zname or "storage 3" in zname or "root" in zname)) or
+            ("4" in target_clean and ("zone 4" in zname or "storage 4" in zname or "ambient" in zname))):
             zone_match = zone
             break
             

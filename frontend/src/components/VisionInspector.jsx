@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { 
   Camera, 
   Upload, 
@@ -406,7 +406,7 @@ const getStorageInspection = (storage) => {
   };
 };
 
-export default function VisionInspector({ onInspectionComplete }) {
+export default function VisionInspector({ zones = [], onRefreshTelemetry, onInspectionComplete, isDarkMode }) {
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState("all");
   const [selectedRiskFilter, setSelectedRiskFilter] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
@@ -666,6 +666,177 @@ const activeStorage = storages.find(s => s?.id === selectedStorageId) || storage
   const [simulationSpoilageOverride, setSimulationSpoilageOverride] = useState(null);
   const [dispatchedKds, setDispatchedKds] = useState(false);
   const [toastMessage, setToastMessage] = useState(null);
+
+    // Live IoT Telemetry Synchronization State
+  const [isSyncingSensors, setIsSyncingSensors] = useState(false);
+  const [lastSensorSyncTime, setLastSensorSyncTime] = useState(() => new Date().toLocaleTimeString());
+  const [isSensorModalOpen, setIsSensorModalOpen] = useState(false);
+  const [sensorUpdateForm, setSensorUpdateForm] = useState({
+    temperature: 11.4,
+    humidity: 90.2,
+    voc: 0.32,
+    co2: 415.0,
+    nh3: 0.02
+  });
+
+  const updateStoragesWithLiveTelemetry = useCallback((liveZones) => {
+    if (!Array.isArray(liveZones) || liveZones.length === 0) return;
+    setStorages(prevStorages => {
+      let changed = false;
+      const updated = prevStorages.map((storage, idx) => {
+        const matchedZone = liveZones.find(z => 
+          z.id === storage.zone_id || 
+          z.id === storage.id || 
+          (storage.name && z.name && storage.name.toLowerCase().includes(z.name.toLowerCase().slice(0, 6))) ||
+          (idx === 0 && (z.id === 'zone-fruit' || z.name?.includes('Zone 1') || z.name?.includes('Storage 1') || z.name?.toLowerCase().includes('fruit'))) ||
+          (idx === 1 && (z.id === 'zone-veg' || z.name?.includes('Zone 2') || z.name?.includes('Storage 2') || z.name?.toLowerCase().includes('crisper') || z.name?.toLowerCase().includes('leafy'))) ||
+          (idx === 2 && (z.id === 'zone-root' || z.name?.includes('Zone 3') || z.name?.includes('Storage 3') || z.name?.toLowerCase().includes('root'))) ||
+          (idx === 3 && (z.id === 'zone-ambient' || z.name?.includes('Zone 4') || z.name?.includes('Storage 4') || z.name?.toLowerCase().includes('ambient')))
+        ) || liveZones[idx % liveZones.length];
+
+        if (!matchedZone) return storage;
+
+        const newTemp = matchedZone.current_temp !== undefined ? Number(matchedZone.current_temp) : storage.current_temp;
+        const newHumidity = matchedZone.current_humidity !== undefined ? Number(matchedZone.current_humidity) : storage.current_humidity;
+        const newVoc = matchedZone.voc !== undefined ? Number(matchedZone.voc) : storage.voc;
+        const newCo2 = matchedZone.co2 !== undefined ? Number(matchedZone.co2) : storage.co2;
+        const newNh3 = matchedZone.nh3 !== undefined ? Number(matchedZone.nh3) : storage.nh3;
+        const newStatus = matchedZone.status || storage.status;
+
+        if (
+          storage.current_temp !== newTemp ||
+          storage.current_humidity !== newHumidity ||
+          storage.voc !== newVoc ||
+          storage.co2 !== newCo2 ||
+          storage.nh3 !== newNh3 ||
+          storage.status !== newStatus
+        ) {
+          changed = true;
+          return {
+            ...storage,
+            current_temp: newTemp,
+            current_humidity: newHumidity,
+            voc: newVoc,
+            co2: newCo2,
+            nh3: newNh3,
+            status: newStatus
+          };
+        }
+        return storage;
+      });
+
+      if (changed) {
+        try {
+          localStorage.setItem('smart_restaurant_storages', JSON.stringify(updated));
+        } catch (e) {}
+        return updated;
+      }
+      return prevStorages;
+    });
+  }, []);
+
+  const fetchLiveSensors = useCallback(async () => {
+    setIsSyncingSensors(true);
+    try {
+      const res = await axios.get("http://localhost:8000/api/sensors/zones");
+      if (res.data?.zones) {
+        updateStoragesWithLiveTelemetry(res.data.zones);
+        setLastSensorSyncTime(new Date().toLocaleTimeString());
+      }
+    } catch (err) {
+      // silent fallback
+    } finally {
+      setIsSyncingSensors(false);
+    }
+  }, [updateStoragesWithLiveTelemetry]);
+
+  useEffect(() => {
+    fetchLiveSensors();
+    const timer = setInterval(fetchLiveSensors, 3000);
+    return () => clearInterval(timer);
+  }, [fetchLiveSensors]);
+
+  useEffect(() => {
+    if (zones && zones.length > 0) {
+      updateStoragesWithLiveTelemetry(zones);
+    }
+  }, [zones, updateStoragesWithLiveTelemetry]);
+
+  const handleTransmitTelemetry = async (e) => {
+    if (e) e.preventDefault();
+    try {
+      const payload = {
+        storage_zone: activeStorage?.name || "Zone 1: Tropical Fruit Chiller (11°C)",
+        temperature: Number(sensorUpdateForm.temperature),
+        humidity: Number(sensorUpdateForm.humidity),
+        voc: Number(sensorUpdateForm.voc),
+        co2: Number(sensorUpdateForm.co2),
+        nh3: Number(sensorUpdateForm.nh3)
+      };
+
+      await axios.post("http://localhost:8000/api/sensors/telemetry", payload);
+
+      setStorages(prev => {
+        const updated = prev.map(s => {
+          if (s.id === activeStorage.id) {
+            return {
+              ...s,
+              current_temp: payload.temperature,
+              current_humidity: payload.humidity,
+              voc: payload.voc,
+              co2: payload.co2,
+              nh3: payload.nh3,
+              status: (Math.abs(payload.temperature - (s.target_temp || 11)) > 3.5 || payload.voc > 0.6 || payload.nh3 > 0.04) ? 'warning' : 'optimal'
+            };
+          }
+          return s;
+        });
+        try {
+          localStorage.setItem('smart_restaurant_storages', JSON.stringify(updated));
+        } catch (e) {}
+        return updated;
+      });
+
+      setLastSensorSyncTime(new Date().toLocaleTimeString());
+      setIsSensorModalOpen(false);
+      showToast(`✓ Live telemetry transmitted to ${activeStorage.name} (${payload.temperature}°C, ${payload.voc} ppm VOC)!`);
+
+      if (onRefreshTelemetry) {
+        onRefreshTelemetry();
+      }
+    } catch (err) {
+      console.error("Failed to transmit telemetry:", err);
+      showToast("Error transmitting telemetry. Ensure backend is running.");
+    }
+  };
+
+  const applySensorPreset = (presetType) => {
+    if (presetType === 'optimal') {
+      setSensorUpdateForm({
+        temperature: Number(activeStorage?.target_temp || 11.0),
+        humidity: Number(activeStorage?.target_humidity || 89.0),
+        voc: 0.22,
+        co2: 430.0,
+        nh3: 0.015
+      });
+    } else if (presetType === 'door_ajar') {
+      setSensorUpdateForm({
+        temperature: Number(activeStorage?.target_temp || 11.0) + 9.5,
+        humidity: 74.0,
+        voc: 0.65,
+        co2: 890.0,
+        nh3: 0.032
+      });
+    } else if (presetType === 'near_spoil') {
+      setSensorUpdateForm({
+        temperature: 28.5,
+        humidity: 66.0,
+        voc: 1.85,
+        co2: 1350.0,
+        nh3: 0.065
+      });
+    }
+  };
 
   const showToast = (msg) => {
     setToastMessage(msg);
@@ -1697,6 +1868,199 @@ const activeStorage = storages.find(s => s?.id === selectedStorageId) || storage
           (Both hardware units operating in the same chamber)
           ───────────────────────────────────────────────────────────── */}
       
+      
+      {/* Modal: Live Telemetry Update & Simulation */}
+      {isSensorModalOpen && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm animate-fade-in"
+          role="dialog"
+          aria-modal="true"
+        >
+          <div className="w-full max-w-lg rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl p-6 space-y-4 animate-slide-up max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-sky-100 dark:bg-sky-950 text-sky-800 dark:text-sky-300">
+                  <Activity className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-slate-900 dark:text-white">
+                    Update Chamber Sensor Telemetry
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    {activeStorage?.name} • Node ID: {activeStorage?.node_id || "ESP32-NODE-01"}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsSensorModalOpen(false)}
+                className="p-1.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Quick 1-Click Presets */}
+            <div className="space-y-1.5">
+              <span className="text-[11px] font-extrabold uppercase text-slate-500 block">
+                Quick Simulation Presets:
+              </span>
+              <div className="grid grid-cols-3 gap-2">
+                <button
+                  type="button"
+                  onClick={() => applySensorPreset('optimal')}
+                  className="p-2 rounded-xl border border-emerald-300 dark:border-emerald-800 bg-emerald-50/60 dark:bg-emerald-950/40 text-emerald-900 dark:text-emerald-300 text-left hover:bg-emerald-100 transition-colors"
+                >
+                  <span className="text-[10px] font-bold block">1. Cold Chain Safe</span>
+                  <span className="text-[9px] text-emerald-700 dark:text-emerald-400 font-mono">11°C • 89% RH</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => applySensorPreset('door_ajar')}
+                  className="p-2 rounded-xl border border-amber-300 dark:border-amber-800 bg-amber-50/60 dark:bg-amber-950/40 text-amber-900 dark:text-amber-300 text-left hover:bg-amber-100 transition-colors"
+                >
+                  <span className="text-[10px] font-bold block">2. Temp Elevation</span>
+                  <span className="text-[9px] text-amber-700 dark:text-amber-400 font-mono">20.5°C • 74% RH</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => applySensorPreset('near_spoil')}
+                  className="p-2 rounded-xl border border-rose-300 dark:border-rose-800 bg-rose-50/60 dark:bg-rose-950/40 text-rose-900 dark:text-rose-300 text-left hover:bg-rose-100 transition-colors"
+                >
+                  <span className="text-[10px] font-bold block">3. Gas Spike (~75%)</span>
+                  <span className="text-[9px] text-rose-700 dark:text-rose-400 font-mono">28.5°C • 1.85 VOC</span>
+                </button>
+              </div>
+            </div>
+
+            <form onSubmit={handleTransmitTelemetry} className="space-y-4 pt-1">
+              
+              {/* Temperature */}
+              <div className="space-y-1">
+                <div className="flex items-center justify-between text-xs font-bold text-slate-700 dark:text-slate-300">
+                  <span className="flex items-center gap-1.5">
+                    <Thermometer className="h-4 w-4 text-rose-500" /> Temperature (°C)
+                  </span>
+                  <span className="font-mono text-sm font-black text-rose-600 dark:text-rose-400">
+                    {sensorUpdateForm.temperature}°C
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min="0"
+                  max="40"
+                  step="0.5"
+                  value={sensorUpdateForm.temperature}
+                  onChange={(e) => setSensorUpdateForm({ ...sensorUpdateForm, temperature: parseFloat(e.target.value) })}
+                  className="w-full accent-rose-600 h-2 bg-slate-200 dark:bg-slate-700 rounded-lg cursor-pointer"
+                />
+              </div>
+
+              {/* Humidity */}
+              <div className="space-y-1">
+                <div className="flex items-center justify-between text-xs font-bold text-slate-700 dark:text-slate-300">
+                  <span className="flex items-center gap-1.5">
+                    <Droplets className="h-4 w-4 text-sky-500" /> Relative Humidity (% RH)
+                  </span>
+                  <span className="font-mono text-sm font-black text-sky-600 dark:text-sky-400">
+                    {sensorUpdateForm.humidity}%
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min="30"
+                  max="100"
+                  step="1"
+                  value={sensorUpdateForm.humidity}
+                  onChange={(e) => setSensorUpdateForm({ ...sensorUpdateForm, humidity: parseFloat(e.target.value) })}
+                  className="w-full accent-sky-600 h-2 bg-slate-200 dark:bg-slate-700 rounded-lg cursor-pointer"
+                />
+              </div>
+
+              {/* VOC */}
+              <div className="space-y-1">
+                <div className="flex items-center justify-between text-xs font-bold text-slate-700 dark:text-slate-300">
+                  <span className="flex items-center gap-1.5">
+                    <Wind className="h-4 w-4 text-amber-500" /> VOC / Ethylene Ripening Gas (ppm)
+                  </span>
+                  <span className="font-mono text-sm font-black text-amber-600 dark:text-amber-400">
+                    {sensorUpdateForm.voc} ppm
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min="0.05"
+                  max="3.00"
+                  step="0.05"
+                  value={sensorUpdateForm.voc}
+                  onChange={(e) => setSensorUpdateForm({ ...sensorUpdateForm, voc: parseFloat(e.target.value) })}
+                  className="w-full accent-amber-600 h-2 bg-slate-200 dark:bg-slate-700 rounded-lg cursor-pointer"
+                />
+              </div>
+
+              {/* Ammonia NH3 */}
+              <div className="space-y-1">
+                <div className="flex items-center justify-between text-xs font-bold text-slate-700 dark:text-slate-300">
+                  <span className="flex items-center gap-1.5">
+                    <Activity className="h-4 w-4 text-purple-500" /> Ammonia (NH₃) Rot Gas (ppm)
+                  </span>
+                  <span className="font-mono text-sm font-black text-purple-600 dark:text-purple-400">
+                    {sensorUpdateForm.nh3} ppm
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min="0.005"
+                  max="0.100"
+                  step="0.005"
+                  value={sensorUpdateForm.nh3}
+                  onChange={(e) => setSensorUpdateForm({ ...sensorUpdateForm, nh3: parseFloat(e.target.value) })}
+                  className="w-full accent-purple-600 h-2 bg-slate-200 dark:bg-slate-700 rounded-lg cursor-pointer"
+                />
+              </div>
+
+              {/* CO2 */}
+              <div className="space-y-1">
+                <div className="flex items-center justify-between text-xs font-bold text-slate-700 dark:text-slate-300">
+                  <span className="flex items-center gap-1.5">
+                    <Gauge className="h-4 w-4 text-emerald-500" /> Respiration CO₂ (ppm)
+                  </span>
+                  <span className="font-mono text-sm font-black text-emerald-600 dark:text-emerald-400">
+                    {sensorUpdateForm.co2} ppm
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min="350"
+                  max="2000"
+                  step="25"
+                  value={sensorUpdateForm.co2}
+                  onChange={(e) => setSensorUpdateForm({ ...sensorUpdateForm, co2: parseFloat(e.target.value) })}
+                  className="w-full accent-emerald-600 h-2 bg-slate-200 dark:bg-slate-700 rounded-lg cursor-pointer"
+                />
+              </div>
+
+              <div className="pt-2 flex items-center justify-end gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setIsSensorModalOpen(false)}
+                  className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2.5 rounded-xl bg-sky-700 hover:bg-sky-800 text-white text-xs font-bold shadow-md shadow-sky-700/20 transition-all active:scale-95 flex items-center gap-1.5"
+                >
+                  <Send className="h-3.5 w-3.5" />
+                  <span>Transmit to Chamber</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* Toast Notification */}
       {toastMessage && (
         <div className="fixed top-5 right-5 z-50 px-4 py-3 rounded-2xl bg-slate-900 dark:bg-emerald-950 text-white text-xs font-bold shadow-2xl border border-emerald-500/50 flex items-center gap-2.5 animate-slide-down">
@@ -1944,24 +2308,61 @@ const activeStorage = storages.find(s => s?.id === selectedStorageId) || storage
         {/* UNIT 2: IoT Environmental Telemetry Array (Right Side) */}
         <div className="lg:col-span-6 flex flex-col justify-between p-4 sm:p-5 bg-[#f8faf9] dark:bg-slate-850 rounded-2xl border border-[#d1ded5] dark:border-slate-800 shadow-2xs space-y-3">
           
-          <div className="flex items-center justify-between pb-2 border-b border-[#e1eae4] dark:border-slate-800 text-xs">
+          <div className="flex flex-wrap items-center justify-between pb-2 border-b border-[#e1eae4] dark:border-slate-800 text-xs gap-2">
             <span className="font-extrabold flex items-center gap-1.5 text-slate-900 dark:text-white truncate">
               <Activity className="h-4 w-4 text-sky-600 dark:text-sky-400 flex-shrink-0" />
               <span>Unit 2: IoT Chamber Environmental Sensors</span>
             </span>
-            <span className="text-[10px] px-2 py-0.5 rounded bg-sky-100 dark:bg-sky-950/60 text-sky-900 dark:text-sky-300 font-bold border border-sky-300 dark:border-sky-700 font-mono">
-              {activeStorage?.node_id || "ESP32-NODE-01"}
-            </span>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="hidden sm:inline">Live Stream</span>
+              </span>
+              <span className="text-[10px] text-slate-400 font-mono hidden md:inline">
+                {lastSensorSyncTime ? `${lastSensorSyncTime}` : 'Syncing...'}
+              </span>
+              <button
+                type="button"
+                onClick={fetchLiveSensors}
+                title="Refresh live sensor telemetry from chamber node"
+                className="p-1 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors cursor-pointer"
+              >
+                <RefreshCw className={`h-3 w-3 ${isSyncingSensors ? 'animate-spin text-emerald-500' : ''}`} />
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsSensorModalOpen(true)}
+                className="px-2 py-0.5 rounded-lg bg-sky-50 dark:bg-sky-950/70 hover:bg-sky-100 dark:hover:bg-sky-900 text-sky-700 dark:text-sky-300 border border-sky-300 dark:border-sky-700 text-[10px] font-bold flex items-center gap-1 transition-all active:scale-95 cursor-pointer shadow-2xs"
+                title="Update or simulate chamber sensor readings"
+              >
+                <Sliders className="h-2.5 w-2.5" />
+                <span>Update Telemetry</span>
+              </button>
+              <span className="text-[10px] px-2 py-0.5 rounded bg-sky-100 dark:bg-sky-950/60 text-sky-900 dark:text-sky-300 font-bold border border-sky-300 dark:border-sky-700 font-mono">
+                {activeStorage?.node_id || "ESP32-NODE-01"}
+              </span>
+            </div>
           </div>
 
           {/* Environmental Micro-Climate Banner */}
-          <div className="p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xs flex items-center justify-between">
+          <div className={`p-3 rounded-xl border shadow-2xs flex items-center justify-between transition-colors ${
+            activeStorage?.status === 'warning' || (Math.abs((activeStorage?.current_temp || 11) - (activeStorage?.target_temp || 11)) > 3.5) || ((activeStorage?.voc || 0) > 0.6)
+              ? 'bg-amber-50 dark:bg-amber-950/40 border-amber-300 dark:border-amber-800'
+              : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800'
+          }`}>
             <div>
               <span className="text-[10px] uppercase font-bold text-slate-500 block">Chamber Micro-Climate Status</span>
-              <span className="text-xs font-black text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5 mt-0.5">
-                <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-                <span>Optimal Cold Chain Storage • Safe Range</span>
-              </span>
+              {activeStorage?.status === 'warning' || (Math.abs((activeStorage?.current_temp || 11) - (activeStorage?.target_temp || 11)) > 3.5) || ((activeStorage?.voc || 0) > 0.6) ? (
+                <span className="text-xs font-black text-amber-700 dark:text-amber-400 flex items-center gap-1.5 mt-0.5">
+                  <AlertTriangle className="h-3.5 w-3.5 text-amber-500 animate-pulse flex-shrink-0" />
+                  <span>Thermal or Gas Stress Detected • Accelerated Decay Phase</span>
+                </span>
+              ) : (
+                <span className="text-xs font-black text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5 mt-0.5">
+                  <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                  <span>Optimal Cold Chain Storage • Safe Range</span>
+                </span>
+              )}
             </div>
             <span className="text-[10px] text-slate-500 font-semibold text-right">
               Target: {activeStorage?.target_temp || 11.0}°C • {activeStorage?.target_humidity || 89}% RH
@@ -2062,20 +2463,31 @@ const activeStorage = storages.find(s => s?.id === selectedStorageId) || storage
           "Output as Spoiled or Fresh and with Remaining Shelf Life"
           ───────────────────────────────────────────────────────────── */}
       {(() => {
-        // Calculation fusing 60% Sensors + 40% Computer Vision
+        // Calculation fusing 60% Optical Vision + 40% IoT Environmental Sensors
+        const tempDev = Math.max(0, (Number(activeStorage?.current_temp || 11.0) - Number(activeStorage?.target_temp || 11.0)));
+        const tempPenalty = tempDev * 3.5;
+        const vocExcess = Math.max(0, Number(activeStorage?.voc || 0.32) - 0.35);
+        const vocPenalty = vocExcess * 25.0;
+        const nh3Excess = Math.max(0, Number(activeStorage?.nh3 || 0.02) - 0.035);
+        const nh3Penalty = nh3Excess * 500.0;
+        const co2Excess = Math.max(0, Number(activeStorage?.co2 || 450) - 900);
+        const co2Penalty = (co2Excess / 1000.0) * 20.0;
+        const curHum = Number(activeStorage?.current_humidity || 90.0);
+        const humPenalty = curHum < 75 ? (75 - curHum) * 0.8 : (curHum > 95 ? (curHum - 95) * 2.0 : 0);
+
+        const sensorScore = Math.min(100, Math.round(tempPenalty + vocPenalty + nh3Penalty + co2Penalty + humPenalty));
+
         const simScore = simulationSpoilageOverride;
         const visualScore = cvResult?.visual_spoilage_score || cvResult?.ripeness_percent || 15.0;
-        const tempPenalty = Math.max(0, ((activeStorage?.current_temp || 11) - (activeStorage?.target_temp || 11)) * 3.5);
-        const vocPenalty = Math.max(0, ((activeStorage?.voc || 0.32) - 0.35) * 20.0);
-        const sensorScore = Math.min(100, tempPenalty + vocPenalty);
 
         const fusedScore = simScore !== null 
           ? simScore 
           : Math.min(99.0, Math.round(((sensorScore * 0.40) + (visualScore * 0.60)) * 10) / 10);
 
+        const dynamicHours = Math.max(0, Math.round((shelfLifePrediction.hours * (1 - (sensorScore / 130.0))) * 10) / 10);
         const fusedRsl = simScore !== null
           ? (simScore >= 70 ? 14.0 : 115.0)
-          : (shelfLifePrediction.hours);
+          : (fusedScore >= 75 ? 0.0 : dynamicHours);
 
         const isSpoiledState = fusedScore >= 75.0 || cvResult?.mould_detected || cvResult?.risk_level === 'Critical';
         const isNearSpoilState = !isSpoiledState && (fusedScore >= 50.0 || fusedRsl <= 24.0 || cvResult?.risk_level === 'High');
@@ -2212,7 +2624,7 @@ const activeStorage = storages.find(s => s?.id === selectedStorageId) || storage
                     <Activity className="h-3.5 w-3.5" /> Unit 2: IoT Sensors Findings:
                   </span>
                   <p className="text-slate-600 dark:text-slate-300 leading-relaxed">
-                    Chamber temperature steady at {activeStorage?.current_temp || 11.4}°C (target: {activeStorage?.target_temp || 11.0}°C), relative humidity at {activeStorage?.current_humidity || 90.2}% RH, VOC ripening gas controlled at {activeStorage?.voc || 0.32} ppm.
+                    Chamber temperature at {activeStorage?.current_temp || 11.4}°C (target: {activeStorage?.target_temp || 11.0}°C), relative humidity at {activeStorage?.current_humidity || 90.2}% RH, VOC ripening gas at {activeStorage?.voc || 0.32} ppm, CO2 at {activeStorage?.co2 || 415} ppm, NH3 at {activeStorage?.nh3 || 0.02} ppm.
                   </p>
                 </div>
               </div>
