@@ -3,7 +3,6 @@ import axios from 'axios';
 import { StatusBar, Style } from '@capacitor/status-bar';
 import Header, { getModulesForRole } from './components/Header';
 import MobileBottomNav from './components/MobileBottomNav';
-import StatsCards from './components/StatsCards';
 import StorageZoneTelemetry from './components/StorageZoneTelemetry';
 import VisionInspector from './components/VisionInspector';
 import MultiModalAssessor from './components/MultiModalAssessor';
@@ -451,8 +450,7 @@ export default function App() {
             {/* Sub-View 2: Multi-Modal Sensor + Vision Fusion Assessor */}
             {spoilageSubTab === 'assessor' && (
               <div className="space-y-4 sm:space-y-6 animate-fade-in">
-                {/* Spoilage Risk & Batch Overview Cards */}
-                <StatsCards stats={stats} isDarkMode={isDarkMode} />
+
                 <MultiModalAssessor
                   currentVisionFeatures={currentVisionFeatures}
                   selectedZone={selectedZone}
