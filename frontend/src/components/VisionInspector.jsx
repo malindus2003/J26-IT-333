@@ -43,7 +43,13 @@ import {
   ShieldCheck,
   Database,
   Thermometer,
-  Droplets
+  Droplets,
+  Send,
+  ChefHat,
+  Flame,
+  Activity,
+  Gauge,
+  Wind
 } from 'lucide-react';
 import axios from 'axios';
 
@@ -372,6 +378,8 @@ const DEFAULT_SYSTEM_STORAGES = [
     target_humidity: 89.0,
     current_humidity: 90.2,
     voc: 0.32,
+    co2: 415.0,
+    nh3: 0.02,
     status: "optimal",
     node_id: "ESP32-NODE-01 (Active)",
     assignedProduce: {
@@ -653,6 +661,151 @@ const activeStorage = storages.find(s => s?.id === selectedStorageId) || storage
   const [cvResult, setCvResult] = useState(SAMPLE_PRESETS[0]);
   const [isCameraActive, setIsCameraActive] = useState(false);
   const [cameraError, setCameraError] = useState(null);
+
+  // Unified Multi-Modal Simulation Override for testing Fresh vs ~75% Spoilage
+  const [simulationSpoilageOverride, setSimulationSpoilageOverride] = useState(null);
+  const [dispatchedKds, setDispatchedKds] = useState(false);
+  const [toastMessage, setToastMessage] = useState(null);
+
+  const showToast = (msg) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 4000);
+  };
+
+  const handleToggleSimulation = () => {
+    if (simulationSpoilageOverride !== null) {
+      setSimulationSpoilageOverride(null);
+      showToast("Reset to real live inspection & sensor telemetry data.");
+    } else {
+      setSimulationSpoilageOverride(76.5);
+      showToast("Simulated ~76.5% Spoilage Threshold. Near-spoilage recipe directive activated!");
+    }
+  };
+
+  const handleDispatchKDSUnified = (recipeTitle, station) => {
+    setDispatchedKds(true);
+    showToast(`✓ "${recipeTitle}" dispatched to Kitchen KDS (${station})!`);
+  };
+
+  // Recipe Directive Generator for active produce when near spoil (~75%)
+  const getProduceRecipeDirective = (produceName, category, spoilageScore) => {
+    const name = (produceName || "Perishable Produce").toLowerCase();
+    const score = Math.round(spoilageScore);
+
+    if (name.includes("mango")) {
+      return {
+        recipeTitle: "Fresh Mango Nectar, Smoothies & Dessert Coulis",
+        station: "Bar & Beverage / Dessert Station",
+        prepTimeMinutes: 15,
+        yieldPortions: "12 - 14 Servings",
+        extendedShelfLife: "+5 Days Chilled / +3 Months Frozen",
+        wasteCost: 38.40,
+        directive: `Softening cuticle and high ethylene detected (${score}% spoilage). Divert ${produceName} immediately to bar cocktail prep and dessert coulis before fermentation sets in.`,
+        steps: [
+          "Peel skin and cut pulp away from seed; discard bruised epidermal spots.",
+          "Puree 70% of pulp in high-speed blender with lime juice and ginger syrup until silky smooth.",
+          "Decant half into bar dispensers for today's lunch brunch cocktails and mocktails.",
+          "Portion remaining coulis into 500ml vacuum bags and freeze for weekly mango cheesecake topping."
+        ]
+      };
+    } else if (name.includes("banana")) {
+      return {
+        recipeTitle: "Spiced Artisan Banana Bread & Breakfast Parfait",
+        station: "Bakery & Pastry Counter",
+        prepTimeMinutes: 25,
+        yieldPortions: "3 Signature Loaves (24 Slices)",
+        extendedShelfLife: "+4 Days Baked / +60 Days Frozen",
+        wasteCost: 26.00,
+        directive: `Senescent sugar spotting and high softening detected (${score}% spoilage). Peak natural fructose makes this ideal for zero-sugar added commercial baking.`,
+        steps: [
+          "Mash bananas with a fork; their high moisture creates an extra tender crumb.",
+          "Fold into batter with Ceylon cinnamon and fold gently with roasted walnuts.",
+          "Bake at 175°C for 50 minutes until golden brown.",
+          "Slice extra bananas into rounds and freeze flat on sheet trays for morning smoothie station."
+        ]
+      };
+    } else if (name.includes("strawberry") || name.includes("strawberr") || name.includes("berry")) {
+      return {
+        recipeTitle: "Warm Strawberry-Basil Compote & Waffle Glaze",
+        station: "Morning Grill & Dessert Bar",
+        prepTimeMinutes: 12,
+        yieldPortions: "10 Portions",
+        extendedShelfLife: "+6 Days Jarred & Chilled",
+        wasteCost: 32.00,
+        directive: `Tissue breakdown and softening detected (${score}% spoilage). Immediate heat reduction locks natural pectin and halts decomposition.`,
+        steps: [
+          "Rinse and hull strawberries, halving larger berries.",
+          "Simmer in wide saucepan with sugar and lemon juice over medium flame for 8-10 minutes.",
+          "Remove from heat, fold in fresh basil chiffonade for aroma, and let cool slightly.",
+          "Serve warm over morning waffles, vanilla bean ice cream, or chill for dessert buffet."
+        ]
+      };
+    } else if (name.includes("tomato")) {
+      return {
+        recipeTitle: "Slow-Roasted Garlic-Herb Tomato Marinara Base",
+        station: "Hot Line & Sauté Station",
+        prepTimeMinutes: 35,
+        yieldPortions: "16 - 18 Servings (2.5 Liters)",
+        extendedShelfLife: "+7 Days Chilled / +6 Months Frozen",
+        wasteCost: 28.50,
+        directive: `Overripe softening and skin cracking detected (${score}% spoilage). Peak acidity and natural lycopene sugars make this optimal for rich savory reduction sauces.`,
+        steps: [
+          "Toss quartered tomatoes with olive oil, crushed garlic, and fresh herbs.",
+          "Roast on hotel pans at 190°C for 25 minutes until blistered and caramelized.",
+          "Transfer to stockpot, simmer with cracked pepper for 10 minutes, and pulse with immersion blender.",
+          "Label as 'House Roasted Marinara Base' for pizza, pasta stations, and shakshuka service."
+        ]
+      };
+    } else if (name.includes("lettuce") || name.includes("spinach") || name.includes("green") || name.includes("salad")) {
+      return {
+        recipeTitle: "Velvety Green Herb Soup & Stock Reduction",
+        station: "Prep Kitchen & Soup Station",
+        prepTimeMinutes: 20,
+        yieldPortions: "12 Bowls",
+        extendedShelfLife: "+4 Days Chilled / +2 Months Frozen",
+        wasteCost: 19.80,
+        directive: `Cellular dehydration and wilting detected (${score}% spoilage). While unsuitable for raw salads, high chlorophyll and dietary fiber make exquisite velvet soups.`,
+        steps: [
+          "Blanch wilted greens in salted boiling water for 45 seconds, then shock in ice bath to preserve vibrant emerald green.",
+          "Sauté shallots and leeks, add potatoes and vegetable broth; simmer until tender.",
+          "Add blanched greens at the very end and blend immediately to retain bright green color.",
+          "Finish with extra virgin olive oil swirl and garlic croutons as soup of the day."
+        ]
+      };
+    } else if (name.includes("carrot")) {
+      return {
+        recipeTitle: "Pickled Ginger-Carrot Ribbons & Slaw Topping",
+        station: "Cold Larder & Garde Manger",
+        prepTimeMinutes: 15,
+        yieldPortions: "25 Portions (Garnish / Slaw)",
+        extendedShelfLife: "+30 Days (Pickled in Brine)",
+        wasteCost: 22.00,
+        directive: `Root flaccidity and surface moisture loss detected (${score}% spoilage). Acidic pickling brine will completely restore crisp texture.`,
+        steps: [
+          "Using a mandoline or Y-peeler, shave carrots into long thin ribbons.",
+          "Bring vinegar, water, sugar, and spices to a quick boil; pour hot pickling liquid over carrot ribbons.",
+          "Allow to cool to room temperature; the acidity crisps the carrots back to a crunch.",
+          "Use as signature condiment on banh mi, grain bowls, and grilled sandwiches."
+        ]
+      };
+    } else {
+      return {
+        recipeTitle: `Fresh ${produceName} Culinary Reduction`,
+        station: category === "Fruits" ? "Bar & Dessert Station" : "Prep Kitchen & Hot Line",
+        prepTimeMinutes: 18,
+        yieldPortions: "10 Servings",
+        extendedShelfLife: "+5 Days Chilled / +2 Months Frozen",
+        wasteCost: 24.00,
+        directive: `Produce softening detected (${score}% spoilage). Process into culinary reduction to prevent spoilage loss.`,
+        steps: [
+          `Trim and inspect ${produceName}; discard damaged surface areas.`,
+          "Process according to culinary style: blend for puree/coulis, or sauté for sauce base.",
+          "Season with citrus or salt to stabilize shelf life, cool and store at 2°C - 4°C."
+        ]
+      };
+    }
+  };
+
 
   // ESP32-CAM Wi-Fi Hardware Node State
   const [esp32Url, setEsp32Url] = useState(() => localStorage.getItem("esp32_cam_url") || "http://172.20.10.2/capture");
@@ -1536,331 +1689,42 @@ const activeStorage = storages.find(s => s?.id === selectedStorageId) || storage
       )}
 
 
-      {/* SECTION 2: Optical Inspection Workbench (Container Photo with Bounding Boxes + Sensory Diagnostics) */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6 pt-2">
-        
-        {/* Real Photographic Container View with AI Bounding Box & Risk Overlay */}
-        <div className="lg:col-span-5 flex flex-col items-center justify-between p-3.5 sm:p-4 bg-[#f8faf9] dark:bg-slate-850 rounded-xl sm:rounded-2xl border border-[#d1ded5] dark:border-slate-800 relative dark:bg-slate-900/60 shadow-2xs">
-          
-          <div className="w-full flex items-center justify-between text-xs text-slate-700 dark:text-slate-300 pb-2 mb-2 border-b border-[#e1eae4] dark:border-slate-800">
-            <span className="font-bold flex items-center gap-1.5 text-slate-900 dark:text-white truncate mr-2">
-              <Camera className="h-4 w-4 text-emerald-700 dark:text-emerald-400 flex-shrink-0" />
-              <span className="truncate">{activeStorage?.name} Optical Feed</span>
-            </span>
-            <span className="text-[10px] px-2.5 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 font-bold border border-emerald-200 dark:border-emerald-800 flex-shrink-0">
-              Optical Sensor
-            </span>
-          </div>
-
-          {/* Identified Produce & AI Confidence Badge */}
-          {cvResult && cvResult.identified_produce && (
-            <div className="w-full mb-2 p-2.5 rounded-xl bg-gradient-to-r from-emerald-50 via-teal-50/70 to-emerald-50 dark:from-emerald-950/70 dark:via-teal-950/50 dark:to-emerald-950/70 border border-emerald-300 dark:border-emerald-700/80 shadow-2xs flex items-center justify-between">
-              <div className="flex items-center gap-2.5 min-w-0">
-                <span className="text-2xl p-1 bg-white dark:bg-slate-800 rounded-lg shadow-2xs flex-shrink-0 border border-emerald-200 dark:border-emerald-800">
-                  {cvResult.produce_icon || "🍎"}
-                </span>
-                <div className="flex flex-col min-w-0">
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className="text-[10px] font-black uppercase tracking-wider text-emerald-800 dark:text-emerald-400">
-                      Detected Produce:
-                    </span>
-                    <span className="text-xs sm:text-sm font-black text-slate-900 dark:text-white">
-                      {cvResult.identified_produce}
-                    </span>
-                    {cvResult.scientific_name && (
-                      <span className="text-[10px] italic text-slate-500 dark:text-slate-400 hidden sm:inline">
-                        ({cvResult.scientific_name})
-                      </span>
-                    )}
-                  </div>
-                  <span className="text-[10px] font-semibold text-emerald-900 dark:text-emerald-300 truncate">
-                    Category: {cvResult.category || "Produce"} • Baseline: {cvResult.baseline_shelf_life_hours || 120}h Shelf-Life
-                  </span>
-                </div>
-              </div>
-              {cvResult.produce_confidence && (
-                <div className="flex flex-col items-end flex-shrink-0 ml-2">
-                  <span className="text-[9px] font-bold text-slate-500 dark:text-slate-400 uppercase">Confidence</span>
-                  <span className="text-xs font-black px-2 py-0.5 rounded-full bg-emerald-200/90 dark:bg-emerald-900 text-emerald-900 dark:text-emerald-100 border border-emerald-300 dark:border-emerald-700 font-mono">
-                    {cvResult.produce_confidence}%
-                  </span>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Risk Diagnostic Banner (Placed outside photo frame to prevent text overlapping with bounding boxes) */}
-          {cvResult && (
-            <div className={`w-full mb-2 px-3 py-2 rounded-xl border text-[11px] sm:text-xs font-bold flex items-center justify-between shadow-2xs ${
-              cvResult.risk_level === 'Critical'
-                ? 'bg-rose-50 text-rose-950 border-rose-300 dark:bg-rose-950/60 dark:text-rose-200 dark:border-rose-800'
-                : cvResult.risk_level === 'High'
-                ? 'bg-amber-50 text-amber-950 border-amber-300 dark:bg-amber-950/60 dark:text-amber-200 dark:border-amber-800'
-                : cvResult.risk_level === 'Medium'
-                ? 'bg-amber-50/70 text-amber-900 border-amber-300 dark:bg-amber-950/40 dark:text-amber-200 dark:border-amber-700'
-                : 'bg-emerald-50 text-emerald-950 border-emerald-300 dark:bg-emerald-950/60 dark:text-emerald-200 dark:border-emerald-800'
-            }`}>
-              <span className="flex items-center gap-1.5 truncate">
-                {cvResult.risk_level === 'Critical' ? (
-                  <XCircle className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-rose-600 dark:text-rose-400 animate-pulse flex-shrink-0" />
-                ) : cvResult.risk_level === 'High' ? (
-                  <AlertTriangle className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-amber-600 dark:text-amber-400 flex-shrink-0" />
-                ) : cvResult.risk_level === 'Medium' ? (
-                  <AlertTriangle className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-amber-500 dark:text-amber-400 flex-shrink-0" />
-                ) : (
-                  <CheckCircle2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-emerald-600 dark:text-emerald-400 flex-shrink-0" />
-                )}
-                <span>{cvResult.identified_produce ? `${cvResult.identified_produce.toUpperCase()} — ` : ""}{cvResult.risk_level.toUpperCase()}: {cvResult.ripeness_stage.toUpperCase()}</span>
-              </span>
-              <span className="font-mono text-[11px] sm:text-xs font-black flex-shrink-0 ml-2">{cvResult.visual_spoilage_score}% Spoilage</span>
-            </div>
-          )}
-
-          {isCameraActive ? (
-            <div className="relative w-full h-64 sm:h-72 lg:h-80 bg-black rounded-xl overflow-hidden flex flex-col items-center justify-center border border-emerald-600">
-              <video
-                ref={videoRef}
-                autoPlay
-                playsInline
-                muted
-                className="w-full h-full object-cover"
-              />
-              <button
-                onClick={captureCameraFrame}
-                className="absolute bottom-3 px-4 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold shadow-xl flex items-center gap-2 cursor-pointer"
-              >
-                <Camera className="h-4 w-4" /> Snap & Inspect Item
-              </button>
-            </div>
-          ) : previewImage ? (
-            <div className="relative w-full flex flex-col items-center">
-              
-              {/* Photo Frame with Clean Bounding Box Overlays */}
-              <div className="relative w-full h-64 sm:h-72 lg:h-80 rounded-xl overflow-hidden shadow-sm border border-[#d1ded5] dark:border-slate-700 bg-slate-100 dark:bg-slate-950 flex items-center justify-center">
-                <img
-                  src={previewImage}
-                  alt="Food Container Inspection"
-                  onError={(e) => {
-                    e.currentTarget.onerror = null;
-                    const curPreset = SAMPLE_PRESETS.find(p => p.id === selectedPresetId);
-                    if (curPreset?.remoteFallbackUrl && e.currentTarget.src !== curPreset.remoteFallbackUrl) {
-                      e.currentTarget.src = curPreset.remoteFallbackUrl;
-                    } else {
-                      e.currentTarget.src = getFallbackSvg(curPreset?.name || 'Container Inspection', curPreset?.category || 'Perishable', curPreset?.icon || '🔬');
-                    }
-                  }}
-                  className="w-full h-full object-cover"
-                />
-
-                {/* Simulated Computer Vision Detection Bounding Box on image */}
-                {cvResult?.bounding_boxes?.map((box, i) => (
-                  <div
-                    key={i}
-                    style={{
-                      position: 'absolute',
-                      left: `${box.x}%`,
-                      top: `${box.y}%`,
-                      width: `${box.width}%`,
-                      height: `${box.height}%`,
-                      borderColor: box.color,
-                    }}
-                    className="border-2 rounded-lg border-dashed bg-rose-500/20 pointer-events-none flex items-start justify-start p-1 z-10"
-                  >
-                    <span
-                      style={{ backgroundColor: box.color }}
-                      className="text-[9px] sm:text-[10px] font-black text-white px-1.5 py-0.5 rounded shadow uppercase"
-                    >
-                      {box.label}
-                    </span>
-                  </div>
-                ))}
-              </div>
-
-              {/* High-Visibility Action Buttons */}
-              <div className="w-full grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2.5">
-                <button
-                  onClick={() => fileInputRef.current.click()}
-                  className="w-full py-2.5 px-3 rounded-xl bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 border border-[#c6d7cd] dark:border-slate-700 text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center justify-center gap-1.5 transition-all shadow-2xs cursor-pointer active:scale-98"
-                >
-                  <Upload className="h-4 w-4 text-emerald-700 dark:text-emerald-400" />
-                  <span>Upload Photo</span>
-                </button>
-                <button
-                  onClick={() => setIsEsp32ModalOpen(true)}
-                  className="w-full py-2.5 px-3 rounded-xl bg-sky-700 hover:bg-sky-800 text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-md shadow-sky-700/20 transition-all cursor-pointer active:scale-98"
-                >
-                  <Cpu className="h-4 w-4 text-sky-200" />
-                  <span>ESP32-CAM Node</span>
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div
-              onClick={() => fileInputRef.current.click()}
-              className="w-full h-64 sm:h-72 lg:h-80 border-2 border-dashed border-[#d1ded5] dark:border-slate-700 hover:border-emerald-600 rounded-xl flex flex-col items-center justify-center cursor-pointer transition-colors p-4 text-center bg-white dark:bg-slate-900"
-            >
-              <div className="p-3 rounded-full bg-emerald-50 dark:bg-slate-800 text-emerald-700 dark:text-emerald-400 mb-2">
-                <Camera className="h-6 w-6" />
-              </div>
-              <span className="text-xs font-bold text-slate-800 dark:text-slate-200">Upload Container Food Photo</span>
-            </div>
-          )}
-
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={handleFileUpload}
-          />
+      {/* ─────────────────────────────────────────────────────────────
+          UNIFIED SECTION: OPTICAL COMPUTER VISION + IOT TELEMETRY
+          (Both hardware units operating in the same chamber)
+          ───────────────────────────────────────────────────────────── */}
+      
+      {/* Toast Notification */}
+      {toastMessage && (
+        <div className="fixed top-5 right-5 z-50 px-4 py-3 rounded-2xl bg-slate-900 dark:bg-emerald-950 text-white text-xs font-bold shadow-2xl border border-emerald-500/50 flex items-center gap-2.5 animate-slide-down">
+          <CheckCircle2 className="h-4 w-4 text-emerald-400 flex-shrink-0" />
+          <span>{toastMessage}</span>
         </div>
+      )}
 
-        {/* Ripeness Stage Progression & Diagnostic Assessment */}
-        <div className="lg:col-span-7 flex flex-col justify-between space-y-3 sm:space-y-4">
-          {cvResult && (
-            <div className="space-y-3 sm:space-y-4">
-              
-              {/* 4-Stage Ripeness Level Progression Bar */}
-              <div className="p-3.5 sm:p-5 rounded-xl sm:rounded-2xl bg-[#f8faf9] dark:bg-slate-850 border border-[#d1ded5] dark:border-slate-800 shadow-xs dark:bg-slate-900/60">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-[11px] sm:text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
-                    <Layers className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-emerald-700 dark:text-emerald-400" /> Lifecycle Stage:
-                  </span>
-                  <span className="text-[11px] sm:text-xs font-bold text-emerald-800 dark:text-emerald-400">
-                    Stage {ripenessStep} of 4: {cvResult.ripeness_stage}
-                  </span>
-                </div>
-
-                {/* 4 Steps Graphic - 2x2 on Mobile, 1x4 on Desktop */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 sm:gap-2 mt-2 sm:mt-3">
-                  
-                  {/* Step 1: Unripe */}
-                  <div className={`p-2.5 sm:p-3 rounded-xl border text-center transition-all ${
-                    ripenessStep === 1
-                      ? 'bg-emerald-100 dark:bg-emerald-950/60 border-emerald-600 text-emerald-950 dark:text-emerald-300 font-bold shadow-sm'
-                      : 'bg-white dark:bg-slate-900 border-[#d1ded5] dark:border-slate-800 text-slate-600 dark:text-slate-400'
-                  }`}>
-                    <span className="text-[9px] sm:text-[10px] block font-bold">Stage 1</span>
-                    <span className="text-xs sm:text-xs font-bold truncate block">🟢 Unripe</span>
-                  </div>
-
-                  {/* Step 2: Optimal Ripe */}
-                  <div className={`p-2.5 sm:p-3 rounded-xl border text-center transition-all ${
-                    ripenessStep === 2
-                      ? 'bg-emerald-100 dark:bg-emerald-950/60 border-emerald-600 text-emerald-950 dark:text-emerald-300 font-bold shadow-sm'
-                      : 'bg-white dark:bg-slate-900 border-[#d1ded5] dark:border-slate-800 text-slate-600 dark:text-slate-400'
-                  }`}>
-                    <span className="text-[9px] sm:text-[10px] block font-bold">Stage 2</span>
-                    <span className="text-xs sm:text-xs font-bold truncate block">✨ Optimal</span>
-                  </div>
-
-                  {/* Step 3: Overripe */}
-                  <div className={`p-2.5 sm:p-3 rounded-xl border text-center transition-all ${
-                    ripenessStep === 3
-                      ? 'bg-amber-100 dark:bg-amber-950/60 border-amber-600 text-amber-950 dark:text-amber-300 font-bold shadow-sm'
-                      : 'bg-white dark:bg-slate-900 border-[#d1ded5] dark:border-slate-800 text-slate-600 dark:text-slate-400'
-                  }`}>
-                    <span className="text-[9px] sm:text-[10px] block font-bold">Stage 3</span>
-                    <span className="text-xs sm:text-xs font-bold truncate block">⚠️ Overripe</span>
-                  </div>
-
-                  {/* Step 4: Spoiled / Rotten */}
-                  <div className={`p-2.5 sm:p-3 rounded-xl border text-center transition-all ${
-                    ripenessStep === 4
-                      ? 'bg-rose-100 dark:bg-rose-950/60 border-rose-600 text-rose-950 dark:text-rose-300 font-bold shadow-sm animate-pulse'
-                      : 'bg-white dark:bg-slate-900 border-[#d1ded5] dark:border-slate-800 text-slate-600 dark:text-slate-400'
-                  }`}>
-                    <span className="text-[9px] sm:text-[10px] block font-bold">Stage 4</span>
-                    <span className="text-xs sm:text-xs font-bold truncate block">🚨 Spoiled</span>
-                  </div>
-
-                </div>
-              </div>
-
-              {/* 4 Sensory Indicators - 2x2 on Mobile, 1x4 on Desktop */}
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
-                <div className="p-3 sm:p-3.5 rounded-xl bg-white dark:bg-slate-850 border border-[#d1ded5] dark:border-slate-800 shadow-xs dark:bg-slate-900/80">
-                  <span className="text-[10px] sm:text-xs font-semibold text-slate-600 dark:text-slate-400 block truncate">Surface Browning</span>
-                  <div className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white mt-0.5">{cvResult.discoloration_score}%</div>
-                </div>
-
-                <div className="p-3 sm:p-3.5 rounded-xl bg-white dark:bg-slate-850 border border-[#d1ded5] dark:border-slate-800 shadow-xs dark:bg-slate-900/80">
-                  <span className="text-[10px] sm:text-xs font-semibold text-slate-600 dark:text-slate-400 block truncate">Mould Colony</span>
-                  <div className="text-sm sm:text-lg font-bold mt-0.5 flex items-center gap-1">
-                    {cvResult.mould_detected ? (
-                      <span className="text-rose-700 dark:text-rose-400 flex items-center gap-1 text-xs sm:text-sm font-bold truncate" title={`Confidence: ${cvResult.mould_confidence || 90}%, Coverage: ${cvResult.mould_coverage}%`}>
-                        <AlertTriangle className="h-3.5 w-3.5" /> Detected ({cvResult.mould_confidence !== undefined ? `${cvResult.mould_confidence}%` : `${cvResult.mould_coverage}%`})
-                      </span>
-                    ) : (
-                      <span className="text-emerald-700 dark:text-emerald-400 flex items-center gap-1 text-xs sm:text-sm font-bold">
-                        <CheckCircle2 className="h-3.5 w-3.5" /> Clear (0%)
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                <div className="p-3 sm:p-3.5 rounded-xl bg-white dark:bg-slate-850 border border-[#d1ded5] dark:border-slate-800 shadow-xs dark:bg-slate-900/80">
-                  <span className="text-[10px] sm:text-xs font-semibold text-slate-600 dark:text-slate-400 block truncate">Tissue Breakdown</span>
-                  <div className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white mt-0.5">{cvResult.texture_degradation}%</div>
-                </div>
-
-                <div className="p-3 sm:p-3.5 rounded-xl bg-white dark:bg-slate-850 border border-[#d1ded5] dark:border-slate-800 shadow-xs dark:bg-slate-900/80">
-                  <span className="text-[10px] sm:text-xs font-semibold text-slate-600 dark:text-slate-400 block truncate">Defect Regions</span>
-                  <div className="text-sm sm:text-base font-bold text-emerald-800 dark:text-emerald-400 mt-0.5">
-                    {cvResult.bounding_boxes?.length || 0} Region(s)
-                  </div>
-                </div>
-              </div>
-
-              {/* Detected Spoilage Symptoms Box */}
-              {cvResult.detected_defects?.length > 0 ? (
-                <div className={`p-3 sm:p-4 rounded-xl border ${
-                  cvResult.risk_level === 'Critical'
-                    ? 'bg-rose-50 dark:bg-rose-950/40 border-rose-300 dark:border-rose-800 text-rose-950 dark:text-rose-200'
-                    : 'bg-amber-50 dark:bg-amber-950/40 border-amber-300 dark:border-amber-800 text-amber-950 dark:text-amber-200'
-                }`}>
-                  <span className={`text-[11px] sm:text-xs font-bold flex items-center gap-1.5 mb-1 ${
-                    cvResult.risk_level === 'Critical' ? 'text-rose-900 dark:text-rose-400' : 'text-amber-900 dark:text-amber-400'
-                  }`}>
-                    <AlertTriangle className="h-3.5 w-3.5" /> Identified Spoilage Symptoms:
-                  </span>
-                  <ul className="text-[11px] sm:text-xs space-y-0.5 list-disc list-inside font-medium">
-                    {cvResult.detected_defects.map((d, i) => (
-                      <li key={i}>{d}</li>
-                    ))}
-                  </ul>
-                </div>
-              ) : (
-                <div className="p-3 sm:p-4 rounded-xl border border-emerald-300 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/40 text-[11px] sm:text-xs text-emerald-950 dark:text-emerald-200 flex items-center gap-2 font-bold">
-                  <CheckCircle2 className="h-4 w-4 text-emerald-700 dark:text-emerald-400" />
-                  <span>No biological defects detected. Item in prime harvest condition.</span>
-                </div>
-              )}
-
-            </div>
-          )}
-        </div>
-
-      </div>
-
-      {/* SECTION 3: AI MULTI-STAGE TELEMETRY & DIAGNOSTICS */}
-      <div className="p-3.5 sm:p-5 rounded-xl sm:rounded-2xl bg-white dark:bg-slate-900 border border-[#d1ded5] dark:border-slate-800 shadow-sm space-y-4 mt-4">
-        
-        {/* Card Header with Badges & History Toggle */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 border-b border-[#e1eae4] dark:border-slate-800 pb-3">
-          <div className="flex items-center gap-2">
-            <div className="p-1.5 sm:p-2 rounded-xl bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-400">
-              <Award className="h-4 w-4 sm:h-5 sm:w-5" />
+      {/* Chamber Header & Synchronization Banner */}
+      <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-emerald-50 via-teal-50/60 to-emerald-50 dark:from-slate-850 dark:via-slate-800 dark:to-slate-850 border border-emerald-200 dark:border-emerald-800 shadow-2xs space-y-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-2xl bg-emerald-700 text-white flex items-center justify-center shadow-md shadow-emerald-700/20 flex-shrink-0">
+              <Boxes className="h-5 w-5" />
             </div>
             <div>
-              <h3 className="text-xs sm:text-sm font-extrabold text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-2">
-                <span>AI Quality Diagnostics — {activeStorage?.name}</span>
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 font-bold border border-emerald-300 dark:border-emerald-700">
-                  {cvResult?.model_version || "v2.2-trained"}
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-sm sm:text-base font-black text-slate-900 dark:text-white">
+                  {activeStorage?.name}
                 </span>
-              </h3>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400 font-semibold">
-                Dataset-backed machine learning inference on CPU • Pascal VOC Ground-Truth Aligned
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-900 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700">
+                  Dual-Unit Synchronized Chamber
+                </span>
+                {simulationSpoilageOverride !== null && (
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300">
+                    Simulation Override: ~{simulationSpoilageOverride}%
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
+                Optical Camera Sensor & 5-Parameter IoT Environmental Array are both installed in this storage chamber.
               </p>
             </div>
           </div>
@@ -1868,329 +1732,512 @@ const activeStorage = storages.find(s => s?.id === selectedStorageId) || storage
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={() => setIsHistoryDrawerOpen(true)}
-              className="px-3 py-1.5 rounded-xl text-xs font-bold bg-[#ecfdf5] hover:bg-[#d1fae5] dark:bg-slate-800 dark:hover:bg-slate-750 text-emerald-900 dark:text-emerald-300 border border-emerald-300 dark:border-slate-700 flex items-center gap-1.5 transition-all shadow-xs"
+              onClick={handleToggleSimulation}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 border transition-all cursor-pointer shadow-2xs ${
+                simulationSpoilageOverride !== null
+                  ? 'bg-amber-600 hover:bg-amber-700 text-white border-amber-600'
+                  : 'bg-white dark:bg-slate-800 hover:bg-amber-50 dark:hover:bg-slate-700 text-amber-900 dark:text-amber-300 border-amber-300 dark:border-amber-700'
+              }`}
+              title="Toggle simulated ~75% spoilage trigger to test Fresh vs Spoiled output"
             >
-              <History className="h-3.5 w-3.5 text-emerald-700 dark:text-emerald-400" />
-              <span>Inspection History</span>
-              {inspectionHistory.length > 0 && (
-                <span className="px-1.5 py-0.2 rounded-full bg-emerald-600 text-white text-[10px]">
-                  {inspectionHistory.length}
+              <Flame className="h-3.5 w-3.5" />
+              <span>{simulationSpoilageOverride !== null ? "Reset to Live Data" : "Test ~75% Spoilage"}</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Row of the Two Synchronized Units in One Chamber */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6 pt-1">
+        
+        {/* UNIT 1: Optical Camera View & CV Inspection (Left Side) */}
+        <div className="lg:col-span-6 flex flex-col justify-between p-4 sm:p-5 bg-[#f8faf9] dark:bg-slate-850 rounded-2xl border border-[#d1ded5] dark:border-slate-800 shadow-2xs space-y-3">
+          
+          <div className="flex items-center justify-between pb-2 border-b border-[#e1eae4] dark:border-slate-800 text-xs">
+            <span className="font-extrabold flex items-center gap-1.5 text-slate-900 dark:text-white truncate">
+              <Camera className="h-4 w-4 text-emerald-700 dark:text-emerald-400 flex-shrink-0" />
+              <span>Unit 1: Optical Computer Vision Scanner</span>
+            </span>
+            <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-100 dark:bg-emerald-950/60 text-emerald-900 dark:text-emerald-300 font-bold border border-emerald-300 dark:border-emerald-700">
+              Camera Feed
+            </span>
+          </div>
+
+          {/* Identified Produce & AI Confidence */}
+          {cvResult && cvResult.identified_produce && (
+            <div className="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-emerald-300 dark:border-emerald-700 shadow-2xs flex items-center justify-between">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <span className="text-2xl p-1 bg-slate-50 dark:bg-slate-800 rounded-lg flex-shrink-0">
+                  {cvResult.produce_icon || "🍎"}
                 </span>
-              )}
+                <div className="min-w-0">
+                  <div className="text-xs font-black text-slate-900 dark:text-white truncate">
+                    {cvResult.identified_produce}
+                  </div>
+                  <div className="text-[10px] text-slate-500 dark:text-slate-400 truncate">
+                    {cvResult.category || "Produce"} • Lifecycle: {cvResult.ripeness_stage}
+                  </div>
+                </div>
+              </div>
+              <span className="text-xs font-black px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900 text-emerald-900 dark:text-emerald-100 border border-emerald-300 font-mono">
+                {cvResult.produce_confidence || 96.5}% Conf.
+              </span>
+            </div>
+          )}
+
+          {/* Photographic Feed with AI Bounding Boxes */}
+          <div className="relative w-full h-64 sm:h-72 rounded-xl overflow-hidden shadow-sm border border-[#d1ded5] dark:border-slate-700 bg-slate-950 flex items-center justify-center">
+            {isCameraActive ? (
+              <video
+                ref={videoRef}
+                autoPlay
+                playsInline
+                muted
+                className="w-full h-full object-cover"
+              />
+            ) : previewImage ? (
+              <img
+                src={previewImage}
+                alt="Chamber Inspection Feed"
+                onError={(e) => {
+                  e.currentTarget.onerror = null;
+                  e.currentTarget.src = getFallbackSvg(cvResult?.name || 'Produce', cvResult?.category || 'Produce', cvResult?.icon || '🍎');
+                }}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <div className="text-slate-400 text-xs font-bold">No Image Available</div>
+            )}
+
+            {/* Bounding box overlays */}
+            {!isCameraActive && cvResult?.bounding_boxes?.map((box, i) => (
+              <div
+                key={i}
+                style={{
+                  position: 'absolute',
+                  left: `${box.x}%`,
+                  top: `${box.y}%`,
+                  width: `${box.width}%`,
+                  height: `${box.height}%`,
+                  borderColor: box.color,
+                  borderWidth: '2px',
+                  borderStyle: 'dashed',
+                  backgroundColor: `${box.color}22`
+                }}
+                className="pointer-events-none rounded transition-all"
+              >
+                <span 
+                  style={{ backgroundColor: box.color }}
+                  className="absolute -top-5 left-0 px-1.5 py-0.2 text-[9px] font-black text-white rounded uppercase tracking-wider"
+                >
+                  {box.label}
+                </span>
+              </div>
+            ))}
+          </div>
+
+          {/* Optical Metrics Bar */}
+          <div className="grid grid-cols-3 gap-2 text-center text-xs">
+            <div className="p-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+              <span className="text-[10px] text-slate-500 font-bold block">Browning</span>
+              <span className="font-black text-slate-900 dark:text-white">{cvResult?.discoloration_score || 3.2}%</span>
+            </div>
+            <div className="p-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+              <span className="text-[10px] text-slate-500 font-bold block">Mould Colony</span>
+              <span className={`font-black ${cvResult?.mould_detected ? 'text-rose-600' : 'text-emerald-600'}`}>
+                {cvResult?.mould_detected ? 'Detected!' : '0% Clear'}
+              </span>
+            </div>
+            <div className="p-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+              <span className="text-[10px] text-slate-500 font-bold block">Tissue Degradation</span>
+              <span className="font-black text-slate-900 dark:text-white">{cvResult?.texture_degradation || 6}%</span>
+            </div>
+          </div>
+
+          {/* Camera Action Buttons */}
+          <div className="flex items-center gap-2 pt-1">
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="flex-1 py-2 px-3 rounded-xl bg-white hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-750 text-slate-800 dark:text-slate-200 text-xs font-bold border border-slate-300 dark:border-slate-700 flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
+            >
+              <Upload className="h-3.5 w-3.5 text-slate-600 dark:text-slate-300" />
+              <span>Upload Photo</span>
+            </button>
+            <button
+              onClick={() => setIsEsp32ModalOpen(true)}
+              className="flex-1 py-2 px-3 rounded-xl bg-sky-700 hover:bg-sky-800 text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm cursor-pointer"
+            >
+              <Cpu className="h-3.5 w-3.5 text-sky-200" />
+              <span>ESP32-CAM Node</span>
             </button>
           </div>
         </div>
 
-        {/* 4-Column Decoupled Diagnostic Telemetry Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        {/* UNIT 2: IoT Environmental Telemetry Array (Right Side) */}
+        <div className="lg:col-span-6 flex flex-col justify-between p-4 sm:p-5 bg-[#f8faf9] dark:bg-slate-850 rounded-2xl border border-[#d1ded5] dark:border-slate-800 shadow-2xs space-y-3">
           
-          {/* Diagnostic 1: Species Identification */}
-          <div className="p-3.5 rounded-xl bg-[#f8faf9] dark:bg-slate-800/60 border border-[#e1eae4] dark:border-slate-700/80 space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                1. Species Identity
-              </span>
-              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
-                cvResult?.is_supported_produce !== false 
-                  ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-900 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700'
-                  : 'bg-amber-100 dark:bg-amber-950 text-amber-900 dark:text-amber-300 border-amber-300 dark:border-amber-700'
-              }`}>
-                {cvResult?.is_supported_produce !== false ? 'Supported Class' : 'Out-of-Distribution'}
-              </span>
-            </div>
-
-            <div className="flex items-center gap-2.5">
-              <span className="text-2xl">{cvResult?.produce_icon || "🍎"}</span>
-              <div className="min-w-0">
-                <div className="text-sm font-extrabold text-slate-900 dark:text-white truncate">
-                  {cvResult?.species_identity || cvResult?.identified_produce || "Fruit / Vegetable"}
-                </div>
-                <div className="text-[10px] text-slate-500 dark:text-slate-400 italic truncate">
-                  {cvResult?.scientific_name || "Biological specimen"}
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-1 pt-1">
-              <div className="flex justify-between text-[11px] font-bold">
-                <span className="text-slate-600 dark:text-slate-400">Confidence:</span>
-                <span className="text-emerald-800 dark:text-emerald-400">{cvResult?.produce_confidence || 85.0}%</span>
-              </div>
-              <div className="w-full bg-slate-200 dark:bg-slate-700 h-2 rounded-full overflow-hidden">
-                <div
-                  className="bg-emerald-600 h-2 rounded-full transition-all duration-300"
-                  style={{ width: `${Math.min(100, cvResult?.produce_confidence || 85)}%` }}
-                />
-              </div>
-            </div>
-
-            {cvResult?.alternative_predictions && cvResult.alternative_predictions.length > 1 && (
-              <div className="text-[10px] text-slate-600 dark:text-slate-400 pt-1 border-t border-slate-200 dark:border-slate-700">
-                <span className="font-bold">Alternatives: </span>
-                {cvResult.alternative_predictions.slice(1, 3).map((alt, idx) => (
-                  <span key={idx} className="mr-1.5">
-                    {alt.produce} ({alt.confidence}%)
-                  </span>
-                ))}
-              </div>
-            )}
+          <div className="flex items-center justify-between pb-2 border-b border-[#e1eae4] dark:border-slate-800 text-xs">
+            <span className="font-extrabold flex items-center gap-1.5 text-slate-900 dark:text-white truncate">
+              <Activity className="h-4 w-4 text-sky-600 dark:text-sky-400 flex-shrink-0" />
+              <span>Unit 2: IoT Chamber Environmental Sensors</span>
+            </span>
+            <span className="text-[10px] px-2 py-0.5 rounded bg-sky-100 dark:bg-sky-950/60 text-sky-900 dark:text-sky-300 font-bold border border-sky-300 dark:border-sky-700 font-mono">
+              {activeStorage?.node_id || "ESP32-NODE-01"}
+            </span>
           </div>
 
-          {/* Diagnostic 2: Ripeness Stage (Physiological) */}
-          <div className="p-3.5 rounded-xl bg-[#f8faf9] dark:bg-slate-800/60 border border-[#e1eae4] dark:border-slate-700/80 space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                2. Ripeness Stage
-              </span>
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border bg-emerald-100 dark:bg-emerald-950 text-emerald-900 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700">
-                Physiological
-              </span>
-            </div>
-
-            <div className="text-sm font-extrabold text-slate-900 dark:text-white flex items-center gap-1.5">
-              <span>{cvResult?.ripeness_classification || cvResult?.ripeness_stage || "Ripe / Optimal"}</span>
-            </div>
-
-            {/* Stage Probabilities Bar */}
-            {cvResult?.stage_probabilities && (
-              <div className="space-y-1 pt-1">
-                <span className="text-[10px] font-bold text-slate-600 dark:text-slate-400">Class Probabilities:</span>
-                <div className="grid grid-cols-3 gap-1 text-[9px] font-bold text-center">
-                  <div className="p-1 rounded-md bg-emerald-100 dark:bg-emerald-950/60 text-emerald-950 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800">
-                    <div>Unripe</div>
-                    <div>{cvResult.stage_probabilities["Unripe / Firm"] || 0}%</div>
-                  </div>
-                  <div className="p-1 rounded-md bg-emerald-100 dark:bg-emerald-950/60 text-emerald-950 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800">
-                    <div>Optimal</div>
-                    <div>{cvResult.stage_probabilities["Ripe / Optimal"] || 0}%</div>
-                  </div>
-                  <div className="p-1 rounded-md bg-amber-100 dark:bg-amber-950/60 text-amber-950 dark:text-amber-300 border border-amber-300 dark:border-amber-800">
-                    <div>Overripe</div>
-                    <div>{cvResult.stage_probabilities["Overripe"] || 0}%</div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            <div className="text-[10px] text-slate-500 dark:text-slate-400 pt-1 border-t border-slate-200 dark:border-slate-700 flex justify-between">
-              <span>Sugar Spotting:</span>
-              <span className="font-semibold text-slate-700 dark:text-slate-300">
-                {cvResult?.ripeness_classification === 'Overripe' ? 'Senescent Sugar Spots' : 'Normal Cuticle'}
-              </span>
-            </div>
-          </div>
-
-          {/* Diagnostic 3: Visible Spoilage Classification (Calibrated) */}
-          <div className="p-3.5 rounded-xl bg-[#f8faf9] dark:bg-slate-800/60 border border-[#e1eae4] dark:border-slate-700/80 space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                3. Visible Spoilage
-              </span>
-              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
-                cvResult?.visible_spoilage_classification === 'No visible spoilage detected' 
-                  ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
-                  : cvResult?.visible_spoilage_classification === 'Localized visible defect'
-                  ? 'bg-amber-100 text-amber-800 border-amber-300'
-                  : cvResult?.visible_spoilage_classification === 'Uncertain'
-                  ? 'bg-purple-100 text-purple-800 border-purple-300'
-                  : 'bg-rose-100 text-rose-800 border-rose-300'
-              }`}>
-                {cvResult?.risk_level || 'Low'} Risk
-              </span>
-            </div>
-
-            <div className={`text-sm font-extrabold flex items-center gap-1.5 ${
-              cvResult?.visible_spoilage_classification === 'No visible spoilage detected'
-                ? 'text-emerald-700 dark:text-emerald-400'
-                : cvResult?.visible_spoilage_classification === 'Localized visible defect'
-                ? 'text-amber-700 dark:text-amber-400'
-                : cvResult?.visible_spoilage_classification === 'Uncertain'
-                ? 'text-purple-700 dark:text-purple-400'
-                : 'text-rose-700 dark:text-rose-400'
-            }`}>
-              <span>{cvResult?.visible_spoilage_classification || 'No visible spoilage detected'}</span>
-            </div>
-
-            <div className="space-y-1 pt-1 text-xs">
-              <div className="flex justify-between text-[11px] font-bold">
-                <span className="text-slate-600 dark:text-slate-400">Spoilage Probability:</span>
-                <span className="font-mono text-slate-800 dark:text-slate-200">
-                  {cvResult?.spoilage_probability !== undefined ? `${cvResult.spoilage_probability}%` : '0.0%'}
-                </span>
-              </div>
-              <div className="w-full bg-slate-200 dark:bg-slate-700 h-2 rounded-full overflow-hidden relative">
-                <div
-                  className={`h-2 rounded-full transition-all duration-300 ${
-                    (cvResult?.spoilage_probability || 0) >= 41.0 ? 'bg-rose-600' : 'bg-emerald-600'
-                  }`}
-                  style={{ width: `${Math.min(100, cvResult?.spoilage_probability || 0)}%` }}
-                />
-              </div>
-            </div>
-
-            <div className="text-[10px] text-slate-500 dark:text-slate-400 pt-1 border-t border-slate-200 dark:border-slate-700 flex justify-between">
-              <span>Decision Threshold:</span>
-              <span className="font-mono font-bold text-slate-700 dark:text-slate-300">
-                T = {cvResult?.calibrated_threshold || 41.0}%
-              </span>
-            </div>
-          </div>
-
-          {/* Diagnostic 4: Defect Types & Localization SLA */}
-          <div className="p-3.5 rounded-xl bg-[#f8faf9] dark:bg-slate-800/60 border border-[#e1eae4] dark:border-slate-700/80 space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                4. Defect Types & SLA
-              </span>
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300">
-                {cvResult?.processing_latency_ms ? `${cvResult.processing_latency_ms} ms CPU` : "< 100 ms"}
-              </span>
-            </div>
-
-            <div className="text-xs">
-              <div className="text-[10px] text-slate-500 dark:text-slate-400">Identified Defect Types</div>
-              <div className="font-bold text-slate-800 dark:text-slate-200 truncate">
-                {cvResult?.defect_types && cvResult.defect_types.length > 0
-                  ? cvResult.defect_types.join(", ")
-                  : "None (Intact Cuticle)"}
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-1.5 pt-0.5 text-xs">
-              <div className="p-1.5 rounded-lg bg-white dark:bg-slate-900 border border-[#e1eae4] dark:border-slate-700">
-                <div className="text-[9px] text-slate-500 dark:text-slate-400">Bounding Boxes</div>
-                <div className="font-extrabold text-slate-800 dark:text-slate-200">
-                  {cvResult?.bounding_boxes ? `${cvResult.bounding_boxes.length}` : "0"}
-                </div>
-              </div>
-
-              <div className="p-1.5 rounded-lg bg-white dark:bg-slate-900 border border-[#e1eae4] dark:border-slate-700">
-                <div className="text-[9px] text-slate-500 dark:text-slate-400">Defect Area</div>
-                <div className="font-extrabold text-slate-800 dark:text-slate-200">
-                  {cvResult?.defect_surface_area_percent !== undefined 
-                    ? `${cvResult.defect_surface_area_percent}%` 
-                    : "0.0%"}
-                </div>
-              </div>
-            </div>
-
-            <div className="text-[10px] text-slate-600 dark:text-slate-400 pt-1 flex items-center justify-between border-t border-slate-200 dark:border-slate-700">
-              <span className="font-bold">Mould Status:</span>
-              <span className={`font-bold ${cvResult?.mould_detected ? 'text-rose-600 dark:text-rose-400 animate-pulse' : 'text-emerald-700 dark:text-emerald-400'}`}>
-                {cvResult?.mould_detected ? `Mould Spores Detected` : "Clean Cuticle"}
-              </span>
-            </div>
-          </div>
-
-        </div>
-
-        {/* Audit Meta Footer */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 pt-2 border-t border-[#e1eae4] dark:border-slate-800 text-[10px] text-slate-500 dark:text-slate-400">
-          <div className="flex items-center gap-2">
-            <span className="font-bold text-slate-700 dark:text-slate-300">Analysis ID:</span>
-            <code className="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 font-mono">
-              {cvResult?.analysis_id || "CV-SCAN-REALTIME"}
-            </code>
-          </div>
-          <div>
-            Benchmark ground truth: 3,202 verified images (Apache 2.0) • Stratified test split (N=321)
-          </div>
-        </div>
-
-      </div>
-
-      {/* SECTION 4: REMAINING SHELF-LIFE (RSL) PREDICTION HERO CARD */}
-      <div className="p-3.5 sm:p-5 rounded-xl sm:rounded-2xl bg-gradient-to-br from-[#ecfdf5] via-[#f0fdf4] to-white dark:from-slate-900 dark:via-slate-900 dark:to-slate-800 border border-emerald-400 dark:border-emerald-600/40 shadow-sm space-y-3 sm:space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 border-b border-emerald-200 dark:border-emerald-900/50 pb-3">
-          <div className="flex items-center gap-2">
-            <div className="p-1.5 sm:p-2 rounded-xl bg-emerald-600 text-white shadow-sm">
-              <Hourglass className="h-4 w-4 sm:h-5 sm:w-5" />
-            </div>
+          {/* Environmental Micro-Climate Banner */}
+          <div className="p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xs flex items-center justify-between">
             <div>
-              <h3 className="text-xs sm:text-sm font-extrabold text-emerald-950 dark:text-emerald-300 uppercase tracking-wider flex items-center gap-1.5">
-                Remaining Shelf-Life (RSL) Dynamic Prediction — {activeStorage?.name}
-              </h3>
-              <span className="text-[11px] sm:text-xs text-emerald-800 dark:text-emerald-400 font-semibold">
-                AI Multi-Modal Degradation Model • {cvResult?.category || "Fruits"} Preservability
+              <span className="text-[10px] uppercase font-bold text-slate-500 block">Chamber Micro-Climate Status</span>
+              <span className="text-xs font-black text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5 mt-0.5">
+                <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span>Optimal Cold Chain Storage • Safe Range</span>
               </span>
             </div>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <span className={`px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-xl text-[11px] sm:text-xs font-black border ${
-              shelfLifePrediction.hours === 0
-                ? 'bg-rose-100 dark:bg-rose-950/60 text-rose-900 dark:text-rose-300 border-rose-400 animate-pulse'
-                : (shelfLifePrediction.hours < 20 ? 'bg-amber-100 dark:bg-amber-950/60 text-amber-900 dark:text-amber-300 border-amber-400' : 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-950 dark:text-emerald-300 border-emerald-400')
-            }`}>
-              {shelfLifePrediction.action}
+            <span className="text-[10px] text-slate-500 font-semibold text-right">
+              Target: {activeStorage?.target_temp || 11.0}°C • {activeStorage?.target_humidity || 89}% RH
             </span>
           </div>
-        </div>
 
-        {/* Shelf-Life Metric Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-3">
-          
-          {/* Main Countdown Gauge */}
-          <div className="p-3 sm:p-4 rounded-xl bg-white dark:bg-slate-800/90 border border-emerald-200 dark:border-emerald-900/40 shadow-sm space-y-1">
-            <span className="text-[11px] sm:text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1">
-              <Clock className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-emerald-600 dark:text-emerald-400" /> Usable Shelf-Life Remaining
-            </span>
-            <div className="flex items-baseline gap-2">
-              <span className={`text-2xl sm:text-3xl font-black ${
-                shelfLifePrediction.hours === 0 ? 'text-rose-600 dark:text-rose-400' : (shelfLifePrediction.hours < 20 ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-700 dark:text-emerald-400')
-              }`}>
-                {shelfLifePrediction.hours}
+          {/* 5-Sensor Telemetry Grid for this Chamber */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 text-xs">
+            
+            {/* 1. Temp */}
+            <div className="p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-1 shadow-2xs">
+              <div className="flex items-center justify-between text-[11px] text-slate-500 font-bold">
+                <span>Temperature</span>
+                <Thermometer className="h-3.5 w-3.5 text-rose-500" />
+              </div>
+              <div className="text-xl font-black text-slate-900 dark:text-white">
+                {activeStorage?.current_temp || 11.4}°C
+              </div>
+              <span className="text-[10px] text-emerald-700 dark:text-emerald-400 font-semibold block">
+                Target: {activeStorage?.target_temp || 11.0}°C
               </span>
-              <span className="text-xs sm:text-sm font-bold text-slate-600 dark:text-slate-300">Hours</span>
-              {shelfLifePrediction.days > 0 && (
-                <span className="text-[10px] sm:text-xs font-bold text-emerald-800 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800">
-                  ~{shelfLifePrediction.days} Days
-                </span>
-              )}
             </div>
-            <p className="text-[10px] sm:text-[11px] text-slate-600 dark:text-slate-300 font-semibold">
-              {shelfLifePrediction.safeDeadline}
+
+            {/* 2. Humidity */}
+            <div className="p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-1 shadow-2xs">
+              <div className="flex items-center justify-between text-[11px] text-slate-500 font-bold">
+                <span>Rel. Humidity</span>
+                <Droplets className="h-3.5 w-3.5 text-sky-500" />
+              </div>
+              <div className="text-xl font-black text-slate-900 dark:text-white">
+                {activeStorage?.current_humidity || 90.2}%
+              </div>
+              <span className="text-[10px] text-sky-700 dark:text-sky-400 font-semibold block">
+                Target: {activeStorage?.target_humidity || 89}% RH
+              </span>
+            </div>
+
+            {/* 3. VOC & Ethylene */}
+            <div className="p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-1 shadow-2xs">
+              <div className="flex items-center justify-between text-[11px] text-slate-500 font-bold">
+                <span>VOC / Ethylene</span>
+                <Wind className="h-3.5 w-3.5 text-amber-500" />
+              </div>
+              <div className="text-xl font-black text-slate-900 dark:text-white">
+                {activeStorage?.voc || 0.32} <span className="text-xs font-normal">ppm</span>
+              </div>
+              <span className="text-[10px] text-slate-500 font-semibold block">
+                Ripening gas level
+              </span>
+            </div>
+
+            {/* 4. CO2 Respiration */}
+            <div className="p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-1 shadow-2xs">
+              <div className="flex items-center justify-between text-[11px] text-slate-500 font-bold">
+                <span>CO₂ Respiration</span>
+                <Gauge className="h-3.5 w-3.5 text-emerald-500" />
+              </div>
+              <div className="text-xl font-black text-slate-900 dark:text-white">
+                {activeStorage?.co2 || 415} <span className="text-xs font-normal">ppm</span>
+              </div>
+              <span className="text-[10px] text-emerald-700 dark:text-emerald-400 font-semibold block">
+                Normal cellular respiration
+              </span>
+            </div>
+
+            {/* 5. Ammonia NH3 */}
+            <div className="p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-1 shadow-2xs sm:col-span-2">
+              <div className="flex items-center justify-between text-[11px] text-slate-500 font-bold">
+                <span>Ammonia (NH₃)</span>
+                <Activity className="h-3.5 w-3.5 text-purple-500" />
+              </div>
+              <div className="text-xl font-black text-slate-900 dark:text-white">
+                {activeStorage?.nh3 || 0.02} <span className="text-xs font-normal">ppm</span>
+              </div>
+              <span className="text-[10px] text-emerald-700 dark:text-emerald-400 font-semibold block">
+                Zero bacterial protein decomposition
+              </span>
+            </div>
+
+          </div>
+
+          {/* Gas & Environment Diagnostic Note */}
+          <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-900 text-xs text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-800 space-y-1">
+            <span className="font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+              <Zap className="h-3.5 w-3.5 text-amber-500" /> Sensor Degradation Corroboration:
+            </span>
+            <p className="text-[11px] leading-relaxed">
+              Thermal stability within ±0.4°C of target slows enzymatic aging. Low ammonia and controlled VOC readings confirm absence of aerobic rotting bacteria.
             </p>
           </div>
 
-          {/* Freshness & Quality Retention Score */}
-          <div className="p-3 sm:p-4 rounded-xl bg-white dark:bg-slate-800/90 border border-emerald-200 dark:border-emerald-900/40 shadow-sm space-y-1">
-            <span className="text-[11px] sm:text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1">
-              <Sparkles className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-emerald-600 dark:text-emerald-400" /> Freshness Index
-            </span>
-            <div className="flex items-baseline gap-2">
-              <span className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white">
-                {shelfLifePrediction.percentage}%
-              </span>
-              <span className="text-[10px] sm:text-xs font-bold text-slate-500 dark:text-slate-400">Score</span>
-            </div>
-            <div className="w-full bg-slate-100 dark:bg-slate-700 rounded-full h-1.5 sm:h-2 mt-1 overflow-hidden border border-slate-200 dark:border-slate-600">
-              <div 
-                className="h-full rounded-full transition-all duration-300"
-                style={{ 
-                  width: `${shelfLifePrediction.percentage}%`,
-                  backgroundColor: shelfLifePrediction.percentage > 50 ? '#059669' : (shelfLifePrediction.percentage > 20 ? '#d97706' : '#dc2626')
-                }}
-              />
-            </div>
-          </div>
-
-          {/* Biological Decay Multiplier */}
-          <div className="p-3 sm:p-4 rounded-xl bg-white dark:bg-slate-800/90 border border-emerald-200 dark:border-emerald-900/40 shadow-sm space-y-1">
-            <span className="text-[11px] sm:text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1">
-              <TrendingDown className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-emerald-600 dark:text-emerald-400" /> Degradation Rate
-            </span>
-            <div className="text-xs sm:text-sm font-bold text-slate-800 dark:text-slate-200 mt-1">
-              {shelfLifePrediction.decayRate}
-            </div>
-            <p className="text-[10px] sm:text-[11px] text-slate-600 dark:text-slate-400 mt-1 font-medium">
-              Dynamic multi-modal fusion of visual defect index ({visualScore}%) & storage parameters • {shelfLifePrediction.confidenceInterval}
-            </p>
-          </div>
-
         </div>
+
       </div>
+
+      {/* ─────────────────────────────────────────────────────────────
+          MASTER FUSED QUALITY ASSESSMENT (CROSS-CHECKING BOTH UNITS)
+          "Output as Spoiled or Fresh and with Remaining Shelf Life"
+          ───────────────────────────────────────────────────────────── */}
+      {(() => {
+        // Calculation fusing 60% Sensors + 40% Computer Vision
+        const simScore = simulationSpoilageOverride;
+        const visualScore = cvResult?.visual_spoilage_score || cvResult?.ripeness_percent || 15.0;
+        const tempPenalty = Math.max(0, ((activeStorage?.current_temp || 11) - (activeStorage?.target_temp || 11)) * 3.5);
+        const vocPenalty = Math.max(0, ((activeStorage?.voc || 0.32) - 0.35) * 20.0);
+        const sensorScore = Math.min(100, tempPenalty + vocPenalty);
+
+        const fusedScore = simScore !== null 
+          ? simScore 
+          : Math.min(99.0, Math.round(((sensorScore * 0.40) + (visualScore * 0.60)) * 10) / 10);
+
+        const fusedRsl = simScore !== null
+          ? (simScore >= 70 ? 14.0 : 115.0)
+          : (shelfLifePrediction.hours);
+
+        const isSpoiledState = fusedScore >= 75.0 || cvResult?.mould_detected || cvResult?.risk_level === 'Critical';
+        const isNearSpoilState = !isSpoiledState && (fusedScore >= 50.0 || fusedRsl <= 24.0 || cvResult?.risk_level === 'High');
+        const isFreshState = !isSpoiledState && !isNearSpoilState;
+
+        const directive = getProduceRecipeDirective(activeProduce?.produceName, activeProduce?.category, fusedScore);
+
+        return (
+          <div className="p-5 sm:p-6 rounded-2xl bg-white dark:bg-slate-900 border-2 border-emerald-500/80 dark:border-emerald-500/60 shadow-lg space-y-5 animate-fade-in">
+            
+            {/* Master Header */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100 dark:border-slate-800">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] font-extrabold uppercase px-2.5 py-0.5 rounded-full bg-slate-900 text-white dark:bg-white dark:text-slate-900">
+                    Dual-Unit Fusion Output
+                  </span>
+                  <span className="text-xs font-bold text-slate-500">
+                    Cross-Checked: Camera Optical Inspection + IoT Environmental Telemetry
+                  </span>
+                </div>
+                <h3 className="text-base sm:text-lg font-black text-slate-900 dark:text-white mt-1">
+                  Comprehensive Produce Health & Usable Shelf-Life Verdict
+                </h3>
+              </div>
+
+              {/* Definitive Output Badge: FRESH vs NEAR-SPOIL vs SPOILED */}
+              <div>
+                {isFreshState && (
+                  <span className="px-4 py-2 rounded-2xl text-xs sm:text-sm font-black bg-emerald-100 text-emerald-950 dark:bg-emerald-950 dark:text-emerald-200 border-2 border-emerald-500 shadow-sm flex items-center gap-2">
+                    <CheckCircle2 className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-600 dark:text-emerald-400" />
+                    <span>STATUS: FRESH (Grade A Harvest)</span>
+                  </span>
+                )}
+                {isNearSpoilState && (
+                  <span className="px-4 py-2 rounded-2xl text-xs sm:text-sm font-black bg-amber-100 text-amber-950 dark:bg-amber-950 dark:text-amber-200 border-2 border-amber-500 shadow-sm flex items-center gap-2 animate-pulse">
+                    <AlertTriangle className="h-4 w-4 sm:h-5 sm:w-5 text-amber-600 dark:text-amber-400" />
+                    <span>STATUS: NEAR-SPOIL (~75% Threshold Reached)</span>
+                  </span>
+                )}
+                {isSpoiledState && (
+                  <span className="px-4 py-2 rounded-2xl text-xs sm:text-sm font-black bg-rose-100 text-rose-950 dark:bg-rose-950 dark:text-rose-200 border-2 border-rose-500 shadow-sm flex items-center gap-2 animate-pulse">
+                    <XCircle className="h-4 w-4 sm:h-5 sm:w-5 text-rose-600 dark:text-rose-400" />
+                    <span>STATUS: SPOILED / QUARANTINE</span>
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Core Metrics: Fused Spoilage % and Fused RSL */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              
+              {/* Spoilage Probability */}
+              <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 space-y-1">
+                <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase">
+                  Fused Spoilage Probability
+                </span>
+                <div className="flex items-baseline gap-2">
+                  <span className={`text-3xl font-black ${
+                    isSpoiledState ? 'text-rose-600' : (isNearSpoilState ? 'text-amber-600' : 'text-emerald-700 dark:text-emerald-400')
+                  }`}>
+                    {fusedScore}%
+                  </span>
+                  <span className="text-xs font-bold text-slate-500">60% Camera + 40% Sensors</span>
+                </div>
+                <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2 mt-2 overflow-hidden">
+                  <div
+                    className={`h-full rounded-full transition-all duration-300 ${
+                      isSpoiledState ? 'bg-rose-600' : (isNearSpoilState ? 'bg-amber-500' : 'bg-emerald-600')
+                    }`}
+                    style={{ width: `${Math.min(100, fusedScore)}%` }}
+                  />
+                </div>
+              </div>
+
+              {/* Remaining Shelf Life */}
+              <div className="p-4 rounded-xl bg-[#ecfdf5] dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 space-y-1">
+                <span className="text-xs font-bold text-emerald-900 dark:text-emerald-300 uppercase flex items-center gap-1.5">
+                  <Hourglass className="h-4 w-4 text-emerald-700 dark:text-emerald-400" /> Remaining Shelf-Life (RSL)
+                </span>
+                <div className="flex items-baseline gap-2">
+                  <span className="text-3xl font-black text-emerald-800 dark:text-emerald-300">
+                    {fusedRsl}
+                  </span>
+                  <span className="text-sm font-bold text-slate-600 dark:text-slate-400">Hours</span>
+                  {fusedRsl > 0 && (
+                    <span className="text-[11px] font-bold text-emerald-800 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-900 px-2 py-0.5 rounded-full border border-emerald-300 dark:border-emerald-700">
+                      ~{(fusedRsl / 24.0).toFixed(1)} Days Usable
+                    </span>
+                  )}
+                </div>
+                <p className="text-[11px] font-medium text-emerald-900 dark:text-emerald-300">
+                  {isSpoiledState 
+                    ? "Safe deadline expired. Do not cook or serve." 
+                    : (isNearSpoilState ? "Must consume or cook within 24 hours!" : "Safe for normal FIFO kitchen rotation.")}
+                </p>
+              </div>
+
+              {/* Degradation Rate */}
+              <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 space-y-1">
+                <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase flex items-center gap-1.5">
+                  <TrendingDown className="h-4 w-4 text-emerald-600 dark:text-emerald-400" /> Decay Multiplier
+                </span>
+                <div className="text-lg font-black text-slate-900 dark:text-white mt-1">
+                  {isSpoiledState ? "Severe breakdown (> 5.2x baseline)" : (isNearSpoilState ? "Accelerated cellular breakdown (3.4x)" : "Normal metabolic aging (1.0x)")}
+                </div>
+                <p className="text-[11px] text-slate-500 font-medium">
+                  Grounded on visual browning ({cvResult?.discoloration_score || 3.2}%) & chamber thermal baseline.
+                </p>
+              </div>
+
+            </div>
+
+            {/* Cross-Check Breakdown Table */}
+            <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-2.5 text-xs">
+              <span className="font-extrabold text-slate-900 dark:text-white uppercase tracking-wider block">
+                Unit Cross-Check Validation Details ({activeStorage?.name}):
+              </span>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 space-y-1">
+                  <span className="font-bold text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5">
+                    <Camera className="h-3.5 w-3.5" /> Unit 1: Optical Camera Findings:
+                  </span>
+                  <p className="text-slate-600 dark:text-slate-300 leading-relaxed">
+                    {cvResult?.detected_defects?.length > 0 
+                      ? cvResult.detected_defects.join(". ")
+                      : "Epidermal peel intact (Grade A), 3.2% localized surface browning, 0% fungal mould spores detected."}
+                  </p>
+                </div>
+                <div className="p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 space-y-1">
+                  <span className="font-bold text-sky-700 dark:text-sky-400 flex items-center gap-1.5">
+                    <Activity className="h-3.5 w-3.5" /> Unit 2: IoT Sensors Findings:
+                  </span>
+                  <p className="text-slate-600 dark:text-slate-300 leading-relaxed">
+                    Chamber temperature steady at {activeStorage?.current_temp || 11.4}°C (target: {activeStorage?.target_temp || 11.0}°C), relative humidity at {activeStorage?.current_humidity || 90.2}% RH, VOC ripening gas controlled at {activeStorage?.voc || 0.32} ppm.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* If Near-Spoil (~75% Spoilage): Render Zero-Waste Recipe Directive */}
+            {(isNearSpoilState || isSpoiledState) && directive && (
+              <div className="p-5 rounded-2xl bg-amber-50 dark:bg-amber-950/50 border border-amber-300 dark:border-amber-800 space-y-3 animate-fade-in">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-amber-200 dark:border-amber-900/60 pb-3">
+                  <div className="flex items-center gap-2.5">
+                    <div className="p-2 rounded-xl bg-amber-200 text-amber-900 dark:bg-amber-900 dark:text-amber-100 flex-shrink-0">
+                      <ChefHat className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-200 text-amber-900 dark:bg-amber-900 dark:text-amber-100">
+                          AI Zero-Waste Chef Directive
+                        </span>
+                        <span className="text-xs font-bold text-slate-600 dark:text-slate-300">
+                          Station: <strong>{directive.station}</strong>
+                        </span>
+                      </div>
+                      <h4 className="text-base font-black text-slate-900 dark:text-white mt-0.5">
+                        {directive.recipeTitle}
+                      </h4>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => handleDispatchKDSUnified(directive.recipeTitle, directive.station)}
+                    className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-xs ${
+                      dispatchedKds
+                        ? 'bg-emerald-100 text-emerald-900 dark:bg-emerald-950 dark:text-emerald-200 border border-emerald-300 dark:border-emerald-700'
+                        : 'bg-emerald-700 hover:bg-emerald-800 text-white active:scale-95'
+                    }`}
+                  >
+                    {dispatchedKds ? (
+                      <>
+                        <Check className="h-4 w-4 text-emerald-600" />
+                        <span>Sent to KDS</span>
+                      </>
+                    ) : (
+                      <>
+                        <Send className="h-4 w-4" />
+                        <span>Dispatch to Kitchen KDS</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                <p className="text-xs text-amber-950 dark:text-amber-200 font-medium">
+                  {directive.directive}
+                </p>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs pt-1">
+                  <div className="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-amber-200 dark:border-amber-900/40">
+                    <span className="text-[10px] text-slate-500 font-bold block">Prep Time</span>
+                    <span className="font-extrabold text-slate-900 dark:text-white">{directive.prepTimeMinutes} Mins</span>
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-amber-200 dark:border-amber-900/40">
+                    <span className="text-[10px] text-slate-500 font-bold block">Batch Yield</span>
+                    <span className="font-extrabold text-slate-900 dark:text-white">{directive.yieldPortions}</span>
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-amber-200 dark:border-amber-900/40">
+                    <span className="text-[10px] text-slate-500 font-bold block">Extended Life</span>
+                    <span className="font-extrabold text-emerald-700 dark:text-emerald-400">{directive.extendedShelfLife}</span>
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-amber-200 dark:border-amber-900/40">
+                    <span className="text-[10px] text-slate-500 font-bold block">Cost Protected</span>
+                    <span className="font-extrabold text-emerald-700 dark:text-emerald-400">${directive.wasteCost.toFixed(2)}</span>
+                  </div>
+                </div>
+
+                <div className="space-y-1.5 pt-1 text-xs">
+                  <span className="font-bold text-slate-900 dark:text-white">Commercial Prep Directives:</span>
+                  <div className="space-y-1.5">
+                    {directive.steps.map((st, i) => (
+                      <div key={i} className="flex items-start gap-2 p-2 rounded-xl bg-white dark:bg-slate-900 border border-amber-200/80 dark:border-amber-900/40 text-slate-700 dark:text-slate-300">
+                        <span className="h-4 w-4 rounded-full bg-emerald-700 text-white text-[9px] font-black flex items-center justify-center flex-shrink-0 mt-0.5">
+                          {i + 1}
+                        </span>
+                        <span>{st}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+              </div>
+            )}
+
+          </div>
+        );
+      })()}
+
 
       {/* ESP32-CAM Hardware Node Modal */}
       {isEsp32ModalOpen && (

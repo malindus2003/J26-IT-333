@@ -25,11 +25,11 @@ import { DEFAULT_ZONES, DEFAULT_INVENTORY, DEFAULT_RECOMMENDATIONS, DEFAULT_DASH
 const SPOILAGE_SUBPARTS = [
   {
     id: 'vision',
-    title: 'Optical Camera CV Scanner',
-    shortTitle: 'Optical Camera CV',
-    description: 'High-resolution photographic inspection, bounding box rot detection & visual ripeness scoring',
+    title: 'Integrated Vision & IoT Chamber Quality Inspector',
+    shortTitle: 'Vision + IoT Chamber',
+    description: 'Unified camera inspection & 5-parameter IoT sensor telemetry in Storage 1, cross-checking both units to output Fresh vs Spoiled status & RSL',
     icon: Camera,
-    badge: 'Computer Vision',
+    badge: 'Multi-Modal Fusion',
     badgeColor: 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-900 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700'
   },
   {
@@ -42,22 +42,13 @@ const SPOILAGE_SUBPARTS = [
     badgeColor: 'bg-amber-100 dark:bg-amber-950/60 text-amber-900 dark:text-amber-300 border-amber-300 dark:border-amber-700'
   },
   {
-    id: 'sensors',
-    title: 'Storage Zone IoT Telemetry',
-    shortTitle: 'Chamber IoT Telemetry',
-    description: 'Real-time NH3, CO2, VOC, humidity and temperature monitoring across 4 fruit & vegetable chambers',
-    icon: Activity,
-    badge: '4 Storage Chambers',
-    badgeColor: 'bg-teal-100 dark:bg-teal-950/60 text-teal-900 dark:text-teal-300 border-teal-300 dark:border-teal-700'
-  },
-  {
     id: 'simulator',
     title: 'ESP32 Hardware Telemetry Simulator',
     shortTitle: 'ESP32 Simulator',
     description: 'Hardware simulation tool to test gas thresholds, anomaly alerts & sensor spikes',
     icon: Sparkles,
     badge: 'Hardware Test',
-    badgeColor: 'bg-amber-100 dark:bg-amber-950/60 text-amber-900 dark:text-amber-300 border-amber-300 dark:border-amber-700'
+    badgeColor: 'bg-teal-100 dark:bg-teal-950/60 text-teal-900 dark:text-teal-300 border-teal-300 dark:border-teal-700'
   }
 ];
 
@@ -354,7 +345,7 @@ export default function App() {
         {activeModule === 'spoilage' && (
           <div className="space-y-4 sm:space-y-6">
             
-            {/* Redesigned Spoilage Module Sub-Header & 4-Subpart Navigation */}
+            {/* Redesigned Spoilage Module Sub-Header & 3-Subpart Navigation */}
             <div className="glass-panel p-4 sm:p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-sm space-y-4">
               
               {/* Header: Clean Title & Live Status */}
@@ -399,7 +390,7 @@ export default function App() {
               </div>
 
               {/* 4 Interactive Subpart Cards */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5 sm:gap-3">
                 {SPOILAGE_SUBPARTS.map((part) => {
                   const PartIcon = part.icon;
                   const isSelected = part.id === spoilageSubTab;
@@ -470,19 +461,7 @@ export default function App() {
               </div>
             )}
 
-            {/* Sub-View 3: IoT Storage Telemetry */}
-            {spoilageSubTab === 'sensors' && (
-              <div className="space-y-4 sm:space-y-6 animate-fade-in">
-                <StorageZoneTelemetry
-                  zones={zones}
-                  selectedZoneId={selectedZoneId}
-                  onSelectZone={setSelectedZoneId}
-                  isDarkMode={isDarkMode}
-                />
-              </div>
-            )}
-
-            {/* Sub-View 4: ESP32 Hardware Simulator */}
+            {/* Sub-View 3: ESP32 Hardware Simulator */}
             {spoilageSubTab === 'simulator' && (
               <div className="space-y-4 sm:space-y-6 animate-fade-in">
                 <ESP32Simulator
