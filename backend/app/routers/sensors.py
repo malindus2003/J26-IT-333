@@ -62,8 +62,15 @@ def ingest_esp32_telemetry(payload: SensorReading):
     zone_match["co2"] = round(payload.co2, 1)
     zone_match["voc"] = round(payload.voc, 3)
 
-    # Re-evaluate status
-    if payload.nh3 > 0.25 or payload.temperature > 5.0:
+    # Dynamic threshold evaluation calibrated for Fruit & Vegetable storage chambers
+    target_temp = zone_match.get("target_temp", 11.0)
+    temp_deviation = abs(payload.temperature - target_temp)
+    is_temp_warning = temp_deviation > 3.5  # Significant temperature deviation from setpoint
+    is_co2_warning = payload.co2 > 1100.0   # Produce respiration spike / ventilation required
+    is_humidity_warning = (payload.humidity > 96.0) or (payload.humidity < 70.0) # Condensation vs desiccation
+    is_nh3_warning = payload.nh3 > 0.05     # Soft rot / cellular tissue decay
+
+    if is_temp_warning or is_co2_warning or is_humidity_warning or is_nh3_warning:
         zone_match["status"] = "warning"
     else:
         zone_match["status"] = "optimal"

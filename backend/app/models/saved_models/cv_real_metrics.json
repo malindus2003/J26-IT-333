@@ -1,7 +1,7 @@
 {
   "dataset_name": "Fruit Freshness Detection Public Benchmark (Zero-Leakage Ingestion)",
   "model_version": "v2.3-calibrated",
-  "evaluated_at": "2026-10-19 15:43:24",
+  "evaluated_at": "2026-10-20 10:38:28",
   "total_dataset_samples": 3322,
   "train_samples": 2657,
   "val_samples": 332,
@@ -16,28 +16,28 @@
       "Orange",
       "Strawberry"
     ],
-    "test_accuracy": 0.7778,
-    "macro_precision": 0.8364,
-    "macro_recall": 0.8283,
-    "macro_f1": 0.8309,
+    "test_accuracy": 0.7838,
+    "macro_precision": 0.8247,
+    "macro_recall": 0.8294,
+    "macro_f1": 0.8244,
     "confusion_matrix": [
       [
-        73,
+        72,
+        8,
         11,
-        7,
-        0
-      ],
-      [
-        4,
-        105,
-        28,
         0
       ],
       [
         3,
-        21,
-        70,
+        110,
+        24,
         0
+      ],
+      [
+        1,
+        24,
+        68,
+        1
       ],
       [
         0,
@@ -176,8 +176,8 @@
   },
   "inference_latency": {
     "hardware_device": "Intel/AMD x86_64 CPU (No GPU)",
-    "mean_latency_ms": 173.58,
-    "p95_latency_ms": 200.7,
+    "mean_latency_ms": 190.28,
+    "p95_latency_ms": 215.18,
     "meets_cpu_sla": false
   }
 }

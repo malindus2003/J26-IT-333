@@ -287,18 +287,13 @@ def extract_multi_domain_features(img_bgr: np.ndarray, presegmented=None) -> np.
     red_ratio = float(np.sum(red_mask) / fg_count * 100.0)
     
     # Specular reflection glare:
-    # Pure saturated white highlights (S < 22, V > 240) in compact areas (< 140 px)
-    glare_cand = fg_mask_bool & (hsv[:, :, 1] < 22) & (hsv[:, :, 2] > 240)
-    num_g, g_labels, g_stats, _ = cv2.connectedComponentsWithStats(glare_cand.astype(np.uint8))
-    glare_mask = np.zeros_like(mask)
-    for gi in range(1, num_g):
-        if g_stats[gi, cv2.CC_STAT_AREA] < 140:
-            glare_mask[g_labels == gi] = 255
+    # High luminance, low saturation highlights within foreground (peel flash reflections & gloss)
+    glare_mask = fg_mask_bool & (hsv[:, :, 1] < 28) & (hsv[:, :, 2] > 220)
     glare_ratio = float(np.sum(glare_mask > 0) / fg_count * 100.0)
     
-    # True fungal mycelium / mould spore patch (low saturation, elevated luminance, contiguous colony, not compact glare)
-    # Fungal hyphae: S < 55, V in [80, 255], area >= 35 px, not pure specular glare
-    cand_mould_raw = fg_mask_bool & (hsv[:, :, 1] < 55) & (hsv[:, :, 2] >= 80) & (glare_mask == 0)
+    # True fungal mycelium / mould spore patch (low saturation, elevated luminance, contiguous colony, not specular glare)
+    # Fungal hyphae: S < 48, V in [75, 235], area >= 35 px, not specular glare
+    cand_mould_raw = fg_mask_bool & (hsv[:, :, 1] < 48) & (hsv[:, :, 2] >= 75) & (~glare_mask)
     num_m, m_labels, m_stats, _ = cv2.connectedComponentsWithStats(cand_mould_raw.astype(np.uint8))
     mould_mask = np.zeros_like(mask)
     for mi in range(1, num_m):

@@ -4,10 +4,10 @@ SLIIT IT4010 Research Project - SST (J26-IT-333)
 Component 3: AI-Based Multi-Modal Food Spoilage Prediction & Quality Assessment
 Author: Maddumage M. S. (IT23348820)
 
-ESP32 Hardware Bridge & Telemetry Ingestion Driver
+ESP32 Hardware Bridge & Telemetry Ingestion Driver (DHT22 + MQ-135)
 =========================================================================================
 Usage Modes:
-  1. Live USB Serial Mode:
+  1. Live USB Serial Mode (Connects to physical ESP32):
      python esp32_hardware_bridge.py --port COM3 --baud 115200
 
   2. Live Presentation / Demo Simulation Mode (No physical ESP32 required):
@@ -25,10 +25,25 @@ import requests
 
 DEFAULT_BACKEND_URL = "http://localhost:8000/api/sensors/telemetry"
 
+def auto_detect_serial_port() -> str:
+    """Auto-detect connected ESP32 / USB serial device."""
+    try:
+        import serial.tools.list_ports
+        ports = list(serial.tools.list_ports.comports())
+        if not ports:
+            return "COM3"
+        for p in ports:
+            desc = p.description.lower()
+            if any(keyword in desc for keyword in ["cp210", "ch340", "uart", "usb serial", "esp32"]):
+                return p.device
+        return ports[0].device
+    except Exception:
+        return "COM3"
+
 def run_simulation(backend_url: str, zone_name: str, interval: float = 4.0):
     """
     Simulates high-fidelity ESP32 sensor telemetry streaming into the FastAPI backend.
-    Perfect for live demonstrations and testing model reactions to environmental spikes.
+    Used for testing model reactions to environmental spikes or offline demos.
     """
     print("=" * 70)
     print("  ESP32 TELEMETRY HARDWARE EMULATOR & BRIDGE")
@@ -38,7 +53,6 @@ def run_simulation(backend_url: str, zone_name: str, interval: float = 4.0):
     print("=" * 70)
     print("Press Ctrl+C to terminate the bridge.\n")
 
-    # Baseline storage parameters for Tropical Produce (Ambul Kesel, Papol, Mango)
     base_temp = 11.2
     base_hum = 88.5
     base_nh3 = 0.015
@@ -51,7 +65,6 @@ def run_simulation(backend_url: str, zone_name: str, interval: float = 4.0):
         while True:
             packet_id += 1
             
-            # Subtle stochastic micro-fluctuations (simulate real ADC noise & biological respiration)
             noise_temp = random.uniform(-0.3, 0.4)
             noise_hum = random.uniform(-1.2, 1.2)
             noise_nh3 = random.uniform(-0.002, 0.003)
@@ -82,8 +95,7 @@ def run_simulation(backend_url: str, zone_name: str, interval: float = 4.0):
                     status = res_data.get("data", {}).get("status", "optimal").upper()
                     print(f"[{now_str}] Packet #{packet_id:04d} -> {zone_name[:20]}... | "
                           f"T: {current_temp:5.2f}°C | H: {current_hum:4.1f}% | "
-                          f"NH3: {current_nh3:6.3f}ppm | CO2: {current_co2:5.1f}ppm | "
-                          f"VOC: {current_voc:5.3f}ppm | Status: [{status}] (HTTP 200 OK)")
+                          f"CO2: {current_co2:5.1f}ppm | Status: [{status}] (HTTP 200 OK)")
                 else:
                     print(f"[{now_str}] Packet #{packet_id:04d} -> Server Error: HTTP {resp.status_code}")
             except requests.exceptions.RequestException as e:
@@ -96,39 +108,68 @@ def run_simulation(backend_url: str, zone_name: str, interval: float = 4.0):
 
 def run_serial_bridge(port: str, baud: int, backend_url: str):
     """
-    Reads physical raw serial UART lines from a physical connected ESP32 microcontroller,
+    Reads physical raw serial UART lines from connected ESP32,
     extracts the telemetry JSON payload, and dispatches it to the FastAPI backend.
     """
     try:
         import serial
+        import serial.tools.list_ports
     except ImportError:
         print("[ERROR] pyserial is not installed. Please run: pip install pyserial")
         sys.exit(1)
 
-    print(f"[Serial Bridge] Connecting to physical ESP32 on port {port} at {baud} baud...")
+    # Validate port existence
+    available_ports = [p.device for p in serial.tools.list_ports.comports()]
+    if port not in available_ports:
+        detected = auto_detect_serial_port()
+        if detected in available_ports:
+            print(f"[Serial Bridge] Specified port {port} not found. Auto-switching to detected port: {detected}")
+            port = detected
+        else:
+            print(f"[WARNING] Available COM ports: {available_ports}")
+
+    print("=" * 70)
+    print("  ESP32 PHYSICAL HARDWARE BRIDGE (DHT22 + MQ-135)")
+    print(f"  Target Serial Port : {port} ({baud} baud)")
+    print(f"  Backend Ingest URL : {backend_url}")
+    print("=" * 70)
+    
     try:
         ser = serial.Serial(port, baud, timeout=1.0)
-        time.sleep(2.0) # ESP32 reboot wait
-        print(f"[Serial Bridge] Connected to {port}! Listening for incoming telemetry packets...")
+        time.sleep(2.0)  # Wait for ESP32 boot
+        print(f"[Serial Bridge] Successfully connected to {port}! Listening for live telemetry...\n")
     except Exception as e:
         print(f"[ERROR] Failed to open serial port {port}: {e}")
+        print("Tip: Check that Arduino Serial Monitor is CLOSED so this bridge can access the port.")
         sys.exit(1)
 
     try:
         while True:
-            line = ser.readline().decode('utf-8', errors='ignore').strip()
-            if not line:
+            raw_line = ser.readline().decode('utf-8', errors='ignore').strip()
+            if not raw_line:
                 continue
 
-            print(f"[ESP32 UART] {line}")
+            # Display readable telemetry in console
+            if raw_line.startswith("[TELEMETRY"):
+                print(f"[ESP32] {raw_line}")
 
-            # Check if line contains JSON payload
-            if line.startswith("{") and line.endswith("}"):
+            # Extract JSON string even if prepended with [JSON]
+            json_str = None
+            if "{" in raw_line and "}" in raw_line:
+                start_idx = raw_line.find("{")
+                end_idx = raw_line.rfind("}") + 1
+                json_str = raw_line[start_idx:end_idx]
+
+            if json_str:
                 try:
-                    payload = json.loads(line)
-                    # Dispatch to backend
+                    payload = json.loads(json_str)
                     resp = requests.post(backend_url, json=payload, timeout=3.0)
-                    print(f"[Bridge Ingest] Dispatched to API -> HTTP {resp.status_code}")
+                    now_str = datetime.datetime.now().strftime("%H:%M:%S")
+                    if resp.status_code == 200:
+                        status = resp.json().get("data", {}).get("status", "optimal").upper()
+                        print(f"[{now_str}] Ingested to Backend -> Status: [{status}] (HTTP 200 OK)")
+                    else:
+                        print(f"[{now_str}] Backend Error: HTTP {resp.status_code}")
                 except json.JSONDecodeError:
                     pass
                 except requests.RequestException as re:
@@ -141,7 +182,7 @@ def run_serial_bridge(port: str, baud: int, backend_url: str):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="ESP32 Telemetry Hardware Bridge for Food Spoilage Node")
     parser.add_argument("--simulate", action="store_true", help="Run in simulation mode without physical hardware")
-    parser.add_argument("--port", type=str, default="COM3", help="Serial port of ESP32 (e.g. COM3 or /dev/ttyUSB0)")
+    parser.add_argument("--port", type=str, default="auto", help="Serial port of ESP32 (e.g. COM3 or auto)")
     parser.add_argument("--baud", type=int, default=115200, help="Serial baud rate (default: 115200)")
     parser.add_argument("--zone", type=str, default="Zone 1: Tropical Fruit Chiller (11°C)", help="Target storage zone")
     parser.add_argument("--url", type=str, default=DEFAULT_BACKEND_URL, help="FastAPI backend ingestion URL")
@@ -149,7 +190,9 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
+    target_port = auto_detect_serial_port() if args.port == "auto" else args.port
+
     if args.simulate:
         run_simulation(args.url, args.zone, args.interval)
     else:
-        run_serial_bridge(args.port, args.baud, args.url)
+        run_serial_bridge(target_port, args.baud, args.url)

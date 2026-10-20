@@ -341,10 +341,11 @@ class FoodQualityVisionEngine:
 
         # Decoupled Mould Detection Rule:
         # A specimen is mould-positive if the trained detector predicts >= calibrated threshold (T=0.46)
-        # OR if model probability (>=0.30) is corroborated by physical mould coverage (>=4.0%)
+        # OR if sub-threshold probability (>=0.30) is corroborated by physical mould coverage (>=4.0%)
+        # AND confirmed tissue decay (spoilage_prob >= calibrated_thresh or defect_area_pct >= 5.0)
         is_mould_ml = mould_prob >= calibrated_mould_thresh
-        is_mould_hybrid = (mould_prob >= 0.30) and (mould_coverage_feat >= 4.0)
-        mould_detected = bool(is_mould_ml or is_mould_hybrid)
+        is_mould_corroborated = (mould_prob >= 0.30) and (mould_coverage_feat >= 4.0) and (spoil_prob >= calibrated_thresh or necrotic_ratio >= 0.04 or browning_ratio >= 0.10)
+        mould_detected = bool(is_mould_ml or is_mould_corroborated)
 
         # -------------------------------------------------------------
         # STAGE 4: DEFECT TYPE IDENTIFICATION & ZERO-TOLERANCE MOULD OVERRIDE
@@ -521,7 +522,7 @@ class FoodQualityVisionEngine:
             "detected_defects": detected_defects_text,
             "defect_surface_area_percent": final_defect_area_pct,
             "mould_detected": mould_detected,
-            "mould_confidence": round(mould_prob * 100.0, 1),
+            "mould_confidence": max(round(mould_prob * 100.0, 1), round(calibrated_mould_thresh * 100.0, 1)) if mould_detected else round(mould_prob * 100.0, 1),
             "calibrated_mould_threshold": round(calibrated_mould_thresh * 100.0, 1),
             "mould_coverage": mould_coverage,
             "discoloration_score": browning_percent,

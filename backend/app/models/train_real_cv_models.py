@@ -124,8 +124,30 @@ def run_training_pipeline():
     print(" STAGE 1: PRODUCE SPECIES IDENTIFICATION CLASSIFIER (4-CLASS) ")
     print("-" * 70)
 
+    # Illumination-robust training augmentation for Strawberry class (99 samples vs ~800-1000 for Apple/Banana/Orange):
+    # Under illumination change alpha:
+    # Color moments (R, G, B, V, L means) scale by alpha
+    # Laplacian variance scales by alpha^2; Sobel gradient means scale by alpha
+    straw_idx = np.where(y_species_train == 3)[0]
+    straw_feats = X_train[straw_idx]
+    aug_feats = []
+    aug_labels = []
+    for alpha in [0.65, 0.85, 1.15]:
+        perturbed = straw_feats.copy()
+        for feat_col in [0, 2, 4, 10, 12]:
+            perturbed[:, feat_col] = np.clip(perturbed[:, feat_col] * alpha, 0, 255)
+        perturbed[:, 29] = perturbed[:, 29] * (alpha**2)
+        perturbed[:, 25] = perturbed[:, 25] * alpha
+        perturbed[:, 26] = perturbed[:, 26] * alpha
+        aug_feats.append(perturbed)
+        aug_labels.append(np.full(len(straw_idx), 3, dtype=int))
+
+    X_train_species = np.vstack([X_train] + aug_feats)
+    y_train_species = np.concatenate([y_species_train] + aug_labels)
+    print(f">> Augmented species training set from {len(X_train)} to {len(X_train_species)} samples.")
+
     rf_species = RandomForestClassifier(n_estimators=160, max_depth=14, random_state=42, n_jobs=-1)
-    rf_species.fit(X_train, y_species_train)
+    rf_species.fit(X_train_species, y_train_species)
     test_species_pred = rf_species.predict(X_test)
     test_species_probs = rf_species.predict_proba(X_test)
 

@@ -29,6 +29,10 @@ import {
   List,
   X,
   Check,
+  Plus,
+  Boxes,
+  Trash2,
+  Pencil,
   Cpu,
   Wifi,
   Radio,
@@ -37,7 +41,9 @@ import {
   Award,
   Info,
   ShieldCheck,
-  Database
+  Database,
+  Thermometer,
+  Droplets
 } from 'lucide-react';
 import axios from 'axios';
 
@@ -356,16 +362,293 @@ const SAMPLE_PRESETS = [
   }
 ];
 
+const DEFAULT_SYSTEM_STORAGES = [
+  {
+    id: "storage-1",
+    name: "Storage 1: Tropical Chiller",
+    category: "Chilled Chamber (Fruit & Veg)",
+    target_temp: 11.0,
+    current_temp: 11.4,
+    target_humidity: 89.0,
+    current_humidity: 90.2,
+    voc: 0.32,
+    status: "optimal",
+    node_id: "ESP32-NODE-01 (Active)",
+    assignedProduce: {
+      presetId: "banana_embul_fresh",
+      produceName: "Embul Banana (Ambul Kesel)",
+      category: "Fruits",
+      imageUrl: "/images/specimens/banana_fresh.jpg",
+      cvResult: SAMPLE_PRESETS[0]
+    }
+  }
+];
+
+const getStorageInspection = (storage) => {
+  if (storage?.assignedProduce?.cvResult) {
+    return storage.assignedProduce;
+  }
+  const preset = SAMPLE_PRESETS.find(p => p.id === storage?.assignedProduce?.presetId) || SAMPLE_PRESETS[0];
+  return {
+    presetId: preset.id,
+    produceName: preset.name,
+    category: preset.category,
+    imageUrl: preset.imageUrl,
+    cvResult: preset
+  };
+};
+
 export default function VisionInspector({ onInspectionComplete }) {
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState("all");
   const [selectedRiskFilter, setSelectedRiskFilter] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
   const [viewMode, setViewMode] = useState("compact"); // 'compact' | 'grid'
   const [specimenDropdownOpen, setSpecimenDropdownOpen] = useState(false);
-  
-  const [selectedPresetId, setSelectedPresetId] = useState(SAMPLE_PRESETS[0].id);
+  // Storage Chamber Management (Each storage has its own scoped produce inspection & RSL telemetry)
+  const [storages, setStorages] = useState(() => {
+    try {
+      const saved = localStorage.getItem('smart_restaurant_storages');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0 && parsed[0]?.id && parsed[0]?.name) {
+          return parsed.map((s, idx) => {
+            if (!s.assignedProduce || !s.assignedProduce.cvResult) {
+              const defaultPreset = SAMPLE_PRESETS[idx % SAMPLE_PRESETS.length] || SAMPLE_PRESETS[0];
+              return {
+                ...s,
+                assignedProduce: {
+                  presetId: defaultPreset.id,
+                  produceName: defaultPreset.name,
+                  category: defaultPreset.category,
+                  imageUrl: defaultPreset.imageUrl,
+                  cvResult: defaultPreset
+                }
+              };
+            }
+            return s;
+          });
+        }
+      }
+    } catch {}
+    return DEFAULT_SYSTEM_STORAGES;
+  });
+  const [selectedStorageId, setSelectedStorageId] = useState("storage-1");
+  const [isAddStorageModalOpen, setIsAddStorageModalOpen] = useState(false);
+  const [isChangeProduceModalOpen, setIsChangeProduceModalOpen] = useState(false);
+  const [newStorageForm, setNewStorageForm] = useState({
+    name: "",
+    category: "Chilled Cold Room (1°C - 5°C)",
+    target_temp: "4.0",
+    target_humidity: "85",
+    node_id: "",
+    preset_id: "lettuce_crisp"
+  });
+
+    const handleAddStorage = (e) => {
+    e.preventDefault();
+    if (!newStorageForm.name.trim()) return;
+    const selectedPreset = SAMPLE_PRESETS.find(p => p.id === newStorageForm.preset_id) || SAMPLE_PRESETS[5] || SAMPLE_PRESETS[0];
+    const newStorage = {
+      id: `storage-${Date.now()}`,
+      name: newStorageForm.name.trim(),
+      category: newStorageForm.category,
+      target_temp: parseFloat(newStorageForm.target_temp) || 4.0,
+      current_temp: parseFloat(newStorageForm.target_temp) || 4.0,
+      target_humidity: parseFloat(newStorageForm.target_humidity) || 85.0,
+      current_humidity: parseFloat(newStorageForm.target_humidity) || 85.0,
+      voc: 0.18,
+      status: "optimal",
+      node_id: newStorageForm.node_id.trim() || `ESP32-NODE-0${storages.length + 1}`,
+      assignedProduce: {
+        presetId: selectedPreset.id,
+        produceName: selectedPreset.name,
+        category: selectedPreset.category,
+        imageUrl: selectedPreset.imageUrl,
+        cvResult: selectedPreset
+      }
+    };
+    const updated = [...storages, newStorage];
+    setStorages(updated);
+    try {
+      localStorage.setItem('smart_restaurant_storages', JSON.stringify(updated));
+    } catch {}
+
+    // Immediately select and assign view to the newly created storage
+    setSelectedStorageId(newStorage.id);
+    setCurrentContainerName(newStorage.name);
+    setSelectedPresetId(selectedPreset.id);
+    setPreviewImage(selectedPreset.imageUrl);
+    setCvResult(selectedPreset);
+    if (onInspectionComplete) {
+      onInspectionComplete(selectedPreset);
+    }
+
+    setIsAddStorageModalOpen(false);
+    setNewStorageForm({
+      name: "",
+      category: "Chilled Cold Room (1°C - 5°C)",
+      target_temp: "4.0",
+      target_humidity: "85",
+      node_id: "",
+      preset_id: "lettuce_crisp"
+    });
+  };
+
+  const handleDeleteCustomStorage = (storageId, e) => {
+    e.stopPropagation();
+    if (storageId === "storage-1") return; // Primary Storage 1 cannot be deleted
+    const updated = storages.filter(s => s.id !== storageId);
+    setStorages(updated);
+    try {
+      localStorage.setItem('smart_restaurant_storages', JSON.stringify(updated));
+    } catch {}
+    setSelectedStorageId("storage-1");
+    const primaryContainer = storages[0]?.containers[0]?.name || "Container #C-101 (Zone 1: Fruit Chiller 11°C)";
+    setCurrentContainerName(primaryContainer);
+  };
+  // Edit & Delete Storage State
+  const [editingStorage, setEditingStorage] = useState(null);
+  const [editStorageForm, setEditStorageForm] = useState({
+    name: "",
+    category: "Chilled Cold Room (1°C - 5°C)",
+    target_temp: "4.0",
+    current_temp: "4.0",
+    target_humidity: "85",
+    current_humidity: "85",
+    node_id: "",
+    preset_id: ""
+  });
+  const [storageToDelete, setStorageToDelete] = useState(null);
+
+  // Switch active storage chamber and load its assigned produce & telemetry
+  const handleSelectStorage = (storage) => {
+    setSelectedStorageId(storage.id);
+    setCurrentContainerName(storage.name);
+    const insp = getStorageInspection(storage);
+    setSelectedPresetId(insp.presetId);
+    setPreviewImage(insp.imageUrl);
+    setCvResult(insp.cvResult);
+    if (onInspectionComplete) {
+      onInspectionComplete(insp.cvResult);
+    }
+  };
+
+  // Update the currently active storage's assigned produce
+  const updateActiveStorageInspection = (presetOrCvResult, imageUrl) => {
+    const updated = storages.map(s => {
+      if (s.id === selectedStorageId) {
+        return {
+          ...s,
+          assignedProduce: {
+            presetId: presetOrCvResult.id || s.assignedProduce?.presetId || null,
+            produceName: presetOrCvResult.identified_produce || presetOrCvResult.name || s.assignedProduce?.produceName || "Produce",
+            category: presetOrCvResult.category || s.assignedProduce?.category || "Fruits",
+            imageUrl: imageUrl || presetOrCvResult.imageUrl || s.assignedProduce?.imageUrl,
+            cvResult: presetOrCvResult
+          }
+        };
+      }
+      return s;
+    });
+    setStorages(updated);
+    try {
+      localStorage.setItem('smart_restaurant_storages', JSON.stringify(updated));
+    } catch {}
+  };
+
+  const handleOpenEditStorage = (storage, e) => {
+    e.stopPropagation();
+    setEditingStorage(storage);
+    const insp = getStorageInspection(storage);
+    setEditStorageForm({
+      name: storage.name || "",
+      category: storage.category || "Chilled Cold Room (1°C - 5°C)",
+      target_temp: String(storage.target_temp ?? 4.0),
+      current_temp: String(storage.current_temp ?? storage.target_temp ?? 4.0),
+      target_humidity: String(storage.target_humidity ?? 85.0),
+      current_humidity: String(storage.current_humidity ?? storage.target_humidity ?? 85.0),
+      node_id: storage.node_id || "",
+      preset_id: insp.presetId || SAMPLE_PRESETS[0].id
+    });
+  };
+
+  const handleUpdateStorage = (e) => {
+    e.preventDefault();
+    if (!editingStorage || !editStorageForm.name.trim()) return;
+
+    const chosenPreset = SAMPLE_PRESETS.find(p => p.id === editStorageForm.preset_id);
+
+    const updated = storages.map(s => {
+      if (s.id === editingStorage.id) {
+        const currentInsp = getStorageInspection(s);
+        const newInsp = chosenPreset ? {
+          presetId: chosenPreset.id,
+          produceName: chosenPreset.name,
+          category: chosenPreset.category,
+          imageUrl: chosenPreset.imageUrl,
+          cvResult: chosenPreset
+        } : currentInsp;
+
+        return {
+          ...s,
+          name: editStorageForm.name.trim(),
+          category: editStorageForm.category,
+          target_temp: parseFloat(editStorageForm.target_temp) || s.target_temp,
+          current_temp: parseFloat(editStorageForm.current_temp) || s.current_temp,
+          target_humidity: parseFloat(editStorageForm.target_humidity) || s.target_humidity,
+          current_humidity: parseFloat(editStorageForm.current_humidity) || s.current_humidity,
+          node_id: editStorageForm.node_id.trim() || s.node_id,
+          assignedProduce: newInsp
+        };
+      }
+      return s;
+    });
+
+    setStorages(updated);
+    try {
+      localStorage.setItem('smart_restaurant_storages', JSON.stringify(updated));
+    } catch {}
+
+    if (selectedStorageId === editingStorage.id) {
+      setCurrentContainerName(editStorageForm.name.trim());
+      if (chosenPreset) {
+        setSelectedPresetId(chosenPreset.id);
+        setPreviewImage(chosenPreset.imageUrl);
+        setCvResult(chosenPreset);
+        if (onInspectionComplete) onInspectionComplete(chosenPreset);
+      }
+    }
+    setEditingStorage(null);
+  };
+
+  const handlePromptDeleteStorage = (storage, e) => {
+    e.stopPropagation();
+    setStorageToDelete(storage);
+  };
+
+  const handleConfirmDeleteStorage = () => {
+    if (!storageToDelete) return;
+    if (storages.length <= 1) {
+      setStorageToDelete(null);
+      return;
+    }
+    const updated = storages.filter(s => s.id !== storageToDelete.id);
+    setStorages(updated);
+    try {
+      localStorage.setItem('smart_restaurant_storages', JSON.stringify(updated));
+    } catch {}
+
+    if (selectedStorageId === storageToDelete.id) {
+      const fallback = updated[0];
+      handleSelectStorage(fallback);
+    }
+    setStorageToDelete(null);
+  };
+
+const activeStorage = storages.find(s => s?.id === selectedStorageId) || storages[0] || DEFAULT_SYSTEM_STORAGES[0];
+  const [selectedPresetId, setSelectedPresetId] = useState(() => activeStorage?.assignedProduce?.presetId || SAMPLE_PRESETS[0].id);
   const [previewImage, setPreviewImage] = useState(SAMPLE_PRESETS[0].imageUrl);
-  const [currentContainerName, setCurrentContainerName] = useState(SAMPLE_PRESETS[0].container);
+  const [currentContainerName, setCurrentContainerName] = useState(SAMPLE_PRESETS[0]?.container || "Container #C-101 (Zone 1: Fruit Chiller 11°C)");
   const [analyzing, setAnalyzing] = useState(false);
   const [cvResult, setCvResult] = useState(SAMPLE_PRESETS[0]);
   const [isCameraActive, setIsCameraActive] = useState(false);
@@ -458,10 +741,11 @@ export default function VisionInspector({ onInspectionComplete }) {
   const handleSelectPreset = (preset) => {
     stopCamera();
     setSelectedPresetId(preset.id);
-    setCurrentContainerName(preset.container);
+    setCurrentContainerName(`${activeStorage?.name || 'Storage'} - ${preset.name}`);
     setPreviewImage(preset.imageUrl);
     setCvResult(preset);
     setSpecimenDropdownOpen(false);
+    updateActiveStorageInspection(preset, preset.imageUrl);
 
     if (onInspectionComplete) {
       onInspectionComplete(preset);
@@ -547,6 +831,7 @@ export default function VisionInspector({ onInspectionComplete }) {
       const res = await axios.post("http://localhost:8000/api/vision/inspect", formData);
       const feat = res.data.features || res.data;
       setCvResult(feat);
+      updateActiveStorageInspection(feat, imageDataUrl);
       if (feat.identified_produce) {
         setCurrentContainerName(`Detected: ${feat.identified_produce} (${feat.category || targetCategory})`);
       }
@@ -579,6 +864,9 @@ export default function VisionInspector({ onInspectionComplete }) {
       setCvResult(feat);
       if (data.image_base64) {
         setPreviewImage(data.image_base64);
+        updateActiveStorageInspection(feat, data.image_base64);
+      } else {
+        updateActiveStorageInspection(feat, previewImage);
       }
       setCurrentContainerName(`ESP32-CAM: ${feat.identified_produce || "Live Capture"} (${feat.category || "Produce"})`);
       setSelectedPresetId(null);
@@ -702,363 +990,551 @@ export default function VisionInspector({ onInspectionComplete }) {
         </div>
       </div>
 
-      {/* ─────────────────────────────────────────────────────────────
-          SECTION: STREAMLINED FOOD SPECIMEN SELECTOR & ORGANIZER
+            {/* ─────────────────────────────────────────────────────────────
+          SECTION: STORAGE CHAMBER SELECTOR & MULTI-STORAGE MANAGEMENT
           ───────────────────────────────────────────────────────────── */}
-      <div className="p-3 sm:p-4 rounded-xl sm:rounded-2xl bg-[#f8faf9] dark:bg-slate-850/80 border border-[#d1ded5] dark:border-slate-800 space-y-3 shadow-2xs">
+      <div className="p-4 sm:p-5 rounded-2xl bg-[#f8faf9] dark:bg-slate-850/80 border border-[#d1ded5] dark:border-slate-800 space-y-4 shadow-2xs">
         
-        {/* Top Active Specimen Bar + Dropdown Selector + Prev/Next Controls */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-2.5 border-b border-[#e1eae4] dark:border-slate-800">
-          
-          {/* Active Specimen Summary */}
-          {(() => {
-            const activePreset = SAMPLE_PRESETS.find(p => p.id === selectedPresetId) || SAMPLE_PRESETS[0];
+        {/* Top Header Row: Chamber Overview & Add Storage Trigger */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-[#e1eae4] dark:border-slate-800">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-black uppercase tracking-wider text-slate-900 dark:text-white flex items-center gap-1.5">
+                <Boxes className="h-4 w-4 text-emerald-700 dark:text-emerald-400" />
+                Active Storage Units
+              </span>
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700">
+                {storages.length} Configured
+              </span>
+            </div>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium mt-0.5">
+              Select a storage chamber to monitor telemetry, or register a new storage unit.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setIsAddStorageModalOpen(true)}
+            className="px-3.5 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 active:scale-95 text-white text-xs font-extrabold flex items-center gap-1.5 shadow-md shadow-emerald-700/20 transition-all cursor-pointer self-start sm:self-auto"
+          >
+            <Plus className="h-4 w-4" />
+            <span>Add Storage</span>
+          </button>
+        </div>
+
+        {/* Storage Units Cards Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          {storages.map((storage) => {
+            const isSelected = selectedStorageId === storage.id;
             return (
-              <div className="flex items-center gap-3 min-w-0">
-                <div className="w-12 h-12 rounded-xl overflow-hidden bg-white dark:bg-slate-900 border border-[#c6d7cd] dark:border-slate-700 flex-shrink-0 shadow-2xs relative">
-                  <img
-                    src={activePreset.imageUrl}
-                    alt={activePreset.name}
-                    onError={(e) => {
-                      e.currentTarget.onerror = null;
-                      e.currentTarget.src = getFallbackSvg(activePreset.name, activePreset.category, activePreset.icon);
-                    }}
-                    className="w-full h-full object-cover"
-                  />
-                  <span className="absolute bottom-0.5 right-0.5 text-[10px] leading-none">{activePreset.icon}</span>
-                </div>
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-xs sm:text-sm font-black text-slate-900 dark:text-white truncate">
-                      {activePreset.name}
-                    </span>
-                    <span className={`text-[9px] sm:text-[10px] font-black px-2 py-0.5 rounded-md border ${
-                      activePreset.risk_level === 'Critical'
-                        ? 'bg-rose-100 dark:bg-rose-950/60 text-rose-900 dark:text-rose-300 border-rose-400 animate-pulse'
-                        : activePreset.risk_level === 'High'
-                        ? 'bg-amber-100 dark:bg-amber-950/60 text-amber-900 dark:text-amber-300 border-amber-400'
-                        : 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-950 dark:text-emerald-300 border-emerald-400'
+              <div
+                key={storage.id}
+                onClick={() => handleSelectStorage(storage)} className={`p-3.5 rounded-2xl border transition-all cursor-pointer relative overflow-hidden group ${
+                  isSelected
+                    ? 'bg-emerald-50/90 dark:bg-emerald-950/50 border-emerald-600 dark:border-emerald-500 shadow-sm ring-1 ring-emerald-500/40'
+                    : 'bg-white dark:bg-slate-900 border-[#d1ded5] dark:border-slate-700 hover:border-emerald-400 hover:bg-emerald-50/30 dark:hover:bg-slate-800/60 shadow-2xs'
+                }`}
+              >
+                {/* Active indicator line */}
+                {isSelected && (
+                  <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 to-teal-500" />
+                )}
+
+                <div className="flex items-center justify-between gap-2 mb-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className={`p-2 rounded-xl flex-shrink-0 ${
+                      isSelected
+                        ? 'bg-emerald-700 text-white shadow-xs'
+                        : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700'
                     }`}>
-                      {activePreset.risk_level}: {activePreset.ripeness_stage.split('(')[0].trim()}
-                    </span>
+                      <Boxes className="h-4 w-4" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-xs font-black text-slate-900 dark:text-white truncate">
+                        {storage.name}
+                      </div>
+                      <div className="text-[10px] text-slate-500 dark:text-slate-400 truncate">
+                        {storage.category}
+                      </div>
+                    </div>
                   </div>
-                  <div className="text-[11px] text-slate-500 dark:text-slate-400 font-medium truncate mt-0.5">
-                    {activePreset.container} • <span className="text-emerald-700 dark:text-emerald-400 font-bold">{activePreset.remaining_shelf_life_hours}h RSL</span>
+
+                  {/* Edit & Delete Storage Action Buttons */}
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    <button
+                      type="button"
+                      onClick={(e) => handleOpenEditStorage(storage, e)}
+                      title={`Edit ${storage.name}`}
+                      className="p-1.5 rounded-lg text-slate-400 hover:text-emerald-700 dark:hover:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/60 transition-colors cursor-pointer"
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={(e) => handlePromptDeleteStorage(storage, e)}
+                      disabled={storages.length <= 1}
+                      title={storages.length <= 1 ? "At least one storage unit must remain active" : `Delete ${storage.name}`}
+                      className={`p-1.5 rounded-lg transition-colors ${
+                        storages.length <= 1
+                          ? 'text-slate-300 dark:text-slate-700 cursor-not-allowed opacity-40'
+                          : 'text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/60 cursor-pointer'
+                      }`}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
                   </div>
+                </div>
+
+                {/* Telemetry Summary Bar */}
+                <div className="grid grid-cols-3 gap-1.5 py-1.5 px-2 rounded-xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200/70 dark:border-slate-700 text-[10px] font-semibold text-slate-600 dark:text-slate-300">
+                  <div className="flex items-center gap-1">
+                    <Thermometer className="h-3 w-3 text-rose-500" />
+                    <span>{storage.current_temp}°C</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Droplets className="h-3 w-3 text-sky-500" />
+                    <span>{storage.current_humidity}%</span>
+                  </div>
+                  <div className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-bold truncate">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                    <span className="truncate">{storage.status}</span>
+                  </div>
+                </div>
+
+                {/* Hardware Node Badge */}
+                <div className="mt-2 flex items-center justify-between text-[10px] font-bold text-slate-500 dark:text-slate-400">
+                  <span>Hardware Node:</span>
+                  <span className="text-emerald-700 dark:text-emerald-400 font-mono text-[9px]">{storage.node_id}</span>
+                </div>
+
+                {/* Assigned Produce Pill */}
+                <div className="mt-2 pt-2 border-t border-slate-200/60 dark:border-slate-800 flex items-center justify-between text-[10px]">
+                  <span className="font-bold text-slate-500 dark:text-slate-400">Assigned Produce:</span>
+                  <span className="font-bold text-emerald-700 dark:text-emerald-400 flex items-center gap-1 truncate max-w-[140px]">
+                    <span>{storage.assignedProduce?.cvResult?.produce_icon || "🍎"}</span>
+                    <span className="truncate">{storage.assignedProduce?.produceName || "Embul Banana"}</span>
+                  </span>
                 </div>
               </div>
             );
-          })()}
-
-          {/* Quick Stepper & Dropdown Picker Controls */}
-          <div className="flex items-center gap-2 flex-shrink-0" ref={specimenDropdownRef}>
-            
-            {/* Previous / Next Stepper */}
-            <div className="flex items-center bg-white dark:bg-slate-900 rounded-xl border border-[#c6d7cd] dark:border-slate-700 p-0.5 shadow-2xs">
-              <button
-                type="button"
-                onClick={handlePrevPreset}
-                disabled={filteredPresets.length <= 1}
-                title="Previous Food Specimen"
-                className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-40 text-slate-700 dark:text-slate-200 transition-colors"
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </button>
-              <span className="text-[10px] font-mono font-bold px-2 text-slate-600 dark:text-slate-400 select-none">
-                {currentIndex >= 0 ? currentIndex + 1 : 1}/{filteredPresets.length || 1}
-              </span>
-              <button
-                type="button"
-                onClick={handleNextPreset}
-                disabled={filteredPresets.length <= 1}
-                title="Next Food Specimen"
-                className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-40 text-slate-700 dark:text-slate-200 transition-colors"
-              >
-                <ChevronRight className="h-4 w-4" />
-              </button>
-            </div>
-
-            {/* Quick Dropdown Picker Button */}
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => setSpecimenDropdownOpen(!specimenDropdownOpen)}
-                className="px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl border border-[#c6d7cd] dark:border-slate-700 bg-white dark:bg-slate-900 hover:border-emerald-600 text-slate-900 dark:text-white text-xs font-bold flex items-center gap-1.5 shadow-2xs transition-all"
-              >
-                <List className="h-3.5 w-3.5 text-emerald-700 dark:text-emerald-400" />
-                <span className="hidden sm:inline">Select Food Item</span>
-                <span className="sm:hidden">Select</span>
-                <ChevronDown className={`h-3.5 w-3.5 text-slate-500 transition-transform ${specimenDropdownOpen ? 'rotate-180 text-emerald-600' : ''}`} />
-              </button>
-
-              {/* Specimen Dropdown List */}
-              {specimenDropdownOpen && (
-                <div className="absolute right-0 mt-2 w-72 sm:w-84 max-h-96 overflow-y-auto rounded-2xl bg-white/98 dark:bg-slate-900/98 backdrop-blur-2xl border border-slate-200 dark:border-slate-800 shadow-2xl p-2 z-50 space-y-1 animate-fade-in no-scrollbar">
-                  <div className="px-3 py-1.5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
-                    <span className="text-[10px] uppercase font-black text-slate-400 tracking-wider">Fruit & Vegetable Specimens</span>
-                    <span className="text-[10px] text-emerald-700 dark:text-emerald-400 font-bold">Organized by Category</span>
-                  </div>
-                  {SAMPLE_PRESETS.map((preset) => {
-                    const isSelected = preset.id === selectedPresetId;
-                    return (
-                      <button
-                        key={preset.id}
-                        type="button"
-                        onClick={() => handleSelectPreset(preset)}
-                        className={`w-full p-2 rounded-xl text-left transition-all flex items-center gap-2.5 ${
-                          isSelected
-                            ? 'bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-700/60'
-                            : 'hover:bg-slate-100 dark:hover:bg-slate-800/80 border border-transparent'
-                        }`}
-                      >
-                        <div className="w-9 h-9 rounded-lg overflow-hidden flex-shrink-0 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
-                          <img
-                            src={preset.imageUrl}
-                            alt={preset.name}
-                            onError={(e) => {
-                              e.currentTarget.onerror = null;
-                              e.currentTarget.src = getFallbackSvg(preset.name, preset.category, preset.icon);
-                            }}
-                            className="w-full h-full object-cover"
-                          />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between">
-                            <span className={`text-xs font-bold truncate ${isSelected ? 'text-emerald-900 dark:text-emerald-300' : 'text-slate-900 dark:text-white'}`}>
-                              {preset.icon} {preset.name}
-                            </span>
-                            <span className={`text-[9px] font-black px-1.5 py-0.2 rounded ${
-                              preset.risk_level === 'Critical' ? 'bg-rose-100 text-rose-800' :
-                              preset.risk_level === 'High' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'
-                            }`}>
-                              {preset.risk_level}
-                            </span>
-                          </div>
-                          <div className="text-[10px] text-slate-500 dark:text-slate-400 truncate">
-                            {preset.category} • {preset.remaining_shelf_life_hours}h left
-                          </div>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-
-            {/* View Mode Toggle: Compact Ribbon vs Full Grid */}
-            <button
-              type="button"
-              onClick={() => setViewMode(viewMode === 'compact' ? 'grid' : 'compact')}
-              className={`p-1.5 sm:p-2 rounded-xl border text-xs font-bold flex items-center gap-1 transition-all ${
-                viewMode === 'grid'
-                  ? 'bg-emerald-700 text-white border-emerald-700 shadow-sm'
-                  : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 border-[#c6d7cd] dark:border-slate-700 hover:border-emerald-500'
-              }`}
-              title={viewMode === 'compact' ? 'Expand to Full Grid' : 'Switch to Compact Ribbon'}
-            >
-              {viewMode === 'compact' ? <Grid className="h-4 w-4" /> : <List className="h-4 w-4" />}
-            </button>
-          </div>
+          })}
         </div>
+</div>
 
-        {/* Filter Toolbar: Search Bar + Category Pills + Spoilage Stage Filters */}
-        <div className="space-y-2">
-          <div className="flex flex-col sm:flex-row gap-2 items-center">
-            
-            {/* Live Search Input */}
-            <div className="relative flex-1 w-full">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
-              <input
-                type="text"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Search produce item (e.g. banana, spinach, mango, tomato)..."
-                className="w-full pl-8.5 pr-8 py-1.5 sm:py-2 text-xs rounded-xl bg-white dark:bg-slate-900 border border-[#c6d7cd] dark:border-slate-700 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-emerald-600 shadow-2xs font-medium"
-              />
-              {searchTerm && (
+      {/* Modal: Add New Storage Chamber */}
+      {isAddStorageModalOpen && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm animate-fade-in"
+          role="dialog"
+          aria-modal="true"
+        >
+          <div className="w-full max-w-md rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl p-6 space-y-4 animate-slide-up">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300">
+                  <Boxes className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-slate-900 dark:text-white">
+                    Register New Storage Unit
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    Add cold room, crisper, or pantry storage
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsAddStorageModalOpen(false)}
+                className="p-1.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleAddStorage} className="space-y-3.5">
+              <div className="space-y-1">
+                <label className="text-[11px] font-extrabold uppercase text-slate-700 dark:text-slate-300 block">
+                  Storage Name
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Storage 2: Walk-In Crisper Vault"
+                  value={newStorageForm.name}
+                  onChange={(e) => setNewStorageForm({ ...newStorageForm, name: e.target.value })}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white text-xs font-semibold focus:outline-none focus:border-emerald-600"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[11px] font-extrabold uppercase text-slate-700 dark:text-slate-300 block">
+                  Chamber Category
+                </label>
+                <select
+                  value={newStorageForm.category}
+                  onChange={(e) => setNewStorageForm({ ...newStorageForm, category: e.target.value })}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white text-xs font-semibold focus:outline-none focus:border-emerald-600"
+                >
+                  <option value="Chilled Cold Room (1°C - 5°C)">Chilled Cold Room (1°C - 5°C)</option>
+                  <option value="Deep Freeze Vault (-18°C)">Deep Freeze Vault (-18°C)</option>
+                  <option value="Tropical Fruit Chiller (10°C - 12°C)">Tropical Fruit Chiller (10°C - 12°C)</option>
+                  <option value="High-Humidity Crisper (4°C - 8°C)">High-Humidity Crisper (4°C - 8°C)</option>
+                  <option value="Ambient Kitchen Prep Rack (25°C - 28°C)">Ambient Kitchen Prep Rack (25°C - 28°C)</option>
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-[11px] font-extrabold uppercase text-slate-700 dark:text-slate-300 block">
+                    Target Temp (°C)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    required
+                    value={newStorageForm.target_temp}
+                    onChange={(e) => setNewStorageForm({ ...newStorageForm, target_temp: e.target.value })}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white text-xs font-semibold focus:outline-none focus:border-emerald-600"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[11px] font-extrabold uppercase text-slate-700 dark:text-slate-300 block">
+                    Target Humidity (%)
+                  </label>
+                  <input
+                    type="number"
+                    required
+                    value={newStorageForm.target_humidity}
+                    onChange={(e) => setNewStorageForm({ ...newStorageForm, target_humidity: e.target.value })}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white text-xs font-semibold focus:outline-none focus:border-emerald-600"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[11px] font-extrabold uppercase text-slate-700 dark:text-slate-300 block">
+                  Hardware Node ID / ESP32 IP (Optional)
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. ESP32-NODE-02 or 192.168.1.150"
+                  value={newStorageForm.node_id}
+                  onChange={(e) => setNewStorageForm({ ...newStorageForm, node_id: e.target.value })}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white text-xs font-semibold focus:outline-none focus:border-emerald-600 font-mono"
+                />
+              </div>
+
+                            <div className="space-y-1">
+                <label className="text-[11px] font-extrabold uppercase text-slate-700 dark:text-slate-300 block">
+                  Assign Produce to Monitor in this Chamber
+                </label>
+                <select
+                  value={newStorageForm.preset_id}
+                  onChange={(e) => setNewStorageForm({ ...newStorageForm, preset_id: e.target.value })}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white text-xs font-semibold focus:outline-none focus:border-emerald-600"
+                >
+                  {SAMPLE_PRESETS.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.icon || '🍎'} {p.name} ({p.category} • {p.remaining_shelf_life_hours}h RSL)
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="pt-2 flex items-center justify-end gap-2.5">
                 <button
                   type="button"
-                  onClick={() => setSearchTerm('')}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 rounded text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                  onClick={() => setIsAddStorageModalOpen(false)}
+                  className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold transition-colors"
                 >
-                  <X className="h-3.5 w-3.5" />
+                  Cancel
                 </button>
-              )}
-            </div>
-
-            {/* Spoilage Stage / Risk Pills */}
-            <div className="flex items-center gap-1 w-full sm:w-auto overflow-x-auto no-scrollbar py-0.5 flex-shrink-0">
-              <span className="text-[10px] uppercase font-black text-slate-400 sm:hidden">Stage:</span>
-              {[
-                { id: "all", label: "All States" },
-                { id: "low", label: "🟢 Fresh" },
-                { id: "high", label: "⚠️ Overripe" },
-                { id: "critical", label: "🚨 Spoiled" }
-              ].map((rf) => (
                 <button
-                  key={rf.id}
-                  type="button"
-                  onClick={() => setSelectedRiskFilter(rf.id)}
-                  className={`px-2 py-1 rounded-lg text-[10px] sm:text-[11px] font-bold transition-all whitespace-nowrap border ${
-                    selectedRiskFilter === rf.id
-                      ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 border-slate-900 dark:border-white shadow-2xs'
-                      : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border-[#d1ded5] dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800'
-                  }`}
+                  type="submit"
+                  className="px-4 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold shadow-md shadow-emerald-700/20 transition-all active:scale-95"
                 >
-                  {rf.label}
+                  Save Storage Chamber
                 </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Category Filter Tabs (Fruits & Vegetables Only) */}
-          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
-            {[
-              { id: "all", label: "All Produce (8)", icon: null },
-              { id: "fruits", label: "Fruits (5)", icon: <Apple className="h-3 w-3" /> },
-              { id: "vegetables", label: "Vegetables (3)", icon: <Carrot className="h-3 w-3" /> },
-            ].map((cat) => (
-              <button
-                key={cat.id}
-                type="button"
-                onClick={() => handleCategoryFilterClick(cat.id)}
-                className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all flex items-center gap-1 whitespace-nowrap border ${
-                  selectedCategoryFilter === cat.id
-                    ? 'bg-emerald-700 text-white border-emerald-700 shadow-2xs'
-                    : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-[#d1ded5] dark:border-slate-700 hover:bg-emerald-50 dark:hover:bg-slate-800'
-                }`}
-              >
-                {cat.icon}
-                <span>{cat.label}</span>
-              </button>
-            ))}
+              </div>
+            </form>
           </div>
         </div>
-
-        {/* View Mode 1: Compact Horizontal Ribbon (Default - Zero vertical space wastage!) */}
-        {viewMode === 'compact' ? (
-          <div className="relative group">
-            {/* Scroll Left Navigator */}
-            <button
-              type="button"
-              onClick={() => scrollCarousel('left')}
-              className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-1.5 sm:-translate-x-3 w-7 h-7 rounded-full bg-white/95 dark:bg-slate-800/95 border border-slate-300 dark:border-slate-700 shadow-md flex items-center justify-center text-slate-700 dark:text-slate-200 z-10 hover:bg-emerald-50 cursor-pointer transition-transform active:scale-95"
-              title="Scroll left"
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </button>
-
-            {/* Horizontal Snap Scroll Container */}
-            <div
-              ref={carouselRef}
-              className="flex items-center gap-2.5 overflow-x-auto no-scrollbar py-1 px-1 scroll-smooth"
-            >
-              {filteredPresets.length === 0 ? (
-                <div className="w-full py-4 text-center text-xs text-slate-500 font-medium">
-                  No food items match your filter. Try adjusting your search query.
+      )}
+      {/* Modal: Edit Storage Chamber */}
+      {editingStorage && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm animate-fade-in"
+          role="dialog"
+          aria-modal="true"
+        >
+          <div className="w-full max-w-md rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl p-6 space-y-4 animate-slide-up">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300">
+                  <Pencil className="h-5 w-5" />
                 </div>
-              ) : (
-                filteredPresets.map((preset) => {
-                  const isSelected = selectedPresetId === preset.id;
+                <div>
+                  <h3 className="text-base font-black text-slate-900 dark:text-white">
+                    Edit Storage Unit
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    Update temperature targets, category, and telemetry node
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingStorage(null)}
+                className="p-1.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleUpdateStorage} className="space-y-3.5">
+              <div className="space-y-1">
+                <label className="text-[11px] font-extrabold uppercase text-slate-700 dark:text-slate-300 block">
+                  Storage Name
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={editStorageForm.name}
+                  onChange={(e) => setEditStorageForm({ ...editStorageForm, name: e.target.value })}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white text-xs font-semibold focus:outline-none focus:border-emerald-600"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[11px] font-extrabold uppercase text-slate-700 dark:text-slate-300 block">
+                  Chamber Category
+                </label>
+                <select
+                  value={editStorageForm.category}
+                  onChange={(e) => setEditStorageForm({ ...editStorageForm, category: e.target.value })}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white text-xs font-semibold focus:outline-none focus:border-emerald-600"
+                >
+                  <option value="Chilled Chamber (Fruit & Veg)">Chilled Chamber (Fruit & Veg)</option>
+                  <option value="Chilled Cold Room (1°C - 5°C)">Chilled Cold Room (1°C - 5°C)</option>
+                  <option value="Deep Freeze Vault (-18°C)">Deep Freeze Vault (-18°C)</option>
+                  <option value="Tropical Fruit Chiller (10°C - 12°C)">Tropical Fruit Chiller (10°C - 12°C)</option>
+                  <option value="High-Humidity Crisper (4°C - 8°C)">High-Humidity Crisper (4°C - 8°C)</option>
+                  <option value="Ambient Kitchen Prep Rack (25°C - 28°C)">Ambient Kitchen Prep Rack (25°C - 28°C)</option>
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-[11px] font-extrabold uppercase text-slate-700 dark:text-slate-300 block">
+                    Target Temp (°C)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    required
+                    value={editStorageForm.target_temp}
+                    onChange={(e) => setEditStorageForm({ ...editStorageForm, target_temp: e.target.value })}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white text-xs font-semibold focus:outline-none focus:border-emerald-600"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[11px] font-extrabold uppercase text-slate-700 dark:text-slate-300 block">
+                    Target Humidity (%)
+                  </label>
+                  <input
+                    type="number"
+                    required
+                    value={editStorageForm.target_humidity}
+                    onChange={(e) => setEditStorageForm({ ...editStorageForm, target_humidity: e.target.value })}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white text-xs font-semibold focus:outline-none focus:border-emerald-600"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[11px] font-extrabold uppercase text-slate-700 dark:text-slate-300 block">
+                  Hardware Node ID / ESP32 IP
+                </label>
+                <input
+                  type="text"
+                  value={editStorageForm.node_id}
+                  onChange={(e) => setEditStorageForm({ ...editStorageForm, node_id: e.target.value })}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white text-xs font-semibold focus:outline-none focus:border-emerald-600 font-mono"
+                />
+              </div>
+
+              <div className="pt-2 flex items-center justify-end gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setEditingStorage(null)}
+                  className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold shadow-md shadow-emerald-700/20 transition-all active:scale-95 cursor-pointer"
+                >
+                  Save Changes
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+
+      {/* Modal: Change Assigned Produce for Active Storage */}
+      {isChangeProduceModalOpen && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm animate-fade-in"
+          role="dialog"
+          aria-modal="true"
+        >
+          <div className="w-full max-w-2xl rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl p-6 space-y-4 animate-slide-up max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800 flex-shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300">
+                  <Apple className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-slate-900 dark:text-white">
+                    Assign Produce Specimen to {activeStorage?.name}
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    Select a produce batch to monitor with optical scanning & shelf-life prediction
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsChangeProduceModalOpen(false)}
+                className="p-1.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="overflow-y-auto space-y-2 pr-1 flex-1">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                {SAMPLE_PRESETS.map((preset) => {
+                  const isCur = cvResult?.id === preset.id;
                   return (
-                    <div
+                    <button
                       key={preset.id}
-                      onClick={() => handleSelectPreset(preset)}
-                      className={`flex-shrink-0 w-36 sm:w-40 p-2 rounded-xl border cursor-pointer transition-all flex flex-col items-center text-center ${
-                        isSelected
-                          ? 'bg-emerald-50 dark:bg-emerald-950/50 border-emerald-600 dark:border-emerald-500 ring-2 ring-emerald-500/50 shadow-sm'
-                          : 'bg-white dark:bg-slate-900 border-[#d1ded5] dark:border-slate-700 hover:border-emerald-400 dark:hover:border-emerald-500 shadow-2xs'
+                      type="button"
+                      onClick={() => {
+                        handleSelectPreset(preset);
+                        setIsChangeProduceModalOpen(false);
+                      }}
+                      className={`p-3 rounded-2xl border text-left transition-all flex items-start gap-3 cursor-pointer ${
+                        isCur
+                          ? 'bg-emerald-50 dark:bg-emerald-950/50 border-emerald-500 shadow-xs ring-1 ring-emerald-500/30'
+                          : 'bg-white dark:bg-slate-800/80 border-slate-200 dark:border-slate-700 hover:border-emerald-400 hover:bg-slate-50 dark:hover:bg-slate-800'
                       }`}
                     >
-                      <div className="w-full h-18 sm:h-20 rounded-lg overflow-hidden relative bg-slate-100 dark:bg-slate-950 mb-1.5 border border-slate-200 dark:border-slate-800">
-                        <img
-                          src={preset.imageUrl}
-                          alt={preset.name}
-                          loading="lazy"
-                          onError={(e) => {
-                            e.currentTarget.onerror = null;
-                            e.currentTarget.src = getFallbackSvg(preset.name, preset.category, preset.icon);
-                          }}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                        />
-                        <span className={`absolute top-1 right-1 text-[8px] font-black px-1.5 py-0.5 rounded shadow ${
-                          preset.risk_level === 'Critical'
-                            ? 'bg-rose-600 text-white'
-                            : preset.risk_level === 'High'
-                            ? 'bg-amber-500 text-white'
-                            : 'bg-emerald-700 text-white'
-                        }`}>
-                          {preset.risk_level}
-                        </span>
+                      <span className="text-2xl p-1.5 bg-slate-100 dark:bg-slate-700 rounded-xl flex-shrink-0">
+                        {preset.icon || '🍎'}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center justify-between gap-1">
+                          <span className="text-xs font-black text-slate-900 dark:text-white truncate">
+                            {preset.name}
+                          </span>
+                          <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full border ${
+                            preset.risk_level === 'Low'
+                              ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                              : preset.risk_level === 'High'
+                              ? 'bg-amber-100 text-amber-800 border-amber-300'
+                              : 'bg-rose-100 text-rose-800 border-rose-300'
+                          }`}>
+                            {preset.risk_level} Risk
+                          </span>
+                        </div>
+                        <div className="text-[10px] text-slate-500 dark:text-slate-400 truncate mt-0.5">
+                          {preset.category} • {preset.ripeness_stage}
+                        </div>
+                        <div className="text-[10px] font-bold text-emerald-700 dark:text-emerald-400 mt-1">
+                          Remaining Shelf-Life: {preset.remaining_shelf_life_hours}h
+                        </div>
                       </div>
-                      <span className="text-[11px] font-bold text-slate-900 dark:text-white line-clamp-1 flex items-center gap-1 w-full justify-center">
-                        <span>{preset.icon}</span> {preset.name}
-                      </span>
-                      <span className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold truncate w-full">
-                        {preset.category} • {preset.remaining_shelf_life_hours}h left
-                      </span>
-                    </div>
+                    </button>
                   );
-                })
-              )}
+                })}
+              </div>
             </div>
 
-            {/* Scroll Right Navigator */}
-            <button
-              type="button"
-              onClick={() => scrollCarousel('right')}
-              className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1.5 sm:translate-x-3 w-7 h-7 rounded-full bg-white/95 dark:bg-slate-800/95 border border-slate-300 dark:border-slate-700 shadow-md flex items-center justify-center text-slate-700 dark:text-slate-200 z-10 hover:bg-emerald-50 cursor-pointer transition-transform active:scale-95"
-              title="Scroll right"
-            >
-              <ChevronRight className="h-4 w-4" />
-            </button>
+            <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex justify-end flex-shrink-0">
+              <button
+                type="button"
+                onClick={() => setIsChangeProduceModalOpen(false)}
+                className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold transition-colors cursor-pointer"
+              >
+                Done
+              </button>
+            </div>
           </div>
-        ) : (
-          /* View Mode 2: Full Grid View (Expanded upon toggle) */
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-2.5 pt-1 animate-fade-in">
-            {filteredPresets.map((preset) => {
-              const isSelected = selectedPresetId === preset.id;
-              return (
-                <div
-                  key={preset.id}
-                  onClick={() => handleSelectPreset(preset)}
-                  className={`p-2 rounded-xl border cursor-pointer transition-all flex flex-col items-center text-center group ${
-                    isSelected
-                      ? 'bg-emerald-50 dark:bg-emerald-950/50 border-emerald-600 dark:border-emerald-500 ring-2 ring-emerald-500/50 shadow-sm'
-                      : 'bg-white dark:bg-slate-900 border-[#d1ded5] dark:border-slate-700 hover:border-emerald-400 dark:hover:border-emerald-500 shadow-2xs'
-                  }`}
-                >
-                  <div className="w-full h-20 sm:h-24 rounded-lg overflow-hidden relative bg-slate-100 dark:bg-slate-950 mb-1 border border-[#d1ded5] dark:border-slate-700">
-                    <img
-                      src={preset.imageUrl}
-                      alt={preset.name}
-                      loading="lazy"
-                      onError={(e) => {
-                        e.currentTarget.onerror = null;
-                        e.currentTarget.src = getFallbackSvg(preset.name, preset.category, preset.icon);
-                      }}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                    />
-                    <span className={`absolute top-1 right-1 text-[8px] sm:text-[9px] font-black px-1.5 py-0.5 rounded shadow ${
-                      preset.risk_level === 'Critical'
-                        ? 'bg-rose-600 text-white'
-                        : preset.risk_level === 'High'
-                        ? 'bg-amber-500 text-white'
-                        : 'bg-emerald-700 text-white'
-                    }`}>
-                      {preset.risk_level}
-                    </span>
-                  </div>
-                  <span className="text-[11px] font-bold text-slate-900 dark:text-white line-clamp-1 flex items-center gap-1">
-                    <span>{preset.icon}</span> {preset.name}
-                  </span>
-                  <span className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold">{preset.category} • {preset.remaining_shelf_life_hours}h</span>
-                </div>
-              );
-            })}
+        </div>
+      )}
+
+      {/* Modal: Delete Storage Confirmation */}
+      {storageToDelete && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm animate-fade-in"
+          role="dialog"
+          aria-modal="true"
+        >
+          <div className="w-full max-w-md rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl p-6 space-y-4 animate-slide-up">
+            <div className="flex items-center gap-3">
+              <div className="p-3 rounded-2xl bg-rose-100 dark:bg-rose-950/70 text-rose-600 dark:text-rose-400 flex-shrink-0">
+                <Trash2 className="h-6 w-6" />
+              </div>
+              <div className="min-w-0">
+                <h3 className="text-base font-black text-slate-900 dark:text-white">
+                  Delete Storage Unit?
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  This action removes the storage chamber from monitoring.
+                </p>
+              </div>
+            </div>
+
+            <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-xs text-slate-700 dark:text-slate-300">
+              <div className="font-bold text-slate-900 dark:text-white">{storageToDelete.name}</div>
+              <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                {storageToDelete.category} • Node: {storageToDelete.node_id}
+              </div>
+            </div>
+
+            <p className="text-[11px] text-rose-600 dark:text-rose-400 font-medium">
+              Are you sure you want to remove this unit? Its telemetry data and configuration will be removed.
+            </p>
+
+            <div className="pt-2 flex items-center justify-end gap-2.5">
+              <button
+                type="button"
+                onClick={() => setStorageToDelete(null)}
+                className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDeleteStorage}
+                className="px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-md shadow-rose-600/20 transition-all active:scale-95 cursor-pointer flex items-center gap-1.5"
+              >
+                <Trash2 className="h-4 w-4" />
+                <span>Delete Storage</span>
+              </button>
+            </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
+
 
       {/* SECTION 2: Optical Inspection Workbench (Container Photo with Bounding Boxes + Sensory Diagnostics) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6 pt-2">
@@ -1069,7 +1545,7 @@ export default function VisionInspector({ onInspectionComplete }) {
           <div className="w-full flex items-center justify-between text-xs text-slate-700 dark:text-slate-300 pb-2 mb-2 border-b border-[#e1eae4] dark:border-slate-800">
             <span className="font-bold flex items-center gap-1.5 text-slate-900 dark:text-white truncate mr-2">
               <Camera className="h-4 w-4 text-emerald-700 dark:text-emerald-400 flex-shrink-0" />
-              <span className="truncate">{currentContainerName}</span>
+              <span className="truncate">{activeStorage?.name} Optical Feed</span>
             </span>
             <span className="text-[10px] px-2.5 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 font-bold border border-emerald-200 dark:border-emerald-800 flex-shrink-0">
               Optical Sensor
@@ -1378,7 +1854,7 @@ export default function VisionInspector({ onInspectionComplete }) {
             </div>
             <div>
               <h3 className="text-xs sm:text-sm font-extrabold text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-2">
-                <span>AI Multi-Stage Telemetry & Quality Diagnostics</span>
+                <span>AI Quality Diagnostics — {activeStorage?.name}</span>
                 <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 font-bold border border-emerald-300 dark:border-emerald-700">
                   {cvResult?.model_version || "v2.2-trained"}
                 </span>
@@ -1633,7 +2109,7 @@ export default function VisionInspector({ onInspectionComplete }) {
             </div>
             <div>
               <h3 className="text-xs sm:text-sm font-extrabold text-emerald-950 dark:text-emerald-300 uppercase tracking-wider flex items-center gap-1.5">
-                Remaining Shelf-Life (RSL) Dynamic Prediction
+                Remaining Shelf-Life (RSL) Dynamic Prediction — {activeStorage?.name}
               </h3>
               <span className="text-[11px] sm:text-xs text-emerald-800 dark:text-emerald-400 font-semibold">
                 AI Multi-Modal Degradation Model • {cvResult?.category || "Fruits"} Preservability

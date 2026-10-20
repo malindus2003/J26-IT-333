@@ -35,7 +35,7 @@ const char* WIFI_SSID     = "Malindu";
 const char* WIFI_PASSWORD = "12345678";
 
 // Central FastAPI Backend IP & Port
-const char* BACKEND_SERVER_URL = "http://192.168.1.10:8000/api/vision/esp32/upload";
+const char* BACKEND_SERVER_URL = "http://172.20.10.6:8000/api/vision/esp32/upload";
 
 // Food Container Metadata
 const char* CONTAINER_ID = "Container #C-101 (Fruit Chiller)";
