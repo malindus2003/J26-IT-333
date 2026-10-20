@@ -2583,9 +2583,7 @@ const activeStorage = storages.find(s => s?.id === selectedStorageId) || storage
         const isNearSpoilState = !isSpoiledState && (fusedScore >= 50.0 || fusedRsl <= 24.0 || cvResult?.risk_level === 'High');
         const isFreshState = !isSpoiledState && !isNearSpoilState;
 
-        const activeProduceName = cvResult?.identified_produce || cvResult?.name || activeStorage?.assignedProduce?.name || 'Produce';
-        const activeProduceCategory = cvResult?.category || activeStorage?.assignedProduce?.category || 'Fruits';
-        const directive = getProduceRecipeDirective(activeProduceName, activeProduceCategory, fusedScore);
+
 
         return (
           <div className="p-5 sm:p-6 rounded-2xl bg-white dark:bg-slate-900 border-2 border-emerald-500/80 dark:border-emerald-500/60 shadow-lg space-y-5 animate-fade-in">
@@ -2720,93 +2718,7 @@ const activeStorage = storages.find(s => s?.id === selectedStorageId) || storage
               </div>
             </div>
 
-            {/* If Near-Spoil (~75% Spoilage): Render Zero-Waste Recipe Directive */}
-            {(isNearSpoilState || isSpoiledState) && directive && (
-              <div className="p-5 rounded-2xl bg-amber-50 dark:bg-amber-950/50 border border-amber-300 dark:border-amber-800 space-y-3 animate-fade-in">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-amber-200 dark:border-amber-900/60 pb-3">
-                  <div className="flex items-center gap-2.5">
-                    <div className="p-2 rounded-xl bg-amber-200 text-amber-900 dark:bg-amber-900 dark:text-amber-100 flex-shrink-0">
-                      <ChefHat className="h-5 w-5" />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-200 text-amber-900 dark:bg-amber-900 dark:text-amber-100">
-                          AI Zero-Waste Chef Directive
-                        </span>
-                        <span className="text-xs font-bold text-slate-600 dark:text-slate-300">
-                          Station: <strong>{directive.station}</strong>
-                        </span>
                       </div>
-                      <h4 className="text-base font-black text-slate-900 dark:text-white mt-0.5">
-                        {directive.recipeTitle}
-                      </h4>
-                    </div>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => handleDispatchKDSUnified(directive.recipeTitle, directive.station)}
-                    className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-xs ${
-                      dispatchedKds
-                        ? 'bg-emerald-100 text-emerald-900 dark:bg-emerald-950 dark:text-emerald-200 border border-emerald-300 dark:border-emerald-700'
-                        : 'bg-emerald-700 hover:bg-emerald-800 text-white active:scale-95'
-                    }`}
-                  >
-                    {dispatchedKds ? (
-                      <>
-                        <Check className="h-4 w-4 text-emerald-600" />
-                        <span>Sent to KDS</span>
-                      </>
-                    ) : (
-                      <>
-                        <Send className="h-4 w-4" />
-                        <span>Dispatch to Kitchen KDS</span>
-                      </>
-                    )}
-                  </button>
-                </div>
-
-                <p className="text-xs text-amber-950 dark:text-amber-200 font-medium">
-                  {directive.directive}
-                </p>
-
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs pt-1">
-                  <div className="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-amber-200 dark:border-amber-900/40">
-                    <span className="text-[10px] text-slate-500 font-bold block">Prep Time</span>
-                    <span className="font-extrabold text-slate-900 dark:text-white">{directive.prepTimeMinutes} Mins</span>
-                  </div>
-                  <div className="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-amber-200 dark:border-amber-900/40">
-                    <span className="text-[10px] text-slate-500 font-bold block">Batch Yield</span>
-                    <span className="font-extrabold text-slate-900 dark:text-white">{directive.yieldPortions}</span>
-                  </div>
-                  <div className="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-amber-200 dark:border-amber-900/40">
-                    <span className="text-[10px] text-slate-500 font-bold block">Extended Life</span>
-                    <span className="font-extrabold text-emerald-700 dark:text-emerald-400">{directive.extendedShelfLife}</span>
-                  </div>
-                  <div className="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-amber-200 dark:border-amber-900/40">
-                    <span className="text-[10px] text-slate-500 font-bold block">Cost Protected</span>
-                    <span className="font-extrabold text-emerald-700 dark:text-emerald-400">${directive.wasteCost.toFixed(2)}</span>
-                  </div>
-                </div>
-
-                <div className="space-y-1.5 pt-1 text-xs">
-                  <span className="font-bold text-slate-900 dark:text-white">Commercial Prep Directives:</span>
-                  <div className="space-y-1.5">
-                    {directive.steps.map((st, i) => (
-                      <div key={i} className="flex items-start gap-2 p-2 rounded-xl bg-white dark:bg-slate-900 border border-amber-200/80 dark:border-amber-900/40 text-slate-700 dark:text-slate-300">
-                        <span className="h-4 w-4 rounded-full bg-emerald-700 text-white text-[9px] font-black flex items-center justify-center flex-shrink-0 mt-0.5">
-                          {i + 1}
-                        </span>
-                        <span>{st}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-              </div>
-            )}
-
-          </div>
         );
       })()}
 
