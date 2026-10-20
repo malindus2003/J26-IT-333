@@ -919,7 +919,7 @@ const activeStorage = storages.find(s => s?.id === selectedStorageId) || storage
 
   const handleFileUpload = async (e) => {
     stopCamera();
-    const file = e.target.files[0];
+    const file = e.target.files?.[0];
     if (file) {
       setCurrentContainerName("Scanning Uploaded Specimen...");
       setSelectedPresetId(null);
@@ -930,6 +930,9 @@ const activeStorage = storages.find(s => s?.id === selectedStorageId) || storage
         await runBackendAnalysis(dataUrl, cvResult?.category || "Fruits");
       };
       reader.readAsDataURL(file);
+    }
+    if (e.target) {
+      e.target.value = '';
     }
   };
 
@@ -1809,8 +1812,17 @@ const activeStorage = storages.find(s => s?.id === selectedStorageId) || storage
               <div className="text-slate-400 text-xs font-bold">No Image Available</div>
             )}
 
+            {/* Analyzing Spinner Overlay */}
+            {analyzing && (
+              <div className="absolute inset-0 bg-slate-950/75 backdrop-blur-xs flex flex-col items-center justify-center gap-2 text-white z-20 animate-fade-in">
+                <RefreshCw className="h-8 w-8 text-emerald-400 animate-spin" />
+                <span className="text-xs font-bold tracking-wide">Analyzing Produce Quality...</span>
+                <span className="text-[10px] text-slate-300">Running rot detection, colour index & mould inspection</span>
+              </div>
+            )}
+
             {/* Bounding box overlays */}
-            {!isCameraActive && cvResult?.bounding_boxes?.map((box, i) => (
+            {!isCameraActive && !analyzing && cvResult?.bounding_boxes?.map((box, i) => (
               <div
                 key={i}
                 style={{
@@ -1854,23 +1866,79 @@ const activeStorage = storages.find(s => s?.id === selectedStorageId) || storage
             </div>
           </div>
 
+          {/* Hidden File Input for Image Upload */}
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileUpload}
+            accept="image/*"
+            style={{ display: 'none' }}
+          />
+
           {/* Camera Action Buttons */}
-          <div className="flex items-center gap-2 pt-1">
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              className="flex-1 py-2 px-3 rounded-xl bg-white hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-750 text-slate-800 dark:text-slate-200 text-xs font-bold border border-slate-300 dark:border-slate-700 flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
-            >
-              <Upload className="h-3.5 w-3.5 text-slate-600 dark:text-slate-300" />
-              <span>Upload Photo</span>
-            </button>
-            <button
-              onClick={() => setIsEsp32ModalOpen(true)}
-              className="flex-1 py-2 px-3 rounded-xl bg-sky-700 hover:bg-sky-800 text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm cursor-pointer"
-            >
-              <Cpu className="h-3.5 w-3.5 text-sky-200" />
-              <span>ESP32-CAM Node</span>
-            </button>
-          </div>
+          {isCameraActive ? (
+            <div className="flex items-center gap-2 pt-1 animate-fade-in">
+              <button
+                type="button"
+                onClick={captureCameraFrame}
+                className="flex-1 py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm cursor-pointer transition-all active:scale-95"
+              >
+                <Camera className="h-3.5 w-3.5" />
+                <span>Capture Frame</span>
+              </button>
+              <button
+                type="button"
+                onClick={stopCamera}
+                className="px-3 py-2 rounded-xl bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 text-slate-700 dark:text-slate-300 text-xs font-bold cursor-pointer transition-all active:scale-95"
+              >
+                Cancel
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 pt-1">
+              <button
+                type="button"
+                disabled={analyzing}
+                onClick={() => {
+                  if (fileInputRef.current) {
+                    fileInputRef.current.click();
+                  }
+                }}
+                className="flex-1 py-2 px-3 rounded-xl bg-white hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-750 text-slate-800 dark:text-slate-200 text-xs font-bold border border-slate-300 dark:border-slate-700 flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs transition-all active:scale-95 disabled:opacity-50"
+              >
+                {analyzing ? (
+                  <>
+                    <RefreshCw className="h-3.5 w-3.5 animate-spin text-emerald-600" />
+                    <span>Analyzing...</span>
+                  </>
+                ) : (
+                  <>
+                    <Upload className="h-3.5 w-3.5 text-slate-600 dark:text-slate-300" />
+                    <span>Upload Photo</span>
+                  </>
+                )}
+              </button>
+
+              <button
+                type="button"
+                onClick={startCamera}
+                className="py-2 px-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold flex items-center justify-center gap-1 border border-slate-300 dark:border-slate-700 shadow-2xs cursor-pointer transition-all active:scale-95"
+                title="Open Live Device Camera"
+              >
+                <Camera className="h-3.5 w-3.5 text-slate-600 dark:text-slate-300" />
+                <span className="hidden sm:inline">Webcam</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsEsp32ModalOpen(true)}
+                className="flex-1 py-2 px-3 rounded-xl bg-sky-700 hover:bg-sky-800 text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm cursor-pointer transition-all active:scale-95"
+              >
+                <Cpu className="h-3.5 w-3.5 text-sky-200" />
+                <span>ESP32-CAM Node</span>
+              </button>
+            </div>
+          )}
         </div>
 
         {/* UNIT 2: IoT Environmental Telemetry Array (Right Side) */}
