@@ -8,6 +8,7 @@ from pydantic import BaseModel
 from fastapi import APIRouter, File, UploadFile, Form, HTTPException, Request
 from typing import Optional, Dict, Any, List
 from ..models.cv_engine import vision_engine
+from ..data.produce_encyclopedia import PRODUCE_ENCYCLOPEDIA, get_produce_profile, search_produce
 
 router = APIRouter(prefix="/api/vision", tags=["Computer Vision Inspection"])
 
@@ -102,6 +103,10 @@ def _format_vision_response(results: Dict[str, Any], category: str) -> Dict[str,
 
         "produce_icon": results.get("produce_icon", "🍎"),
         "scientific_name": results.get("scientific_name", ""),
+        "surface_analysis": results.get("surface_analysis", {}),
+        "color_profile_analysis": results.get("color_profile_analysis", {}),
+        "spoilage_level_detail": results.get("spoilage_level_detail", {}),
+        "produce_encyclopedia_profile": results.get("produce_encyclopedia_profile"),
         "bounding_boxes": results.get("bounding_boxes", []),
         "image_width": results.get("image_width", 256),
         "image_height": results.get("image_height", 256),
@@ -344,3 +349,31 @@ def get_model_benchmark_metrics():
         with open(metrics_path, "r", encoding="utf-8") as f:
             return json.load(f)
     return {"status": "error", "message": "Metrics report not found."}
+
+@router.get("/produce-encyclopedia")
+def get_produce_encyclopedia(category: Optional[str] = None, search: Optional[str] = None):
+    """
+    Returns the comprehensive produce encyclopedia for all 47 produce items,
+    including surface texture, color metrics, and spoilage progression stages.
+    """
+    items = search_produce(query=search, category=category)
+    return {
+        "status": "success",
+        "total": len(items),
+        "category_filter": category or "all",
+        "search_query": search or "",
+        "items": items
+    }
+
+@router.get("/produce-encyclopedia/{produce_name}")
+def get_single_produce_encyclopedia(produce_name: str):
+    """
+    Returns the detailed biological and optical inspection profile for a specific produce item.
+    """
+    profile = get_produce_profile(produce_name)
+    if not profile:
+        raise HTTPException(status_code=404, detail=f"Produce '{produce_name}' not found in encyclopedia")
+    return {
+        "status": "success",
+        "profile": profile
+    }

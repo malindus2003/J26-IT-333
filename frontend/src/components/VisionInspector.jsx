@@ -49,7 +49,8 @@ import {
   Flame,
   Activity,
   Gauge,
-  Wind
+  Wind,
+  BookOpen
 } from 'lucide-react';
 import axios from 'axios';
 
@@ -1019,6 +1020,38 @@ const activeStorage = storages.find(s => s?.id === selectedStorageId) || storage
   const [inspectionHistory, setInspectionHistory] = useState([]);
   const [isHistoryDrawerOpen, setIsHistoryDrawerOpen] = useState(false);
 
+  // Produce Encyclopedia Modal & Inspection Knowledge Base
+  const [isEncyclopediaModalOpen, setIsEncyclopediaModalOpen] = useState(false);
+  const [encyclopediaItems, setEncyclopediaItems] = useState([]);
+  const [encyclopediaLoading, setEncyclopediaLoading] = useState(false);
+  const [encyclopediaSearch, setEncyclopediaSearch] = useState('');
+  const [encyclopediaCategory, setEncyclopediaCategory] = useState('all');
+  const [selectedEncyclopediaProduce, setSelectedEncyclopediaProduce] = useState(null);
+
+  const fetchEncyclopedia = async (cat = 'all', q = '') => {
+    setEncyclopediaLoading(true);
+    try {
+      const url = `http://localhost:8000/api/vision/produce-encyclopedia?category=${cat}&search=${encodeURIComponent(q)}`;
+      const res = await axios.get(url);
+      if (res.data?.items) {
+        setEncyclopediaItems(res.data.items);
+        if (res.data.items.length > 0) {
+          setSelectedEncyclopediaProduce(prev => {
+            if (prev) {
+              const matched = res.data.items.find(i => i.produce_name === prev.produce_name);
+              return matched || res.data.items[0];
+            }
+            return res.data.items[0];
+          });
+        }
+      }
+    } catch (e) {
+      console.warn("Could not fetch produce encyclopedia:", e);
+    } finally {
+      setEncyclopediaLoading(false);
+    }
+  };
+
   const fetchHistory = async () => {
     try {
       const res = await axios.get("http://localhost:8000/api/vision/history");
@@ -1345,6 +1378,21 @@ const activeStorage = storages.find(s => s?.id === selectedStorageId) || storage
         </div>
 
         {/* Action Buttons */}
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              setIsEncyclopediaModalOpen(true);
+              fetchEncyclopedia(encyclopediaCategory, encyclopediaSearch);
+            }}
+            className="px-3 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold flex items-center gap-1.5 shadow-md shadow-emerald-700/20 transition-all cursor-pointer active:scale-95"
+            title="Open Produce Encyclopedia with Surface & Color Criteria for 47 Fruits & Vegetables"
+          >
+            <BookOpen className="h-4 w-4 text-emerald-200" />
+            <span>Produce Encyclopedia</span>
+            <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-emerald-900/90 text-emerald-200 font-mono font-bold">47</span>
+          </button>
+        </div>
         <div className="flex items-center gap-2">
           <button
             onClick={() => setIsEsp32ModalOpen(true)}
@@ -2254,6 +2302,70 @@ const activeStorage = storages.find(s => s?.id === selectedStorageId) || storage
             </div>
           </div>
 
+          {/* Surface Texture, Color & Spoilage Progression Diagnostics */}
+          {cvResult && (
+            <div className="p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-2 text-xs">
+              <div className="flex items-center justify-between pb-1.5 border-b border-slate-100 dark:border-slate-800">
+                <span className="font-extrabold text-slate-900 dark:text-white flex items-center gap-1.5">
+                  <Sliders className="h-3.5 w-3.5 text-emerald-600" />
+                  <span>Surface & Color Diagnostics</span>
+                </span>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+                  {cvResult.surface_analysis?.texture_type || "Intact Epidermis"}
+                </span>
+              </div>
+
+              {/* Surface Texture & Tactile Details */}
+              <div className="grid grid-cols-2 gap-2 text-[11px]">
+                <div className="p-2 rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-700/60">
+                  <div className="text-[10px] font-bold text-slate-500 dark:text-slate-400">Surface Texture</div>
+                  <div className="font-bold text-slate-800 dark:text-slate-200 truncate">
+                    {cvResult.surface_analysis?.texture_type || "Smooth Cuticle"}
+                  </div>
+                  <div className="text-[9px] text-slate-500 dark:text-slate-400 mt-0.5 line-clamp-1">
+                    {cvResult.surface_analysis?.tactile_feel || "Firm and resilient peel"}
+                  </div>
+                </div>
+
+                <div className="p-2 rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-700/60">
+                  <div className="text-[10px] font-bold text-slate-500 dark:text-slate-400">Color Profile</div>
+                  <div className="font-bold text-slate-800 dark:text-slate-200 truncate">
+                    {cvResult.color_profile_analysis?.primary_hue || "Varietal Pigment"}
+                  </div>
+                  <div className="text-[9px] text-emerald-700 dark:text-emerald-400 font-semibold mt-0.5 truncate">
+                    {cvResult.color_profile_analysis?.color_congruence || "Normal Spectrum"}
+                  </div>
+                </div>
+              </div>
+
+              {/* Biological Spoilage Stage & Pathogen Watch */}
+              <div className="p-2 rounded-lg bg-emerald-50/70 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 space-y-1">
+                <div className="flex items-center justify-between text-[10px]">
+                  <span className="font-extrabold text-emerald-900 dark:text-emerald-300">
+                    Spoilage Level: {cvResult.spoilage_level_detail?.stage_name || (visualScore > 75 ? "Spoiled / Quarantine" : (visualScore > 50 ? "Overripe ~75%" : "Optimal Fresh"))}
+                  </span>
+                  <span className="font-mono text-emerald-700 dark:text-emerald-400 font-bold">
+                    Score: {visualScore}%
+                  </span>
+                </div>
+                <p className="text-[10px] text-slate-600 dark:text-slate-300 leading-tight">
+                  {cvResult.spoilage_level_detail?.visual_cues || "Epidermal peel intact without necrotic rot spots. Cellular turgor pressure within optimal freshness threshold."}
+                </p>
+                {cvResult.spoilage_level_detail?.common_pathogens && (
+                  <div className="text-[9px] text-rose-700 dark:text-rose-400 font-semibold flex items-center gap-1">
+                    <ShieldAlert className="h-3 w-3 flex-shrink-0" />
+                    <span>Pathogen Watch: {cvResult.spoilage_level_detail.common_pathogens}</span>
+                  </div>
+                )}
+                {cvResult.spoilage_level_detail?.chef_action && (
+                  <div className="text-[9px] text-amber-800 dark:text-amber-300 font-medium bg-amber-100/60 dark:bg-amber-950/60 p-1 rounded border border-amber-300/40">
+                    👨‍🍳 {cvResult.spoilage_level_detail.chef_action}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Hidden File Input for Image Upload */}
           <input
             type="file"
@@ -3048,6 +3160,381 @@ const activeStorage = storages.find(s => s?.id === selectedStorageId) || storage
           </div>
         </div>
       )}
+
+      {/* Produce Encyclopedia & Inspection Criteria Modal (47 Commodities) */}
+      {isEncyclopediaModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/65 backdrop-blur-xs">
+          <div className="w-full max-w-5xl max-h-[92vh] flex flex-col bg-white dark:bg-slate-900 rounded-3xl border border-emerald-500/40 shadow-2xl p-4 sm:p-6 space-y-4 animate-in fade-in zoom-in-95 duration-150 overflow-hidden">
+            
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3 flex-shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-2xl bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300">
+                  <BookOpen className="h-6 w-6" />
+                </div>
+                <div>
+                  <h3 className="text-base sm:text-lg font-black text-slate-900 dark:text-white flex items-center gap-2">
+                    <span>Produce Encyclopedia & Inspection Criteria</span>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 font-bold border border-emerald-300 dark:border-emerald-800 font-mono">
+                      47 Commodities
+                    </span>
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    Surface textures, color profiles, and 4-stage biological spoilage progression benchmarks
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setIsEncyclopediaModalOpen(false)}
+                className="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer transition-colors"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Filter and Search Bar */}
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 flex-shrink-0">
+              {/* Category Filter Pills */}
+              <div className="flex items-center gap-1.5 p-1 rounded-xl bg-slate-100 dark:bg-slate-800/80 w-full sm:w-auto">
+                {[
+                  { id: "all", label: "All Items", count: 47 },
+                  { id: "fruits", label: "Fruits", count: 20 },
+                  { id: "vegetables", label: "Vegetables", count: 27 },
+                ].map(tab => (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => {
+                      setEncyclopediaCategory(tab.id);
+                      fetchEncyclopedia(tab.id, encyclopediaSearch);
+                    }}
+                    className={`flex-1 sm:flex-none px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                      encyclopediaCategory === tab.id
+                        ? 'bg-emerald-700 text-white shadow-xs'
+                        : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
+                    }`}
+                  >
+                    <span>{tab.label}</span>
+                    <span className="ml-1.5 text-[10px] opacity-80 font-mono">({tab.count})</span>
+                  </button>
+                ))}
+              </div>
+
+              {/* Search Input */}
+              <div className="relative w-full sm:w-72">
+                <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+                <input
+                  type="text"
+                  value={encyclopediaSearch}
+                  onChange={(e) => {
+                    setEncyclopediaSearch(e.target.value);
+                    fetchEncyclopedia(encyclopediaCategory, e.target.value);
+                  }}
+                  placeholder="Search name, variety, pathogen..."
+                  className="w-full pl-9 pr-3 py-2 text-xs rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-none focus:border-emerald-600 font-medium"
+                />
+              </div>
+            </div>
+
+            {/* Main Content: Split Grid (List Left, Deep-Dive Right) */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 flex-1 min-h-0 overflow-hidden">
+              
+              {/* Left Column: Commodity Scroll List */}
+              <div className="lg:col-span-4 overflow-y-auto pr-1 space-y-1.5 custom-scrollbar max-h-[60vh] lg:max-h-[65vh]">
+                {encyclopediaLoading && encyclopediaItems.length === 0 ? (
+                  <div className="p-8 text-center text-xs text-slate-400">
+                    <RefreshCw className="h-6 w-6 animate-spin mx-auto text-emerald-600 mb-2" />
+                    Loading encyclopedia...
+                  </div>
+                ) : encyclopediaItems.length === 0 ? (
+                  <div className="p-8 text-center text-xs text-slate-400">
+                    No produce matching search criteria.
+                  </div>
+                ) : (
+                  encyclopediaItems.map((item) => {
+                    const isSelected = selectedEncyclopediaProduce?.produce_name === item.produce_name;
+                    return (
+                      <div
+                        key={item.produce_name}
+                        onClick={() => setSelectedEncyclopediaProduce(item)}
+                        className={`p-2.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between gap-2.5 ${
+                          isSelected
+                            ? 'bg-emerald-50/90 dark:bg-emerald-950/60 border-emerald-500 shadow-xs'
+                            : 'bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-800 hover:border-emerald-300 dark:hover:border-slate-700'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <span className="text-2xl p-1 bg-white dark:bg-slate-900 rounded-lg flex-shrink-0 shadow-2xs">
+                            {item.icon || "🍎"}
+                          </span>
+                          <div className="min-w-0">
+                            <div className="text-xs font-black text-slate-900 dark:text-white truncate">
+                              {item.short_name || item.produce_name}
+                            </div>
+                            <div className="text-[10px] text-slate-500 dark:text-slate-400 truncate italic">
+                              {item.scientific_name}
+                            </div>
+                          </div>
+                        </div>
+
+                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                          item.category === 'Fruits'
+                            ? 'bg-amber-100 dark:bg-amber-950/80 text-amber-900 dark:text-amber-300'
+                            : 'bg-emerald-100 dark:bg-emerald-950/80 text-emerald-900 dark:text-emerald-300'
+                        }`}>
+                          {item.category === 'Fruits' ? 'Fruit' : 'Veg'}
+                        </span>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+
+              {/* Right Column: Selected Produce Comprehensive Inspection Sheet */}
+              <div className="lg:col-span-8 overflow-y-auto pr-1 space-y-3.5 custom-scrollbar max-h-[60vh] lg:max-h-[65vh]">
+                {selectedEncyclopediaProduce ? (
+                  <div className="space-y-3.5">
+                    
+                    {/* Header Banner */}
+                    <div className="p-3.5 rounded-2xl bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-slate-800 dark:to-slate-800/60 border border-emerald-200 dark:border-slate-700 flex flex-wrap items-center justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <span className="text-3xl p-1.5 bg-white dark:bg-slate-900 rounded-2xl shadow-xs">
+                          {selectedEncyclopediaProduce.icon}
+                        </span>
+                        <div>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h4 className="text-sm sm:text-base font-black text-slate-900 dark:text-white">
+                              {selectedEncyclopediaProduce.produce_name}
+                            </h4>
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900 text-emerald-900 dark:text-emerald-100">
+                              {selectedEncyclopediaProduce.variety}
+                            </span>
+                          </div>
+                          <div className="text-xs text-slate-600 dark:text-slate-400 font-mono italic">
+                            {selectedEncyclopediaProduce.scientific_name} • Origin: {selectedEncyclopediaProduce.origin}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <div className="text-right text-[11px]">
+                          <span className="text-slate-400 font-medium block">Cold Shelf-Life</span>
+                          <span className="font-black text-emerald-700 dark:text-emerald-400 font-mono">
+                            {selectedEncyclopediaProduce.storage?.cold_shelf_hours}h (~{(selectedEncyclopediaProduce.storage?.cold_shelf_hours / 24).toFixed(0)}d)
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Section 1: Surface Texture & Optical Traits */}
+                    <div className="p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-2">
+                      <div className="flex items-center justify-between text-xs pb-1.5 border-b border-slate-100 dark:border-slate-800">
+                        <span className="font-extrabold text-slate-900 dark:text-white flex items-center gap-1.5">
+                          <Sliders className="h-4 w-4 text-emerald-600" />
+                          <span>1. Surface Texture & Cuticular Structure</span>
+                        </span>
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                          {selectedEncyclopediaProduce.surface?.gloss_level}
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                        <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-700">
+                          <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block">Texture Type</span>
+                          <span className="font-black text-slate-900 dark:text-white">
+                            {selectedEncyclopediaProduce.surface?.texture_type}
+                          </span>
+                          <p className="text-[11px] text-slate-600 dark:text-slate-300 mt-1 leading-relaxed">
+                            {selectedEncyclopediaProduce.surface?.tactile_feel}
+                          </p>
+                        </div>
+
+                        <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-700 space-y-1.5">
+                          <div className="flex items-center justify-between text-[11px]">
+                            <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400">Micro-Roughness Index</span>
+                            <span className="font-mono font-bold text-emerald-600">
+                              {selectedEncyclopediaProduce.surface?.roughness_score} / 10
+                            </span>
+                          </div>
+                          <div className="w-full bg-slate-200 dark:bg-slate-700 h-1.5 rounded-full overflow-hidden">
+                            <div 
+                              className="bg-emerald-600 h-full rounded-full" 
+                              style={{ width: `${(selectedEncyclopediaProduce.surface?.roughness_score / 10) * 100}%` }}
+                            />
+                          </div>
+                          <div className="flex items-center justify-between text-[9px] text-slate-400">
+                            <span>1 (Smooth Waxy)</span>
+                            <span>10 (Spiked/Warty)</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Section 2: Peel / Leaf Color Profile */}
+                    <div className="p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-2">
+                      <div className="flex items-center justify-between text-xs pb-1.5 border-b border-slate-100 dark:border-slate-800">
+                        <span className="font-extrabold text-slate-900 dark:text-white flex items-center gap-1.5">
+                          <Eye className="h-4 w-4 text-emerald-600" />
+                          <span>2. Peel / Leaf Color Profile & Pigments</span>
+                        </span>
+                        <span className="text-[10px] font-mono text-slate-500">
+                          {selectedEncyclopediaProduce.color?.hsv_range}
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                        <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-700">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400">Primary Hue:</span>
+                            <span className="font-bold text-slate-900 dark:text-white text-xs">
+                              {selectedEncyclopediaProduce.color?.primary_hue}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400">Secondary:</span>
+                            <span className="text-slate-700 dark:text-slate-300 text-xs">
+                              {selectedEncyclopediaProduce.color?.secondary_hue}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-slate-600 dark:text-slate-400 mt-1 italic">
+                            {selectedEncyclopediaProduce.color?.description}
+                          </p>
+                        </div>
+
+                        <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-700 space-y-1 text-xs">
+                          <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block">Baseline Natural Pigment Ranges</span>
+                          <div className="space-y-1 pt-1 text-[11px]">
+                            <div className="flex items-center justify-between">
+                              <span className="text-emerald-700 dark:text-emerald-400 font-medium">Chlorophyll Green:</span>
+                              <span className="font-mono font-bold">{selectedEncyclopediaProduce.color?.baseline_ratios?.green_pct?.join(' - ')}%</span>
+                            </div>
+                            <div className="flex items-center justify-between">
+                              <span className="text-amber-700 dark:text-amber-400 font-medium">Carotenoid Yellow:</span>
+                              <span className="font-mono font-bold">{selectedEncyclopediaProduce.color?.baseline_ratios?.yellow_pct?.join(' - ')}%</span>
+                            </div>
+                            <div className="flex items-center justify-between">
+                              <span className="text-rose-700 dark:text-rose-400 font-medium">Anthocyanin / Red:</span>
+                              <span className="font-mono font-bold">{selectedEncyclopediaProduce.color?.baseline_ratios?.red_pct?.join(' - ')}%</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Section 3: 4-Stage Spoilage Progression Guide */}
+                    <div className="p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-2.5">
+                      <div className="flex items-center justify-between text-xs pb-1.5 border-b border-slate-100 dark:border-slate-800">
+                        <span className="font-extrabold text-slate-900 dark:text-white flex items-center gap-1.5">
+                          <AlertTriangle className="h-4 w-4 text-amber-500" />
+                          <span>3. Biological Spoilage Progression Stages (0% to 100%)</span>
+                        </span>
+                        <span className="text-[10px] font-bold text-slate-400 font-mono">
+                          Target: {selectedEncyclopediaProduce.storage?.optimal_temp_c}°C • {selectedEncyclopediaProduce.storage?.optimal_humidity_pct}% RH
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 text-xs">
+                        
+                        {/* Stage 1: Fresh */}
+                        <div className="p-3 rounded-xl bg-emerald-50/70 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800 space-y-1">
+                          <div className="flex items-center justify-between text-[11px]">
+                            <span className="font-black text-emerald-900 dark:text-emerald-300 flex items-center gap-1">
+                              <span className="w-2 h-2 rounded-full bg-emerald-500" /> Stage 1: Fresh (0-25%)
+                            </span>
+                            <span className="font-mono text-[10px] font-bold text-emerald-700 dark:text-emerald-400">Grade A</span>
+                          </div>
+                          <p className="text-[11px] text-slate-700 dark:text-slate-300 leading-tight">
+                            {selectedEncyclopediaProduce.spoilage_progression?.fresh?.visual_cues}
+                          </p>
+                          <div className="text-[10px] font-medium text-emerald-800 dark:text-emerald-300 pt-0.5">
+                            Firmness: {selectedEncyclopediaProduce.spoilage_progression?.fresh?.firmness}
+                          </div>
+                        </div>
+
+                        {/* Stage 2: Optimal */}
+                        <div className="p-3 rounded-xl bg-sky-50/70 dark:bg-sky-950/40 border border-sky-300 dark:border-sky-800 space-y-1">
+                          <div className="flex items-center justify-between text-[11px]">
+                            <span className="font-black text-sky-900 dark:text-sky-300 flex items-center gap-1">
+                              <span className="w-2 h-2 rounded-full bg-sky-500" /> Stage 2: Peak Ripe (25-50%)
+                            </span>
+                            <span className="font-mono text-[10px] font-bold text-sky-700 dark:text-sky-400">Grade B</span>
+                          </div>
+                          <p className="text-[11px] text-slate-700 dark:text-slate-300 leading-tight">
+                            {selectedEncyclopediaProduce.spoilage_progression?.optimal?.visual_cues}
+                          </p>
+                          <div className="text-[10px] font-medium text-sky-800 dark:text-sky-300 pt-0.5">
+                            Firmness: {selectedEncyclopediaProduce.spoilage_progression?.optimal?.firmness}
+                          </div>
+                        </div>
+
+                        {/* Stage 3: Near Spoilage ~75% */}
+                        <div className="p-3 rounded-xl bg-amber-50/70 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 space-y-1">
+                          <div className="flex items-center justify-between text-[11px]">
+                            <span className="font-black text-amber-900 dark:text-amber-300 flex items-center gap-1">
+                              <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" /> Stage 3: Near-Spoil (~75%)
+                            </span>
+                            <span className="font-mono text-[10px] font-bold text-amber-700 dark:text-amber-400">Rescue Alert</span>
+                          </div>
+                          <p className="text-[11px] text-slate-700 dark:text-slate-300 leading-tight">
+                            {selectedEncyclopediaProduce.spoilage_progression?.near_spoilage?.visual_cues}
+                          </p>
+                          <div className="text-[10px] font-bold text-amber-800 dark:text-amber-300 bg-amber-100/80 dark:bg-amber-900/60 p-1 rounded mt-1">
+                            👨‍🍳 {selectedEncyclopediaProduce.spoilage_progression?.near_spoilage?.chef_action}
+                          </div>
+                        </div>
+
+                        {/* Stage 4: Spoiled Quarantine */}
+                        <div className="p-3 rounded-xl bg-rose-50/70 dark:bg-rose-950/40 border border-rose-300 dark:border-rose-800 space-y-1">
+                          <div className="flex items-center justify-between text-[11px]">
+                            <span className="font-black text-rose-900 dark:text-rose-300 flex items-center gap-1">
+                              <span className="w-2 h-2 rounded-full bg-rose-500" /> Stage 4: Spoiled (75-100%)
+                            </span>
+                            <span className="font-mono text-[10px] font-bold text-rose-700 dark:text-rose-400">Quarantine</span>
+                          </div>
+                          <p className="text-[11px] text-slate-700 dark:text-slate-300 leading-tight">
+                            {selectedEncyclopediaProduce.spoilage_progression?.spoiled?.visual_cues}
+                          </p>
+                          <div className="text-[10px] font-bold text-rose-800 dark:text-rose-300 pt-0.5">
+                            Pathogens: {selectedEncyclopediaProduce.spoilage_progression?.spoiled?.common_pathogens}
+                          </div>
+                        </div>
+
+                      </div>
+                    </div>
+
+                  </div>
+                ) : (
+                  <div className="p-12 text-center text-xs text-slate-400">
+                    Select a produce commodity on the left to inspect its surface texture, color, and spoilage progression criteria.
+                  </div>
+                )}
+              </div>
+
+            </div>
+
+            {/* Modal Footer */}
+            <div className="flex items-center justify-between pt-3 border-t border-slate-200 dark:border-slate-800 flex-shrink-0">
+              <div className="text-xs text-slate-500 dark:text-slate-400 hidden sm:block">
+                All 47 commodities calibrated with RGB/HSV color moments, Sobel/Laplacian gradients & decay kinetics.
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsEncyclopediaModalOpen(false)}
+                  className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-xs font-bold text-slate-700 dark:text-slate-300 cursor-pointer"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

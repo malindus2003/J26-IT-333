@@ -89,6 +89,7 @@ from backend.app.data.prepare_cv_dataset import (
 )
 
 from backend.app.models.train_cv_models import PRODUCE_INFO
+from backend.app.data.produce_encyclopedia import get_produce_profile, PRODUCE_ENCYCLOPEDIA
 
 
 
@@ -562,13 +563,20 @@ class FoodQualityVisionEngine:
 
         }
 
-        produce_icon = species_meta.get("icon", fallback_icons.get(identified_produce, "🍎" if is_supported_produce else "❓"))
-
-        scientific_name = species_meta.get("scientific", fallback_scientific.get(identified_produce, ""))
-
-        baseline_shelf_life = float(species_meta.get("shelf_life_hours", species_meta.get("shelf_life", fallback_shelf_life.get(identified_produce, 168.0 if is_supported_produce else 72.0))))
-
-        detected_category = species_meta.get("category", category)
+        encyclopedia_profile = get_produce_profile(identified_produce)
+        if encyclopedia_profile:
+            produce_icon = encyclopedia_profile.get("icon", fallback_icons.get(identified_produce, "🍎" if is_supported_produce else "❓"))
+            scientific_name = encyclopedia_profile.get("scientific_name", fallback_scientific.get(identified_produce, ""))
+            detected_category = encyclopedia_profile.get("category", category)
+            if "storage" in encyclopedia_profile and "cold_shelf_hours" in encyclopedia_profile["storage"]:
+                baseline_shelf_life = float(encyclopedia_profile["storage"]["cold_shelf_hours"])
+            else:
+                baseline_shelf_life = float(species_meta.get("shelf_life_hours", species_meta.get("shelf_life", fallback_shelf_life.get(identified_produce, 168.0 if is_supported_produce else 72.0))))
+        else:
+            produce_icon = species_meta.get("icon", fallback_icons.get(identified_produce, "🍎" if is_supported_produce else "❓"))
+            scientific_name = species_meta.get("scientific", fallback_scientific.get(identified_produce, ""))
+            baseline_shelf_life = float(species_meta.get("shelf_life_hours", species_meta.get("shelf_life", fallback_shelf_life.get(identified_produce, 168.0 if is_supported_produce else 72.0))))
+            detected_category = species_meta.get("category", category)
 
 
 
@@ -987,6 +995,70 @@ class FoodQualityVisionEngine:
 
 
         # -------------------------------------------------------------
+        # STAGE 7B: SURFACE, COLOR & SPOILAGE LEVEL BIOLOGICAL ANALYSIS
+        # -------------------------------------------------------------
+        surface_analysis = {}
+        color_profile_analysis = {}
+        spoilage_level_detail = {}
+
+        if encyclopedia_profile:
+            surf_meta = encyclopedia_profile.get("surface", {})
+            col_meta = encyclopedia_profile.get("color", {})
+            spoil_meta = encyclopedia_profile.get("spoilage_progression", {})
+
+            roughness_meas = round(float(feat_vec[25] * 0.25), 1)
+            surface_status = (
+                "Intact Cuticular Epidermis (Grade A)" if texture_degradation < 15.0
+                else ("Moderate Surface Micro-Roughness / Freckling" if texture_degradation < 45.0
+                      else "Severe Cuticular Degradation / Wrinkling (Quarantine Alert)")
+            )
+            surface_analysis = {
+                "texture_type": surf_meta.get("texture_type", "Smooth Epidermis"),
+                "tactile_feel": surf_meta.get("tactile_feel", "Firm and resilient"),
+                "roughness_score": surf_meta.get("roughness_score", 3.0),
+                "measured_roughness": roughness_meas,
+                "gloss_level": surf_meta.get("gloss_level", "Waxy Sheen"),
+                "surface_status": surface_status,
+                "tissue_degradation_pct": texture_degradation
+            }
+
+            green_m = round(float(feat_vec[18]), 1)
+            yellow_m = round(float(feat_vec[19]), 1)
+            red_m = round(float(feat_vec[20]), 1)
+            if browning_percent < 8.0:
+                color_congruence = "Normal Varietal Pigment Distribution"
+            elif browning_percent < 25.0:
+                color_congruence = "Localized Discoloration / Oxidation Detected"
+            else:
+                color_congruence = "Significant Melanization / Rot Discoloration"
+
+            color_profile_analysis = {
+                "primary_hue": col_meta.get("primary_hue", "Natural Produce Hue"),
+                "secondary_hue": col_meta.get("secondary_hue", "Natural Accents"),
+                "description": col_meta.get("description", ""),
+                "color_congruence": color_congruence,
+                "pigment_breakdown": {
+                    "chlorophyll_green_pct": green_m,
+                    "carotenoid_yellow_pct": yellow_m,
+                    "anthocyanin_red_pct": red_m,
+                    "browning_melanin_pct": browning_percent
+                }
+            }
+
+            if visual_score < 25.0:
+                spoilage_level_detail = dict(spoil_meta.get("fresh", {}))
+                spoilage_level_detail["stage_name"] = "Fresh / Grade A"
+            elif visual_score < 50.0:
+                spoilage_level_detail = dict(spoil_meta.get("optimal", {}))
+                spoilage_level_detail["stage_name"] = "Optimal Ripe / Grade B"
+            elif visual_score < 75.0:
+                spoilage_level_detail = dict(spoil_meta.get("near_spoilage", {}))
+                spoilage_level_detail["stage_name"] = "Overripe / Early Decay (~75% Spoilage)"
+            else:
+                spoilage_level_detail = dict(spoil_meta.get("spoiled", {}))
+                spoilage_level_detail["stage_name"] = "Spoiled / Quarantine Mandate"
+
+        # -------------------------------------------------------------
 
         # STAGE 8: STRUCTURED DIAGNOSTIC LOGGING
 
@@ -1169,6 +1241,14 @@ class FoodQualityVisionEngine:
             "image_height": orig_h,
 
             "processing_latency_ms": latency_ms,
+
+            "surface_analysis": surface_analysis,
+
+            "color_profile_analysis": color_profile_analysis,
+
+            "spoilage_level_detail": spoilage_level_detail,
+
+            "produce_encyclopedia_profile": encyclopedia_profile,
 
             "diagnostic_log": diagnostic_log,
 
@@ -1475,6 +1555,14 @@ class FoodQualityVisionEngine:
             "image_height": 256,
 
             "processing_latency_ms": 0.0,
+
+            "surface_analysis": {},
+
+            "color_profile_analysis": {},
+
+            "spoilage_level_detail": {},
+
+            "produce_encyclopedia_profile": None,
 
             "diagnostic_log": {"error": "Failed to decode valid image stream."},
 
