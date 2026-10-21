@@ -44,7 +44,7 @@ import axios from 'axios';
 import AddMenuItemModal from './AddMenuItemModal';
 
 // --- DEFAULT ROBUST FALLBACK DATA (Prevents empty UI when backend is starting or offline) ---
-const FALLBACK_MENU_ITEMS = ["
+const FALLBACK_MENU_ITEMS = [
 
   {
     id: "menu-01",
@@ -843,7 +843,6 @@ export default function OrderManagementDashboard({ onRefresh, isDarkMode, curren
                 <Plus className="h-4 w-4 stroke-[3]" />
                 <span>Add New Item</span>
               </button>
-            </div>
             </div>
           </div>
 
