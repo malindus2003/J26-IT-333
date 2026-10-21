@@ -17,7 +17,7 @@ export default function DemandForecastingDashboard({ isDarkMode, currentRole = '
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('overview'); // 'overview', 'analytics', 'xai', 'simulator', 'retraining', 'closed_loop'
-  const [userRole, setUserRole] = useState(currentRole === 'staff' ? 'staff' : 'admin');
+  const userRole = currentRole === 'staff' ? 'staff' : 'admin';
   const [demandDropdownOpen, setDemandDropdownOpen] = useState(false);
   const demandDropdownRef = useRef(null);
 
@@ -33,10 +33,7 @@ export default function DemandForecastingDashboard({ isDarkMode, currentRole = '
   
   useEffect(() => {
     if (currentRole === 'staff') {
-      setUserRole('staff');
       setActiveTab('overview');
-    } else {
-      setUserRole('admin');
     }
   }, [currentRole]);
   
@@ -394,6 +391,7 @@ export default function DemandForecastingDashboard({ isDarkMode, currentRole = '
   ];
 
   const visibleTabs = allTabs.filter(t => t.roles.includes(userRole));
+  const activeTabToRender = userRole === 'staff' ? 'overview' : activeTab;
 
   const currentTabIdx = visibleTabs.findIndex(t => t.id === activeTab);
   const handlePrevTab = () => {
@@ -447,39 +445,6 @@ export default function DemandForecastingDashboard({ isDarkMode, currentRole = '
                 : "Item-level demand predictions and kitchen prep guidance calibrated with live weather and dining reservations."
               }
             </p>
-          </div>
-
-          {/* Right Header Panel: Role Selector & Adaptive KPIs */}
-          <div className="flex flex-col sm:items-end gap-2.5 w-full sm:w-auto">
-            
-            {/* Role Switcher Pill: Only accessible to Admin/Manager */}
-            {currentRole === 'admin' && (
-              <div className="flex items-center gap-1 p-1 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 self-start sm:self-end">
-                <span className="text-[10px] text-slate-500 font-bold px-1.5">View Mode:</span>
-                <button
-                  type="button"
-                  onClick={() => setUserRole('admin')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer ${
-                    userRole === 'admin'
-                      ? 'bg-emerald-700 text-white shadow-xs'
-                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-                  }`}
-                >
-                  Manager View
-                </button>
-                <button
-                  type="button"
-                  onClick={() => { setUserRole('staff'); setActiveTab('overview'); }}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer ${
-                    userRole === 'staff'
-                      ? 'bg-emerald-700 text-white shadow-xs'
-                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-                  }`}
-                >
-                  Chef View
-                </button>
-              </div>
-            )}
           </div>
         </div>
       </div>
@@ -652,7 +617,7 @@ export default function DemandForecastingDashboard({ isDarkMode, currentRole = '
       {/* ========================================================================= */}
       {/* TAB 1: OVERVIEW & DAILY KITCHEN PREP GUIDANCE */}
       {/* ========================================================================= */}
-      {activeTab === 'overview' && (
+      {activeTabToRender === 'overview' && (
         <div className="space-y-6">
           
           {/* 3-Day Planning Horizon Switcher Bar */}
@@ -853,11 +818,8 @@ export default function DemandForecastingDashboard({ isDarkMode, currentRole = '
                       
                       <td className="py-3.5 px-4">
                         <div className="font-bold text-slate-900 dark:text-white text-sm">{item.name}</div>
-                        <div className="flex items-center gap-2 mt-0.5">
+                        <div className="mt-0.5">
                           <span className="text-[11px] text-slate-500 dark:text-slate-400 font-mono font-semibold">LKR {item.price.toFixed(2)}</span>
-                          <span className="text-[10px] text-emerald-700 dark:text-emerald-400 font-bold bg-emerald-50 dark:bg-emerald-950/60 px-1.5 py-0.2 rounded border border-emerald-200 dark:border-emerald-800">
-                            {item.confidence}% Conf.
-                          </span>
                         </div>
                       </td>
 
@@ -867,9 +829,6 @@ export default function DemandForecastingDashboard({ isDarkMode, currentRole = '
 
                       <td className="py-3.5 px-3">
                         <div className="text-base font-black text-slate-900 dark:text-white">{item.predicted_demand_today} <span className="text-xs font-normal text-slate-500">portions</span></div>
-                        <span className="text-[10px] text-emerald-700 dark:text-emerald-400 font-bold block">
-                          {item.trend} vs 90d avg ({item.historical_avg})
-                        </span>
                       </td>
 
                       <td className="py-3.5 px-4">
@@ -954,7 +913,7 @@ export default function DemandForecastingDashboard({ isDarkMode, currentRole = '
       {/* ========================================================================= */}
       {/* TAB 2: 7-DAY & SHIFT DEMAND ANALYTICS */}
       {/* ========================================================================= */}
-      {activeTab === 'analytics' && (
+      {activeTabToRender === 'analytics' && (
         <div className="space-y-6">
           
           {/* Multi-Day Projection Chart */}
@@ -1101,7 +1060,7 @@ export default function DemandForecastingDashboard({ isDarkMode, currentRole = '
       {/* ========================================================================= */}
       {/* TAB 3: EXPLAINABLE AI (XAI) & FACTOR ATTRIBUTION */}
       {/* ========================================================================= */}
-      {activeTab === 'xai' && (
+      {activeTabToRender === 'xai' && (
         <div className="space-y-6">
           
           {/* EXPLAINABLE AI ATTRIBUTION PANEL */}
@@ -1275,7 +1234,7 @@ export default function DemandForecastingDashboard({ isDarkMode, currentRole = '
       {/* ========================================================================= */}
       {/* TAB 4: "WHAT-IF" SCENARIO SIMULATION SANDBOX */}
       {/* ========================================================================= */}
-      {activeTab === 'simulator' && (
+      {activeTabToRender === 'simulator' && (
         <div className="space-y-6">
           
           <div className="glass-panel p-6 rounded-2xl bg-white dark:bg-slate-900 border border-[#cbdad0] dark:border-slate-800 shadow-sm space-y-5">
