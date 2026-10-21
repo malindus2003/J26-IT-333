@@ -205,8 +205,11 @@ class MultiModalSpoilageMLEngine:
             x_input = np.hstack([num_feats, cat_encoded])
 
             # Inference
+            if self.rsl_model is None or self.prob_model is None or self.risk_model is None or self.produce_encoder is None:
+                return None
             rsl_pred = float(self.rsl_model.predict(x_input)[0])
             prob_pred = float(self.prob_model.predict(x_input)[0])
+            risk_idx = int(self.risk_model.predict(x_input)[0])
             inv_map = {0: "Low", 1: "Medium", 2: "High", 3: "Critical"}
             risk_str = inv_map.get(risk_idx, "Medium")
 

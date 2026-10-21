@@ -831,7 +831,7 @@ def get_kitchen_metrics():
     for s in staff:
         s_id = s.get("id") or s.get("emp_id")
         s_name = s.get("name")
-        match_rec = next((r for r in rec_staff if r["staff_id"] == s_id or r["staff_name"] == s_name or r["staff_name"] in s_name), None)
+        match_rec = next((r for r in rec_staff if r["staff_id"] == s_id or r["staff_name"] == s_name or (s_name and r["staff_name"] in s_name)), None)
         if match_rec:
             s["pending_reallocation_directive"] = match_rec
 

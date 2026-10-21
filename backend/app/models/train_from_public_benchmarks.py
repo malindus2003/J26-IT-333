@@ -124,8 +124,10 @@ def train_cv_on_public_images():
             objs = tree.getroot().findall("object")
             if not objs:
                 continue
-            # Get dominant object label
-            label = objs[0].find("name").text
+            name_elem = objs[0].find("name")
+            if name_elem is None or not name_elem.text:
+                continue
+            label = name_elem.text
             if label not in class_map_3tier:
                 continue
 
