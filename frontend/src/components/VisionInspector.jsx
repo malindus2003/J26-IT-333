@@ -1348,7 +1348,7 @@ const activeStorage = storages.find(s => s?.id === selectedStorageId) || storage
             {/* ─────────────────────────────────────────────────────────────
           SECTION: STORAGE CHAMBER SELECTOR & MULTI-STORAGE MANAGEMENT
           ───────────────────────────────────────────────────────────── */}
-      <div className="p-4 sm:p-5 rounded-2xl bg-[#f8faf9] dark:bg-slate-850/80 border border-[#d1ded5] dark:border-slate-800 space-y-4 shadow-2xs">
+      <div className="p-4 sm:p-5 rounded-2xl bg-[#f8faf9] dark:bg-slate-800/80 border border-[#d1ded5] dark:border-slate-700 space-y-4 shadow-2xs">
         
         {/* Top Header Row: Chamber Overview & Add Storage Trigger */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-[#e1eae4] dark:border-slate-800">
@@ -2079,7 +2079,7 @@ const activeStorage = storages.find(s => s?.id === selectedStorageId) || storage
       )}
 
       {/* Chamber Header & Synchronization Banner */}
-      <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-emerald-50 via-teal-50/60 to-emerald-50 dark:from-slate-850 dark:via-slate-800 dark:to-slate-850 border border-emerald-200 dark:border-emerald-800 shadow-2xs space-y-3">
+      <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-emerald-50 via-teal-50/60 to-emerald-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 border border-emerald-200 dark:border-emerald-800 shadow-2xs space-y-3">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <div className="h-10 w-10 rounded-2xl bg-emerald-700 text-white flex items-center justify-center shadow-md shadow-emerald-700/20 flex-shrink-0">
@@ -2127,7 +2127,7 @@ const activeStorage = storages.find(s => s?.id === selectedStorageId) || storage
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6 pt-1">
         
         {/* UNIT 1: Optical Camera View & CV Inspection (Left Side) */}
-        <div className="lg:col-span-6 flex flex-col justify-between p-4 sm:p-5 bg-[#f8faf9] dark:bg-slate-850 rounded-2xl border border-[#d1ded5] dark:border-slate-800 shadow-2xs space-y-3">
+        <div className="lg:col-span-6 flex flex-col justify-between p-4 sm:p-5 bg-[#f8faf9] dark:bg-slate-800/80 rounded-2xl border border-[#d1ded5] dark:border-slate-700 shadow-2xs space-y-3">
           
           <div className="flex items-center justify-between pb-2 border-b border-[#e1eae4] dark:border-slate-800 text-xs">
             <span className="font-extrabold flex items-center gap-1.5 text-slate-900 dark:text-white truncate">
@@ -2277,7 +2277,7 @@ const activeStorage = storages.find(s => s?.id === selectedStorageId) || storage
                     fileInputRef.current.click();
                   }
                 }}
-                className="flex-1 py-2 px-3 rounded-xl bg-white hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-750 text-slate-800 dark:text-slate-200 text-xs font-bold border border-slate-300 dark:border-slate-700 flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs transition-all active:scale-95 disabled:opacity-50"
+                className="flex-1 py-2 px-3 rounded-xl bg-white hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 text-xs font-bold border border-slate-300 dark:border-slate-700 flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs transition-all active:scale-95 disabled:opacity-50"
               >
                 {analyzing ? (
                   <>
@@ -2315,7 +2315,7 @@ const activeStorage = storages.find(s => s?.id === selectedStorageId) || storage
         </div>
 
         {/* UNIT 2: IoT Environmental Telemetry Array (Right Side) */}
-        <div className="lg:col-span-6 flex flex-col justify-between p-4 sm:p-5 bg-[#f8faf9] dark:bg-slate-850 rounded-2xl border border-[#d1ded5] dark:border-slate-800 shadow-2xs space-y-3">
+        <div className="lg:col-span-6 flex flex-col justify-between p-4 sm:p-5 bg-[#f8faf9] dark:bg-slate-800/80 rounded-2xl border border-[#d1ded5] dark:border-slate-700 shadow-2xs space-y-3">
           
           <div className="flex flex-wrap items-center justify-between pb-2 border-b border-[#e1eae4] dark:border-slate-800 text-xs gap-2">
             <span className="font-extrabold flex items-center gap-1.5 text-slate-900 dark:text-white truncate">
@@ -2962,7 +2962,7 @@ const activeStorage = storages.find(s => s?.id === selectedStorageId) || storage
                   {inspectionHistory.map((rec, idx) => (
                     <div
                       key={rec.analysis_id || idx}
-                      className="p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-[#f8faf9] dark:bg-slate-850 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs"
+                      className="p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-[#f8faf9] dark:bg-slate-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs"
                     >
                       <div className="flex items-center gap-3">
                         <span className="text-2xl">{rec.produce_icon || "🍎"}</span>

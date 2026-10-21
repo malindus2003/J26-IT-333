@@ -554,7 +554,7 @@ export default function MultiModalAssessor({ currentVisionFeatures, selectedZone
             type="button"
             onClick={() => fileInputRef.current?.click()}
             disabled={isUploading}
-            className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-750 text-slate-800 dark:text-slate-200 text-xs font-bold flex items-center gap-1.5 border border-slate-300 dark:border-slate-700 cursor-pointer transition-colors"
+            className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 text-xs font-bold flex items-center gap-1.5 border border-slate-300 dark:border-slate-700 cursor-pointer transition-colors"
             title="Upload an image to inspect produce in this storage"
           >
             <Upload className="h-3.5 w-3.5 text-slate-600 dark:text-slate-300" />
@@ -622,7 +622,7 @@ export default function MultiModalAssessor({ currentVisionFeatures, selectedZone
                 className={`p-3.5 rounded-2xl border text-left transition-all relative overflow-hidden group cursor-pointer ${
                   isSelected
                     ? 'bg-emerald-50/90 dark:bg-emerald-950/60 border-emerald-500 shadow-md ring-1 ring-emerald-500/40'
-                    : 'bg-white dark:bg-slate-850 border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 shadow-2xs'
+                    : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 shadow-2xs'
                 }`}
               >
                 {/* Active Indicator Top Edge */}
@@ -682,7 +682,7 @@ export default function MultiModalAssessor({ currentVisionFeatures, selectedZone
       <div className="pt-2 border-t border-[#e1eae4] dark:border-slate-800 space-y-4">
         
         {/* Active Storage Chamber Header Banner */}
-        <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-850/80 border border-slate-200 dark:border-slate-750 flex flex-col md:flex-row md:items-center justify-between gap-3">
+        <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 flex flex-col md:flex-row md:items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <div className="h-12 w-12 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center text-3xl shadow-2xs flex-shrink-0">
               {activeProduce?.cvResult?.produce_icon || (activeProduce?.category === "Fruits" ? "🍎" : "🥕")}
@@ -762,7 +762,7 @@ export default function MultiModalAssessor({ currentVisionFeatures, selectedZone
             </div>
 
             {/* Generated Chef Recipe Directives Card */}
-            <div className="p-5 sm:p-6 rounded-2xl bg-white dark:bg-slate-850 border border-emerald-300 dark:border-emerald-700/80 shadow-md space-y-4">
+            <div className="p-5 sm:p-6 rounded-2xl bg-white dark:bg-slate-800/90 border border-emerald-300 dark:border-emerald-700/80 shadow-md space-y-4">
               
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-4">
                 <div>
@@ -853,7 +853,7 @@ export default function MultiModalAssessor({ currentVisionFeatures, selectedZone
           /* ─────────────────────────────────────────────────────────────
               CASE B: FRESH (< 70-75%) -> SHOW REASSURING OPTIMAL STATUS
               ───────────────────────────────────────────────────────────── */
-          <div className="p-6 sm:p-8 rounded-2xl bg-white dark:bg-slate-850 border border-slate-200 dark:border-slate-750 text-center space-y-4 animate-fade-in shadow-2xs">
+          <div className="p-6 sm:p-8 rounded-2xl bg-white dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700 text-center space-y-4 animate-fade-in shadow-2xs">
             
             <div className="mx-auto h-14 w-14 rounded-3xl bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-400 flex items-center justify-center border border-emerald-200 dark:border-emerald-800 shadow-sm">
               <CheckCircle2 className="h-7 w-7" />
@@ -889,7 +889,7 @@ export default function MultiModalAssessor({ currentVisionFeatures, selectedZone
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-750 text-slate-800 dark:text-slate-200 text-xs font-bold flex items-center gap-1.5 border border-slate-300 dark:border-slate-700 cursor-pointer transition-colors"
+                className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 text-xs font-bold flex items-center gap-1.5 border border-slate-300 dark:border-slate-700 cursor-pointer transition-colors"
               >
                 <Upload className="h-3.5 w-3.5 text-slate-600 dark:text-slate-300" />
                 <span>Upload Overripe Photo to Test Trigger</span>

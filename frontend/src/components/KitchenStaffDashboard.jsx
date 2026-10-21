@@ -741,7 +741,7 @@ export default function KitchenStaffDashboard({ isDarkMode, currentRole = 'admin
                     <button
                       type="button"
                       onClick={() => setKitchenDropdownOpen(!kitchenDropdownOpen)}
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-850 hover:border-orange-500 dark:hover:border-orange-500 flex items-center justify-between gap-2.5 shadow-2xs transition-all text-left group cursor-pointer"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-orange-500 dark:hover:border-orange-500 flex items-center justify-between gap-2.5 shadow-2xs transition-all text-left group cursor-pointer"
                     >
                       <div className="flex items-center gap-2.5 min-w-0">
                         <div className="p-2 rounded-lg bg-orange-100 dark:bg-orange-950/60 text-orange-800 dark:text-orange-300 border border-orange-300 dark:border-orange-700 flex-shrink-0 group-hover:scale-105 transition-transform">
