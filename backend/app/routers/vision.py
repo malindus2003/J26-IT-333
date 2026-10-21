@@ -115,6 +115,7 @@ def _format_vision_response(results: Dict[str, Any], category: str) -> Dict[str,
 async def inspect_food_image(
     file: Optional[UploadFile] = File(None),
     category: str = Form("Fruits"),
+    expected_produce: Optional[str] = Form(None),
     image_base64: Optional[str] = Form(None)
 ):
     """
@@ -134,7 +135,7 @@ async def inspect_food_image(
     else:
         raise HTTPException(status_code=400, detail="No image file or base64 data provided")
 
-    results = vision_engine.analyze_image(image_bytes, category=category)
+    results = vision_engine.analyze_image(image_bytes, category=category, expected_produce=expected_produce)
     response_data = _format_vision_response(results, category)
 
     # Persist summary into inspection history

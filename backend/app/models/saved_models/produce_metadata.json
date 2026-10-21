@@ -5,7 +5,8 @@
     "Apple",
     "Banana",
     "Orange",
-    "Strawberry"
+    "Strawberry",
+    "Mango"
   ],
   "fallback_species": "Unknown / Unsupported Produce",
   "rejection_confidence_threshold": 50.0,
@@ -53,7 +54,7 @@
     },
     "Mango": {
       "icon": "\ud83e\udd6d",
-      "scientific": "Mangifera indica",
+      "scientific": "Mangifera indica (Karthakolomban)",
       "shelf_life_hours": 192.0,
       "category": "Fruits"
     },

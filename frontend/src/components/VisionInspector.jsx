@@ -1126,6 +1126,11 @@ const activeStorage = storages.find(s => s?.id === selectedStorageId) || storage
       reader.onload = async (event) => {
         const dataUrl = event.target.result;
         setPreviewImage(dataUrl);
+        setCvResult(prev => ({
+          ...prev,
+          bounding_boxes: [],
+          identified_produce: "Analyzing Specimen..."
+        }));
         await runBackendAnalysis(dataUrl, cvResult?.category || "Fruits");
       };
       reader.readAsDataURL(file);
@@ -1173,6 +1178,11 @@ const activeStorage = storages.find(s => s?.id === selectedStorageId) || storage
     stopCamera();
     setPreviewImage(dataUrl);
     setCurrentContainerName("Scanning Captured Photo...");
+    setCvResult(prev => ({
+      ...prev,
+      bounding_boxes: [],
+      identified_produce: "Analyzing Specimen..."
+    }));
     runBackendAnalysis(dataUrl, cvResult?.category || "Fruits");
   };
 
@@ -1182,6 +1192,9 @@ const activeStorage = storages.find(s => s?.id === selectedStorageId) || storage
       const formData = new FormData();
       formData.append("category", targetCategory);
       formData.append("image_base64", imageDataUrl);
+      if (activeStorage?.assignedProduce?.produceName) {
+        formData.append("expected_produce", activeStorage.assignedProduce.produceName);
+      }
 
       const res = await axios.post("http://localhost:8000/api/vision/inspect", formData);
       const feat = res.data.features || res.data;
@@ -1196,6 +1209,8 @@ const activeStorage = storages.find(s => s?.id === selectedStorageId) || storage
       }
     } catch (err) {
       console.error("CV inspection error:", err);
+      setToastMessage("Vision API Error: Backend server is unreachable at http://localhost:8000. Please start the backend service.");
+      setTimeout(() => setToastMessage(null), 6000);
     } finally {
       setAnalyzing(false);
     }
