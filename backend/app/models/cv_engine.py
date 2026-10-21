@@ -336,6 +336,8 @@ class FoodQualityVisionEngine:
             if s not in species_probs:
                 species_probs[s] = 0.05
 
+
+
         # -------------------------------------------------------------
         # 3. BIOLOGICAL MORPHO-CHROMATIC SIGNATURES
         # -------------------------------------------------------------
@@ -347,15 +349,18 @@ class FoodQualityVisionEngine:
         is_trained_strawberry = (species_probs.get("Strawberry", 0.0) >= 0.55)
         is_trained_mango = (species_probs.get("Mango", 0.0) >= 0.55)
 
-        # A. WATERMELON (Whole green rind with minimal yellow, or sliced red/pink flesh with green margin)
+        # A. WATERMELON (Whole green exocarp or sliced red/pink flesh)
+        # Whole watermelon: Smooth thick exocarp rind, dark green, LOW texture roughness, NO ruffled leafy layers
         is_whole_watermelon = (
             not is_trained_citrus_orange and not is_trained_apple and not is_trained_banana and not is_trained_mango and
             ((green_pct >= 35.0) or (40.0 <= h_mean <= 85.0 and green_pct >= 25.0 and yellow_pct < 6.0)) and
-            red_pct < 6.0 and yellow_pct < 6.0 and (0.70 <= aspect_val <= 1.40) and (lap_var < 1400.0)
+            red_pct < 6.0 and yellow_pct < 6.0 and (0.70 <= aspect_val <= 1.40) and
+            (edge_density < 11.5) and (lap_var < 450.0) and (v_mean < 165.0 and r_mean < 125.0)
         )
         is_sliced_watermelon = (
             not is_trained_citrus_orange and not is_trained_apple and not is_trained_strawberry and not is_trained_mango and
-            red_pct >= 18.0 and green_pct >= 1.8 and yellow_pct < 20.0 and (necrotic_pct >= 0.05 or v_mean > 110.0)
+            red_pct >= 18.0 and green_pct >= 1.8 and yellow_pct < 20.0 and (necrotic_pct >= 0.05 or v_mean > 110.0) and
+            (edge_density < 16.0)
         )
         if is_whole_watermelon or is_sliced_watermelon:
             species_probs["Watermelon"] = max(species_probs.get("Watermelon", 0.0), 0.94)
@@ -439,21 +444,120 @@ class FoodQualityVisionEngine:
 
         # F. TOMATO (High lycopene red, smooth thin cuticle, spherical, no achenes)
         if red_pct >= 45.0 and glare_pct >= 0.8 and (0.88 <= aspect_val <= 1.15) and not is_strawberry_calyx and not is_strawberry_seed_texture:
-            if "Tomato" not in species_probs:
-                species_probs["Tomato"] = 0.0
-            species_probs["Tomato"] = max(species_probs["Tomato"], 0.94)
+            species_probs["Tomato"] = max(species_probs.get("Tomato", 0.0), 1.50)
 
         # G. CARROT (Beta-carotene orange, elongated taproot)
         if (12.0 <= h_mean <= 28.0) and (yellow_pct + red_pct >= 45.0) and (aspect_val > 1.35 or aspect_val < 0.70):
-            if "Carrot" not in species_probs:
-                species_probs["Carrot"] = 0.0
-            species_probs["Carrot"] = max(species_probs["Carrot"], 0.93)
+            species_probs["Carrot"] = max(species_probs.get("Carrot", 0.0), 1.50)
 
         # H. CUCUMBER (Elongated cylindrical green)
         if green_pct >= 40.0 and (aspect_val > 1.45 or aspect_val < 0.68):
-            if "Cucumber" not in species_probs:
-                species_probs["Cucumber"] = 0.0
-            species_probs["Cucumber"] = max(species_probs["Cucumber"], 0.93)
+            species_probs["Cucumber"] = max(species_probs.get("Cucumber", 0.0), 1.50)
+
+        # I. LETTUCE (Iceberg / Romaine / Butterhead: Light chlorophyll green, ruffled crinkled foliage, crisp pale inner core)
+        is_lettuce = (
+            not is_trained_citrus_orange and not is_trained_apple and not is_trained_banana and not is_trained_mango and
+            green_pct >= 28.0 and red_pct < 8.0 and yellow_pct < 15.0 and
+            (36.0 <= h_mean <= 78.0) and
+            (v_mean >= 140.0 and (r_mean >= 105.0 or b_mean >= 90.0)) and
+            (edge_density >= 11.5 or lap_var >= 450.0)
+        )
+        if is_lettuce:
+            species_probs["Lettuce"] = max(species_probs.get("Lettuce", 0.0), 1.60)
+            species_probs["Watermelon"] = species_probs.get("Watermelon", 0.0) * 0.01
+            species_probs["Apple"] = species_probs.get("Apple", 0.0) * 0.02
+            species_probs["Orange"] = species_probs.get("Orange", 0.0) * 0.02
+            species_probs["Strawberry"] = species_probs.get("Strawberry", 0.0) * 0.02
+            species_probs["Banana"] = species_probs.get("Banana", 0.0) * 0.02
+
+        # J. CABBAGE (Gova: Compact spherical head, smooth to curved wrapper leaves, pale/blue-green or savoy)
+        is_cabbage = (
+            not is_lettuce and not is_whole_watermelon and
+            not is_trained_citrus_orange and not is_trained_apple and not is_trained_banana and not is_trained_mango and
+            green_pct >= 25.0 and red_pct < 8.0 and yellow_pct < 12.0 and
+            (38.0 <= h_mean <= 85.0) and
+            (0.75 <= aspect_val <= 1.30) and
+            (edge_density < 16.0) and (lap_var < 800.0) and (v_mean >= 125.0)
+        )
+        if is_cabbage:
+            species_probs["Cabbage"] = max(species_probs.get("Cabbage", 0.0), 1.50)
+            species_probs["Watermelon"] = species_probs.get("Watermelon", 0.0) * 0.01
+            species_probs["Apple"] = species_probs.get("Apple", 0.0) * 0.02
+            species_probs["Banana"] = species_probs.get("Banana", 0.0) * 0.02
+
+        # K. SPINACH & LEAFY GREENS (Gotukola, Kankun, Mukunuwenna: Deep forest green, high edge density, delicate foliage)
+        is_spinach = (
+            not is_lettuce and not is_cabbage and not is_whole_watermelon and
+            green_pct >= 42.0 and red_pct < 6.0 and
+            (44.0 <= h_mean <= 88.0) and
+            (v_mean < 155.0) and (edge_density >= 15.0 or lap_var >= 800.0)
+        )
+        if is_spinach:
+            species_probs["Spinach"] = max(species_probs.get("Spinach", 0.0), 1.50)
+            species_probs["Watermelon"] = species_probs.get("Watermelon", 0.0) * 0.01
+            species_probs["Apple"] = species_probs.get("Apple", 0.0) * 0.02
+
+        # L. BROCCOLI (Granular dense floret canopy, deep forest green)
+        is_broccoli = (
+            green_pct >= 35.0 and red_pct < 5.0 and yellow_pct < 10.0 and
+            (h_mean >= 45.0) and (v_mean < 135.0) and
+            (edge_density >= 18.0 or lap_var >= 1000.0)
+        )
+        if is_broccoli:
+            species_probs["Broccoli"] = max(species_probs.get("Broccoli", 0.0), 1.50)
+            species_probs["Watermelon"] = species_probs.get("Watermelon", 0.0) * 0.01
+
+        # M. CAULIFLOWER (Cream-white granular curd, pale yellowish-white)
+        is_cauliflower = (
+            s_mean < 45.0 and v_mean >= 155.0 and
+            (edge_density >= 13.0 or lap_var >= 400.0) and
+            (green_pct < 25.0) and (red_pct < 10.0)
+        )
+        if is_cauliflower:
+            species_probs["Cauliflower"] = max(species_probs.get("Cauliflower", 0.0), 1.50)
+            species_probs["Apple"] = species_probs.get("Apple", 0.0) * 0.03
+
+        # N. CAPSICUM / BELL PEPPER (Deep uniform green/red/yellow, high specular cuticular glare, smooth lobed exocarp)
+        is_capsicum = (
+            not is_strawberry_seed_texture and not is_lettuce and
+            (
+                (green_pct >= 40.0 and glare_pct >= 1.6 and edge_density < 11.0) or
+                (red_pct >= 40.0 and glare_pct >= 1.8 and not is_trained_apple and edge_density < 10.0 and (0.70 <= aspect_val <= 1.35)) or
+                (yellow_pct >= 40.0 and glare_pct >= 1.8 and edge_density < 10.0 and not is_banana_peel)
+            )
+        )
+        if is_capsicum:
+            species_probs["Capsicum"] = max(species_probs.get("Capsicum", 0.0), 1.50)
+            species_probs["Watermelon"] = species_probs.get("Watermelon", 0.0) * 0.01
+            species_probs["Apple"] = species_probs.get("Apple", 0.0) * 0.02
+
+        # O. EGGPLANT / BRINJAL (Deep glossy purple/black, low brightness, smooth cuticle)
+        is_eggplant = (
+            v_mean < 80.0 and s_mean > 25.0 and
+            (h_mean > 115.0 or h_mean < 20.0) and
+            not is_strawberry_seed_texture and (lap_var < 400.0)
+        )
+        if is_eggplant:
+            species_probs["Eggplant"] = max(species_probs.get("Eggplant", 0.0), 1.50)
+
+        # P. POTATO (Earthy starchy buff/brown skin, matte low glare, moderate saturation)
+        is_potato = (
+            (14.0 <= h_mean <= 38.0) and (20.0 <= s_mean <= 75.0) and (105.0 <= v_mean <= 190.0) and
+            green_pct < 6.0 and glare_pct < 1.0 and edge_density < 12.0 and
+            not is_trained_banana and not is_trained_citrus_orange
+        )
+        if is_potato:
+            species_probs["Potato"] = max(species_probs.get("Potato", 0.0), 1.50)
+            species_probs["Banana"] = species_probs.get("Banana", 0.0) * 0.05
+            species_probs["Orange"] = species_probs.get("Orange", 0.0) * 0.05
+
+        # Q. RED ONION (Concentric dry papery reddish-purple tunic)
+        is_red_onion = (
+            (h_mean > 135.0 or h_mean < 18.0) and red_pct >= 12.0 and
+            (0.80 <= aspect_val <= 1.25) and not is_trained_apple and not is_strawberry_calyx
+        )
+        if is_red_onion:
+            species_probs["Red Onion"] = max(species_probs.get("Red Onion", 0.0), 1.50)
         # -------------------------------------------------------------
         # 4. EXPECTED PRODUCE CONTEXT INGESTION (47 Commodities Support)
         # -------------------------------------------------------------
@@ -564,8 +668,9 @@ class FoodQualityVisionEngine:
         # STAGE 1: PRODUCE SPECIES IDENTIFICATION (Multi-Modal Botanical)
         # -------------------------------------------------------------
         supported_species = list(self.produce_metadata.get("supported_species", SUPPORTED_SPECIES))
-        if "Watermelon" not in supported_species:
-            supported_species.append("Watermelon")
+        for extra_sp in ["Watermelon", "Lettuce", "Cabbage", "Spinach", "Broccoli", "Cauliflower", "Tomato", "Carrot", "Cucumber", "Capsicum", "Eggplant", "Potato", "Red Onion"]:
+            if extra_sp not in supported_species:
+                supported_species.append(extra_sp)
 
         identified_produce, produce_confidence, is_supported_produce, species_probs_dict, alternative_predictions = \
             self._discriminate_and_identify_species(x_input, feat_vec, supported_species, expected_produce)
