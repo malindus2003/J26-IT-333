@@ -313,6 +313,7 @@ orders_db = list(INITIAL_ORDERS)
 class OrderItemPayload(BaseModel):
     menu_id: str
     quantity: int
+    portion_size: Optional[str] = None
 
 class CreateOrderPayload(BaseModel):
     table_no: str
@@ -334,6 +335,8 @@ class CreateMenuItemPayload(BaseModel):
     image_url: Optional[str] = ""
     description: Optional[str] = ""
     recipe_bom: Optional[List[Dict[str, Any]]] = []
+    has_portions: Optional[bool] = False
+    portions: Optional[List[Dict[str, Any]]] = []
     current_stock: Optional[int] = 25
     branch_id: Optional[str] = "branch-hikkaduwa"
 
@@ -500,6 +503,24 @@ def add_menu_item(payload: CreateMenuItemPayload):
         for b in bom_list
     ]
 
+    cleaned_portions = []
+    for p in (payload.portions or []):
+        if p.get("size"):
+            p_boms = []
+            for b in p.get("recipe_bom", []):
+                if b.get("ingredient_name"):
+                    p_boms.append({
+                        "ingredient_name": b.get("ingredient_name", "").strip(),
+                        "category": b.get("category", "Vegetables"),
+                        "required_kg": float(b.get("required_kg", 0.1))
+                    })
+            cleaned_portions.append({
+                "size": p.get("size"),
+                "price_lkr": float(p.get("price_lkr", payload.price_lkr)),
+                "prep_time_mins": int(p.get("prep_time_mins", payload.prep_time_mins)),
+                "recipe_bom": p_boms
+            })
+
     cost = float(payload.cost_lkr) if payload.cost_lkr else round(float(payload.price_lkr) * 0.45, 2)
 
     new_dish = {
@@ -515,6 +536,8 @@ def add_menu_item(payload: CreateMenuItemPayload):
         "station_name": station_name,
         "image_url": payload.image_url.strip() if payload.image_url else "/images/dishes/dish_1.jpg",
         "description": payload.description.strip() if payload.description else "",
+        "has_portions": bool(payload.has_portions and cleaned_portions),
+        "portions": cleaned_portions,
         "recipe_bom": bom_list,
         "ingredients": ingredients_compat,
         "current_stock": payload.current_stock or 25,
@@ -577,21 +600,33 @@ def place_new_order(payload: CreateOrderPayload):
             continue
         
         qty = max(1, it.quantity)
-        subtotal = menu_item["price_lkr"] * qty
+
+        # Portion variant resolution
+        portion_variant = None
+        if it.portion_size and menu_item.get("has_portions") and menu_item.get("portions"):
+            portion_variant = next((p for p in menu_item["portions"] if str(p.get("size", "")).lower() == str(it.portion_size).lower()), None)
+
+        unit_price = float(portion_variant["price_lkr"]) if (portion_variant and portion_variant.get("price_lkr")) else float(menu_item["price_lkr"])
+        recipe_bom_to_use = portion_variant["recipe_bom"] if (portion_variant and portion_variant.get("recipe_bom")) else menu_item.get("recipe_bom", [])
+        
+        subtotal = unit_price * qty
         total_amount += subtotal
         primary_station_id = menu_item["station_id"]
         primary_station_name = menu_item["station_name"]
         max_prep_time = max(max_prep_time, menu_item["prep_time_mins"])
 
+        item_display_name = f"{menu_item['name']} ({it.portion_size})" if it.portion_size else menu_item["name"]
+
         order_items.append({
             "menu_id": menu_item["id"],
-            "name": menu_item["name"],
+            "name": item_display_name,
+            "portion_size": it.portion_size or "",
             "quantity": qty,
-            "unit_price": menu_item["price_lkr"]
+            "unit_price": unit_price
         })
 
         # Smart FIFO Ingredient Deduction from Inventory
-        for bom in menu_item["recipe_bom"]:
+        for bom in recipe_bom_to_use:
             total_req = bom["required_kg"] * qty
             candidates = [
                 inv for inv in inventory_db 

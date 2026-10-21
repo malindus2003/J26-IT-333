@@ -550,6 +550,7 @@ export default function OrderManagementDashboard({ onRefresh, isDarkMode, curren
 
   // New Order State
   const [selectedDish, setSelectedDish] = useState(null);
+  const [selectedPortionSize, setSelectedPortionSize] = useState('Medium');
   const [additionalItems, setAdditionalItems] = useState([]);
   const [showAddItemSelector, setShowAddItemSelector] = useState(false);
   const [tableNumber, setTableNumber] = useState("Table 01");
@@ -644,8 +645,18 @@ export default function OrderManagementDashboard({ onRefresh, isDarkMode, curren
     try {
       setSubmittingOrder(true);
       
+      const activePortion = (selectedDish.has_portions && selectedDish.portions?.length > 0)
+        ? (selectedDish.portions.find(p => p.size === selectedPortionSize) || selectedDish.portions[0])
+        : null;
+      const effectiveUnitPrice = activePortion ? activePortion.price_lkr : selectedDish.price_lkr;
+      const effectiveBOM = (activePortion?.recipe_bom?.length) ? activePortion.recipe_bom : (selectedDish.recipe_bom || []);
+
       const allItemsPayload = [
-        { menu_id: selectedDish.id, quantity: Number(portionCount) },
+        { 
+          menu_id: selectedDish.id, 
+          quantity: Number(portionCount),
+          portion_size: activePortion ? activePortion.size : null
+        },
         ...additionalItems.map(it => ({ menu_id: it.menu_id, quantity: Number(it.quantity) }))
       ];
 
@@ -671,12 +682,13 @@ export default function OrderManagementDashboard({ onRefresh, isDarkMode, curren
             const mItem = menu.find(m => m.id === it.menu_id) || selectedDish;
             return {
               menu_id: it.menu_id,
-              name: mItem?.name || "Dish",
+              name: mItem?.name ? `${mItem.name}${it.portion_size ? ` (${it.portion_size})` : ''}` : "Dish",
+              portion_size: it.portion_size || "",
               quantity: it.quantity,
-              unit_price: mItem?.price_lkr || 1200
+              unit_price: effectiveUnitPrice
             };
           }),
-          total_amount_lkr: (selectedDish.price_lkr * Number(portionCount)),
+          total_amount_lkr: (effectiveUnitPrice * Number(portionCount)),
           status: "in_prep",
           table_status: "occupied",
           station_id: selectedDish.station_id || "station-1",
@@ -684,7 +696,7 @@ export default function OrderManagementDashboard({ onRefresh, isDarkMode, curren
           created_at: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
           elapsed_mins: 0,
           target_prep_mins: selectedDish.prep_time_mins || 10,
-          ingredients_deducted: selectedDish.recipe_bom.map(b => ({
+          ingredients_deducted: effectiveBOM.map(b => ({
             item: b.ingredient_name,
             amount_kg: (b.required_kg * Number(portionCount)).toFixed(2),
             batch: "BAT-2026-FIFO (Low RSL)"
@@ -699,7 +711,7 @@ export default function OrderManagementDashboard({ onRefresh, isDarkMode, curren
           ...prev,
           active_kitchen_tickets: prev.active_kitchen_tickets + 1,
           in_prep_count: prev.in_prep_count + 1,
-          total_revenue_lkr: prev.total_revenue_lkr + (selectedDish.price_lkr * Number(portionCount))
+          total_revenue_lkr: prev.total_revenue_lkr + (effectiveUnitPrice * Number(portionCount))
         } : prev);
         setOrderSuccessMessage(`Order #${newOrderNum} placed for ${payload.table_no}! Smart FIFO ingredients deducted.`);
       }
@@ -1090,6 +1102,8 @@ export default function OrderManagementDashboard({ onRefresh, isDarkMode, curren
                   <button
                     onClick={() => {
                       setSelectedDish(dish);
+                      setSelectedPortionSize(dish.has_portions && dish.portions?.[0]?.size ? (dish.portions.find(p => p.size === 'Medium')?.size || dish.portions[0].size) : 'Medium');
+                      setPortionCount(1);
                       setShowNewOrderModal(true);
                     }}
                     className="w-full py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm transition-all hover:scale-102 cursor-pointer"
@@ -2232,124 +2246,165 @@ export default function OrderManagementDashboard({ onRefresh, isDarkMode, curren
             </div>
 
             <form onSubmit={handleCreateOrder} className="space-y-4 text-xs">
-              
-              {/* Selected Dish Card Summary */}
-              <div className="p-3.5 rounded-xl bg-[#f8faf9] dark:bg-slate-800 border border-[#d1ded5] dark:border-slate-700 flex items-center gap-3">
-                <img
-                  src={selectedDish.image_url}
-                  alt={selectedDish.name}
-                  onError={(e) => {
-                    e.currentTarget.onerror = null;
-                    e.currentTarget.src = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><rect width="100%" height="100%" fill="%23059669" fill-opacity="0.12"/><text x="50%" y="55%" dominant-baseline="middle" text-anchor="middle" font-size="28">🍽️</text></svg>`;
-                  }}
-                  className="h-14 w-14 rounded-lg object-cover flex-shrink-0"
-                />
-                <div>
-                  <h4 className="font-extrabold text-sm text-slate-900 dark:text-white">{selectedDish.name}</h4>
-                  <span className="text-xs font-bold text-emerald-800 dark:text-emerald-400 font-mono">
-                    Rs. {selectedDish.price_lkr} • {selectedDish.station_name}
-                  </span>
-                </div>
-              </div>
+              {(() => {
+                const activePortion = (selectedDish.has_portions && selectedDish.portions?.length > 0)
+                  ? (selectedDish.portions.find(p => p.size === selectedPortionSize) || selectedDish.portions[0])
+                  : null;
+                const effectiveUnitPrice = activePortion ? activePortion.price_lkr : selectedDish.price_lkr;
+                const effectiveBOM = (activePortion?.recipe_bom?.length) ? activePortion.recipe_bom : (selectedDish.recipe_bom || []);
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-slate-800 dark:text-slate-200 font-bold block mb-1">Order Channel</label>
-                  <select
-                    value={orderType}
-                    onChange={(e) => setOrderType(e.target.value)}
-                    className="w-full bg-[#f8faf9] dark:bg-slate-800 border border-[#c6d7cd] dark:border-slate-700 rounded-xl px-3 py-2 text-slate-900 dark:text-white font-bold focus:outline-none focus:border-emerald-600"
-                  >
-                    <option value="Dine-In">Dine-In (Select Table Below)</option>
-                    <option value="Takeout">Takeaway / Takeout</option>
-                    <option value="Delivery">Delivery Platform</option>
-                  </select>
-                </div>
+                return (
+                  <>
+                    {/* Selected Dish Card Summary */}
+                    <div className="p-3.5 rounded-xl bg-[#f8faf9] dark:bg-slate-800 border border-[#d1ded5] dark:border-slate-700 flex items-center gap-3">
+                      <img
+                        src={selectedDish.image_url}
+                        alt={selectedDish.name}
+                        onError={(e) => {
+                          e.currentTarget.onerror = null;
+                          e.currentTarget.src = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><rect width="100%" height="100%" fill="%23059669" fill-opacity="0.12"/><text x="50%" y="55%" dominant-baseline="middle" text-anchor="middle" font-size="28">🍽️</text></svg>`;
+                        }}
+                        className="h-14 w-14 rounded-lg object-cover flex-shrink-0"
+                      />
+                      <div>
+                        <h4 className="font-extrabold text-sm text-slate-900 dark:text-white">{selectedDish.name}</h4>
+                        <span className="text-xs font-bold text-emerald-800 dark:text-emerald-400 font-mono">
+                          Rs. {effectiveUnitPrice} {activePortion ? `(${activePortion.size} Portion)` : ''} • {selectedDish.station_name}
+                        </span>
+                      </div>
+                    </div>
 
-                <div>
-                  <label className="text-slate-800 dark:text-slate-200 font-bold block mb-1">Selected Table</label>
-                  <select
-                    disabled={orderType !== 'Dine-In'}
-                    value={tableNumber}
-                    onChange={(e) => setTableNumber(e.target.value)}
-                    className="w-full bg-[#f8faf9] dark:bg-slate-800 border border-[#c6d7cd] dark:border-slate-700 rounded-xl px-3 py-2 text-slate-900 dark:text-white font-bold focus:outline-none focus:border-emerald-600 disabled:opacity-50"
-                  >
-                    {tables.map(t => (
-                      <option key={t.table_no} value={t.table_no}>
-                        {t.table_no} ({t.status === 'available' ? '✓ Free' : 'Occupied'})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
+                    {/* Portion Tier Selector if Dish has Portions */}
+                    {selectedDish.has_portions && selectedDish.portions?.length > 0 && (
+                      <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-1.5">
+                        <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300 block">
+                          Choose Portion Size (Portion Tier):
+                        </span>
+                        <div className="grid grid-cols-3 gap-2">
+                          {selectedDish.portions.map((p) => (
+                            <button
+                              key={p.size}
+                              type="button"
+                              onClick={() => setSelectedPortionSize(p.size)}
+                              className={`py-2 px-2.5 rounded-xl border text-center transition-all cursor-pointer ${
+                                selectedPortionSize === p.size
+                                  ? 'bg-emerald-700 text-white border-emerald-800 shadow-sm'
+                                  : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-[#d1ded5] dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700'
+                              }`}
+                            >
+                              <div className="font-extrabold text-xs">{p.size}</div>
+                              <div className={`text-[11px] font-mono mt-0.5 font-bold ${selectedPortionSize === p.size ? 'text-emerald-100' : 'text-emerald-700 dark:text-emerald-400'}`}>
+                                Rs. {p.price_lkr}
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
 
-              {/* Free Tables Quick Chips */}
-              {orderType === 'Dine-In' && availableTables.length > 0 && (
-                <div>
-                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Quick Select Available Free Tables:</span>
-                  <div className="flex flex-wrap gap-1.5">
-                    {availableTables.map(tbl => (
-                      <button
-                        key={tbl.table_no}
-                        type="button"
-                        onClick={() => setTableNumber(tbl.table_no)}
-                        className={`px-2.5 py-1 rounded-lg font-bold text-xs border transition-all ${
-                          tableNumber === tbl.table_no
-                            ? 'bg-emerald-700 text-white border-emerald-800 shadow-sm'
-                            : 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-900 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100'
-                        }`}
-                      >
-                        {tbl.table_no}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-slate-800 dark:text-slate-200 font-bold block mb-1">Order Channel</label>
+                        <select
+                          value={orderType}
+                          onChange={(e) => setOrderType(e.target.value)}
+                          className="w-full bg-[#f8faf9] dark:bg-slate-800 border border-[#c6d7cd] dark:border-slate-700 rounded-xl px-3 py-2 text-slate-900 dark:text-white font-bold focus:outline-none focus:border-emerald-600"
+                        >
+                          <option value="Dine-In">Dine-In (Select Table Below)</option>
+                          <option value="Takeout">Takeaway / Takeout</option>
+                          <option value="Delivery">Delivery Platform</option>
+                        </select>
+                      </div>
 
-              <div>
-                <div className="flex justify-between font-bold mb-1">
-                  <span className="text-slate-800 dark:text-slate-200">Portion Quantity:</span>
-                  <span className="text-emerald-800 dark:text-emerald-400 text-sm">{portionCount} portions (Total: Rs. {selectedDish.price_lkr * portionCount})</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  {[1, 2, 3, 4, 5].map(n => (
-                    <button
-                      key={n}
-                      type="button"
-                      onClick={() => setPortionCount(n)}
-                      className={`flex-1 py-1.5 rounded-lg font-bold border transition-all ${
-                        portionCount === n
-                          ? 'bg-emerald-700 text-white border-emerald-800 shadow-sm'
-                          : 'bg-[#f8faf9] dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-[#d1ded5] dark:border-slate-700 hover:bg-slate-100'
-                      }`}
-                    >
-                      {n}
-                    </button>
-                  ))}
-                </div>
-              </div>
+                      <div>
+                        <label className="text-slate-800 dark:text-slate-200 font-bold block mb-1">Selected Table</label>
+                        <select
+                          disabled={orderType !== 'Dine-In'}
+                          value={tableNumber}
+                          onChange={(e) => setTableNumber(e.target.value)}
+                          className="w-full bg-[#f8faf9] dark:bg-slate-800 border border-[#c6d7cd] dark:border-slate-700 rounded-xl px-3 py-2 text-slate-900 dark:text-white font-bold focus:outline-none focus:border-emerald-600 disabled:opacity-50"
+                        >
+                          {tables.map(t => (
+                            <option key={t.table_no} value={t.table_no}>
+                              {t.table_no} ({t.status === 'available' ? '✓ Free' : 'Occupied'})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
 
-              <div>
-                <label className="text-slate-800 dark:text-slate-200 font-bold block mb-1">Kitchen / Chef Notes</label>
-                <textarea
-                  rows="2"
-                  value={customerNote}
-                  onChange={(e) => setCustomerNote(e.target.value)}
-                  placeholder="e.g. Less oil, extra chili on the side, allergies..."
-                  className="w-full bg-[#f8faf9] dark:bg-slate-800 border border-[#c6d7cd] dark:border-slate-700 rounded-xl px-3 py-2 text-slate-900 dark:text-white font-medium focus:outline-none focus:border-emerald-600"
-                />
-              </div>
+                    {/* Free Tables Quick Chips */}
+                    {orderType === 'Dine-In' && availableTables.length > 0 && (
+                      <div>
+                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Quick Select Available Free Tables:</span>
+                        <div className="flex flex-wrap gap-1.5">
+                          {availableTables.map(tbl => (
+                            <button
+                              key={tbl.table_no}
+                              type="button"
+                              onClick={() => setTableNumber(tbl.table_no)}
+                              className={`px-2.5 py-1 rounded-lg font-bold text-xs border transition-all ${
+                                tableNumber === tbl.table_no
+                                  ? 'bg-emerald-700 text-white border-emerald-800 shadow-sm'
+                                  : 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-900 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100'
+                              }`}
+                            >
+                              {tbl.table_no}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
 
-              {/* Smart FIFO Ingredient Deduction Preview */}
-              <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800/60 space-y-1">
-                <span className="font-bold text-emerald-950 dark:text-emerald-300 flex items-center gap-1.5 text-[11px]">
-                  <Sparkles className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
-                  Smart FIFO Auto-Deduction preview:
-                </span>
-                <p className="text-[10px] text-slate-600 dark:text-slate-300 leading-relaxed font-medium">
-                  {selectedDish.recipe_bom.map(b => `${(b.required_kg * portionCount).toFixed(2)}kg ${b.ingredient_name.split('(')[0]}`).join(' + ')} will be automatically deducted from cold storage batches with lowest remaining shelf-life.
-                </p>
-              </div>
+                    <div>
+                      <div className="flex justify-between font-bold mb-1">
+                        <span className="text-slate-800 dark:text-slate-200">Portion Quantity:</span>
+                        <span className="text-emerald-800 dark:text-emerald-400 text-sm">
+                          {portionCount} portions (Total: Rs. {effectiveUnitPrice * portionCount})
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {[1, 2, 3, 4, 5].map(n => (
+                          <button
+                            key={n}
+                            type="button"
+                            onClick={() => setPortionCount(n)}
+                            className={`flex-1 py-1.5 rounded-lg font-bold border transition-all cursor-pointer ${
+                              portionCount === n
+                                ? 'bg-emerald-700 text-white border-emerald-800 shadow-sm'
+                                : 'bg-[#f8faf9] dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-[#d1ded5] dark:border-slate-700 hover:bg-slate-100'
+                            }`}
+                          >
+                            {n}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="text-slate-800 dark:text-slate-200 font-bold block mb-1">Kitchen / Chef Notes</label>
+                      <textarea
+                        rows="2"
+                        value={customerNote}
+                        onChange={(e) => setCustomerNote(e.target.value)}
+                        placeholder="e.g. Less oil, extra chili on the side, allergies..."
+                        className="w-full bg-[#f8faf9] dark:bg-slate-800 border border-[#c6d7cd] dark:border-slate-700 rounded-xl px-3 py-2 text-slate-900 dark:text-white font-medium focus:outline-none focus:border-emerald-600"
+                      />
+                    </div>
+
+                    {/* Smart FIFO Ingredient Deduction Preview */}
+                    <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800/60 space-y-1">
+                      <span className="font-bold text-emerald-950 dark:text-emerald-300 flex items-center gap-1.5 text-[11px]">
+                        <Sparkles className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                        Smart FIFO Auto-Deduction preview:
+                      </span>
+                      <p className="text-[10px] text-slate-600 dark:text-slate-300 leading-relaxed font-medium">
+                        {effectiveBOM.map(b => `${(b.required_kg * portionCount).toFixed(2)}kg ${b.ingredient_name.split('(')[0]}`).join(' + ')} will be automatically deducted from cold storage batches with lowest remaining shelf-life.
+                      </p>
+                    </div>
+                  </>
+                );
+              })()}
 
               <div className="flex items-center justify-end gap-2 pt-3 border-t border-[#e1eae4] dark:border-slate-800">
                 <button
