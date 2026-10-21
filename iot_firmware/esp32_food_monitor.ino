@@ -1,26 +1,16 @@
 /*
  * =========================================================================================
  * SLIIT IT4010 Research Project - SST (J26-IT-333)
- * Component 3: AI-Based Multi-Modal Food Spoilage Prediction & Quality Assessment
+ * Component 3: Multi-Modal Spoilage Prediction & Cold Storage Quality Assessment
  * Author: Maddumage M. S. (IT23348820)
  * 
- * Target Microcontroller: ESP32 DevKit V1 (30-pin, Dual-Core 240MHz, 4MB Flash)
- * Firmware Module: Storage Zone Environmental Telemetry & Gas Ingestion Node
- * =========================================================================================
- * 
- * Description:
- * Reads physical telemetry from:
- *   1. DHT22 (Temperature & Relative Humidity) via GPIO 4 (1-Wire digital bus)
- *   2. MQ-137 Gas Sensor (Ammonia / NH3 protein deamination) via GPIO 34 (ADC1_CH6)
- *   3. MQ-135 Gas Sensor (CO2 cellular respiration & air quality) via GPIO 35 (ADC1_CH7)
- *   4. SGP30 VOC Sensor (Total Volatile Organic Compounds & Ethylene) via GPIO 21 (SDA), 22 (SCL)
- * 
- * Performs:
- *   - 12-bit SAR ADC multi-sample smoothing (16 samples per burst)
- *   - Sensor resistance calculation (Rs/R0 ratio power-law transformation for ppm)
- *   - JSON serialization using ArduinoJson v6/v7
- *   - HTTP POST transmission to FastAPI Backend: POST /api/sensors/telemetry
- *   - Wi-Fi auto-reconnect and watchdog telemetry pacing
+ * Hardware Target: ESP32 DevKit V1 (Dual-Core 240MHz)
+ * Sensors, Displays & Alarms:
+ *   1. DHT22 (DAT -> GPIO 4)            - Temperature & Relative Humidity
+ *   2. MQ-135 (AO  -> GPIO 35)           - Respiration CO2 & Air Quality
+ *   3. 0.96" OLED I2C (SDA -> GPIO 21, SCL -> GPIO 22) - Real-time Spoilage Screen
+ *   4. 4-Pin RGB LED (R -> 18, G -> 19, B -> 23)       - Visual Fresh/Spoil Light
+ *   5. 2-Pin Buzzer (+) -> GPIO 5                      - Acoustic Spoilage Siren
  * =========================================================================================
  */
 
@@ -29,257 +19,374 @@
 #include <ArduinoJson.h>
 #include <DHT.h>
 #include <Wire.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
+
+// Brownout protection registers
+#include "soc/soc.h"
+#include "soc/rtc_cntl_reg.h"
 
 // ============================================================================
-// NETWORK CONFIGURATION
+// 1. OLED DISPLAY CONFIGURATION (128x64 I2C)
 // ============================================================================
-// Replace with your Wi-Fi credentials (or mobile hotspot for PP1 presentation)
+#define SCREEN_WIDTH 128
+#define SCREEN_HEIGHT 64
+#define OLED_RESET    -1
+#define SCREEN_ADDRESS 0x3C
+
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+bool oledFound = false;
+
+// ============================================================================
+// 2. NETWORK & BACKEND CONFIGURATION
+// ============================================================================
 const char* WIFI_SSID     = "Your_WiFi_SSID";
 const char* WIFI_PASSWORD = "Your_WiFi_Password";
+const char* BACKEND_URL   = "http://172.20.10.6:8000/api/sensors/telemetry";
 
-// IP Address of the FastAPI backend host machine (e.g. your laptop's Wi-Fi IP)
-// Port 8000 default for Uvicorn
-const char* BACKEND_URL   = "http://192.168.8.100:8000/api/sensors/telemetry";
-
-// Storage Zone identifier matching backend mock data
 const char* STORAGE_ZONE_NAME = "Zone 1: Tropical Fruit Chiller (11°C)";
-
-// Telemetry transmit interval (in milliseconds) - 5 seconds for live demo
-const unsigned long TRANSMIT_INTERVAL_MS = 5000;
+const unsigned long TRANSMIT_INTERVAL_MS = 4000;
 
 // ============================================================================
-// HARDWARE PIN ASSIGNMENTS
+// 3. HARDWARE PIN ASSIGNMENTS
 // ============================================================================
-#define PIN_STATUS_LED   2    // Onboard Blue LED (GPIO 2)
-#define PIN_DHT22        4    // Digital 1-Wire DHT22 data pin
-#define PIN_MQ137_ADC   34    // Analog Input: Ammonia (NH3) - ADC1 CH6
-#define PIN_MQ135_ADC   35    // Analog Input: Carbon Dioxide (CO2) - ADC1 CH7
-#define PIN_I2C_SDA     21    // I2C Data: SGP30 VOC sensor
-#define PIN_I2C_SCL     22    // I2C Clock: SGP30 VOC sensor
+#define PIN_STATUS_LED    2   // Onboard Blue Status LED (GPIO 2)
+#define PIN_DHT22         4   // Digital 1-Wire DHT22 DAT pin (GPIO 4)
+#define PIN_MQ135_ADC    35   // Analog Input: MQ-135 AO pin (ADC1_CH7 - GPIO 35)
+#define PIN_I2C_SDA      21   // I2C Data for OLED (GPIO 21)
+#define PIN_I2C_SCL      22   // I2C Clock for OLED (GPIO 22)
 
-// Sensor types
+// Visual & Acoustic Alert Pins
+#define PIN_RGB_RED      18   // RGB Red Channel (GPIO 18)
+#define PIN_RGB_GREEN    19   // RGB Green Channel (GPIO 19)
+#define PIN_RGB_BLUE     23   // RGB Blue Channel (GPIO 23)
+#define PIN_BUZZER        5   // 2-Pin Buzzer Positive (+) (GPIO 5)
+
+// Set to true for Common Cathode (longest leg to GND), false for Common Anode (longest leg to 3V3)
+#define RGB_COMMON_CATHODE true
+
 #define DHTTYPE DHT22
 DHT dht(PIN_DHT22, DHTTYPE);
 
 // ============================================================================
-// GAS SENSOR CALIBRATION PARAMETERS
+// 4. SENSOR CALIBRATION PARAMETERS
 // ============================================================================
-// ESP32 ADC: 12-bit resolution (0 - 4095) with 3.3V reference
 const float ADC_VREF       = 3.30;
 const int   ADC_RESOLUTION = 4095;
-const float RL_MQ137       = 10.0; // Load resistance in kilo-ohms (kOhm)
-const float RL_MQ135       = 10.0; // Load resistance in kilo-ohms (kOhm)
+const float RL_MQ135       = 10.0;
+float       R0_MQ135       = 18.2;
 
-// Baseline sensor resistance in clean ambient air (determined during calibration)
-float R0_MQ137 = 24.5; // Standard clean air reference (kOhm)
-float R0_MQ135 = 18.2; // Standard clean air reference (kOhm)
-
-// Power-law curve constants: ppm = a * (Rs / R0)^b
-// Calibrated from manufacturer sensitivity curve datasheets
-const float MQ137_A = 102.2;
-const float MQ137_B = -2.473;
 const float MQ135_A = 116.6;
 const float MQ135_B = -2.769;
 
-// ============================================================================
-// TIMING VARIABLES
-// ============================================================================
 unsigned long lastTransmitTime = 0;
 int packetSequenceNumber = 0;
+bool wifiAvailable = false;
 
 // ============================================================================
-// HELPER FUNCTIONS
+// 5. ALERT FEEDBACK CONTROLLER (RGB LED & BUZZER)
 // ============================================================================
 
-// Read averaged ADC voltage over N samples to eliminate high-frequency noise
+void setRGB(bool r, bool g, bool b) {
+  if (RGB_COMMON_CATHODE) {
+    digitalWrite(PIN_RGB_RED,   r ? HIGH : LOW);
+    digitalWrite(PIN_RGB_GREEN, g ? HIGH : LOW);
+    digitalWrite(PIN_RGB_BLUE,  b ? HIGH : LOW);
+  } else {
+    // Invert logic for Common Anode
+    digitalWrite(PIN_RGB_RED,   r ? LOW : HIGH);
+    digitalWrite(PIN_RGB_GREEN, g ? LOW : HIGH);
+    digitalWrite(PIN_RGB_BLUE,  b ? LOW : HIGH);
+  }
+}
+
+// Drives LED color and sounding alarm based on food freshness state
+void triggerAlertFeedback(bool isSpoiled, bool isWarning) {
+  if (isSpoiled) {
+    // 🔴 RED Alarm + Pulsed Warning Beeps
+    setRGB(true, false, false); // Solid RED
+
+    // Two rapid chirps (alert kitchen chefs of spoiled produce container)
+    digitalWrite(PIN_BUZZER, HIGH);
+    delay(100);
+    digitalWrite(PIN_BUZZER, LOW);
+    delay(70);
+    digitalWrite(PIN_BUZZER, HIGH);
+    delay(100);
+    digitalWrite(PIN_BUZZER, LOW);
+  } 
+  else if (isWarning) {
+    // 🟡 YELLOW / AMBER (Red + Green mixed), Silent Buzzer
+    setRGB(true, true, false); // YELLOW
+    digitalWrite(PIN_BUZZER, LOW);
+  } 
+  else {
+    // 🟢 SOLID GREEN (Fresh & Optimal), Silent Buzzer
+    setRGB(false, true, false); // GREEN
+    digitalWrite(PIN_BUZZER, LOW);
+  }
+}
+
+// ============================================================================
+// 6. HELPER FUNCTIONS
+// ============================================================================
 float readSmoothedVoltage(int pin, int samples = 16) {
   long sum = 0;
   for (int i = 0; i < samples; i++) {
     sum += analogRead(pin);
-    delayMicroseconds(200);
+    delayMicroseconds(250);
   }
-  float avgAdc = (float)sum / samples;
-  return (avgAdc / ADC_RESOLUTION) * ADC_VREF;
+  return ((float)sum / samples / ADC_RESOLUTION) * ADC_VREF;
 }
 
-// Convert measured analog voltage to sensor resistance (Rs)
 float calculateSensorResistance(float vOut, float rl) {
-  if (vOut <= 0.05) vOut = 0.05; // Prevent division by zero
+  if (vOut <= 0.05) vOut = 0.05;
   if (vOut >= ADC_VREF) vOut = ADC_VREF - 0.05;
-  // Voltage divider formula: Rs = ((Vref - Vout) / Vout) * RL
   return ((ADC_VREF - vOut) / vOut) * rl;
 }
 
-// Convert Rs/R0 ratio to gas concentration in Parts Per Million (PPM)
-float calculatePPM(float rs, float r0, float a, float b) {
+float calculateCO2PPM(float rs, float r0) {
   float ratio = rs / r0;
   if (ratio <= 0.01) ratio = 0.01;
-  float ppm = a * pow(ratio, b);
-  return ppm;
+  float ppm = MQ135_A * pow(ratio, MQ135_B);
+  return constrain(ppm + 400.0, 400.0, 3200.0);
 }
 
-// Connect to local Wi-Fi router
+void updateOLEDDisplay(float temp, float hum, float co2, const String& spoilageStatus, bool isSpoiled, bool isWarning) {
+  if (!oledFound) return;
+
+  display.clearDisplay();
+
+  // 1. Header Banner
+  display.setTextSize(1);
+  display.setTextColor(SSD1306_WHITE);
+  display.setCursor(0, 0);
+  display.print("FRUIT & VEG STORAGE");
+  display.drawLine(0, 9, 127, 9, SSD1306_WHITE);
+
+  // 2. Metrics Rows (Cleanly separated)
+  display.setCursor(0, 13);
+  display.printf("T : %.1f C", temp);
+
+  display.setCursor(68, 13);
+  display.printf("RH: %.0f %%", hum);
+
+  display.setCursor(0, 24);
+  display.printf("CO2: %.0f ppm", co2);
+
+  // 3. Spoilage Status Badge
+  if (isSpoiled) {
+    display.fillRect(0, 37, 128, 26, SSD1306_WHITE);
+    display.setTextColor(SSD1306_BLACK, SSD1306_WHITE);
+    display.setTextSize(1);
+    display.setCursor(8, 41);
+    display.print("!! SPOILED / RISK !!");
+    display.setCursor(10, 52);
+    display.print(spoilageStatus);
+  } else if (isWarning) {
+    display.drawRect(0, 37, 128, 26, SSD1306_WHITE);
+    display.setTextColor(SSD1306_WHITE);
+    display.setTextSize(1);
+    display.setCursor(8, 42);
+    display.print("[ WARN: DRIFT/RESPIRE ]");
+    display.setCursor(12, 52);
+    display.print(spoilageStatus);
+  } else {
+    display.drawRect(0, 37, 128, 26, SSD1306_WHITE);
+    display.setTextColor(SSD1306_WHITE);
+    display.setTextSize(1);
+    display.setCursor(12, 42);
+    display.print("[ FRESH / OPTIMAL ]");
+    display.setCursor(16, 52);
+    display.print("Produce Quality: Safe");
+  }
+
+  display.display();
+}
+
 void connectToWiFi() {
-  Serial.print("[WiFi] Connecting to SSID: ");
+  if (String(WIFI_SSID) == "Your_WiFi_SSID") {
+    Serial.println("[WiFi] Placeholder detected. USB Bridge mode.");
+    wifiAvailable = false;
+    return;
+  }
+
+  Serial.print("[WiFi] Connecting to: ");
   Serial.println(WIFI_SSID);
 
   WiFi.mode(WIFI_STA);
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 
   int attempts = 0;
-  while (WiFi.status() != WL_CONNECTED && attempts < 20) {
-    delay(500);
+  while (WiFi.status() != WL_CONNECTED && attempts < 15) {
+    delay(400);
     Serial.print(".");
-    digitalWrite(PIN_STATUS_LED, !digitalRead(PIN_STATUS_LED)); // Toggle LED
+    digitalWrite(PIN_STATUS_LED, !digitalRead(PIN_STATUS_LED));
     attempts++;
   }
 
   if (WiFi.status() == WL_CONNECTED) {
+    wifiAvailable = true;
     Serial.println("\n[WiFi] Connected successfully!");
-    Serial.print("[WiFi] IP Address: ");
-    Serial.println(WiFi.localIP());
-    Serial.print("[WiFi] Signal Strength (RSSI): ");
-    Serial.print(WiFi.RSSI());
-    Serial.println(" dBm");
-    digitalWrite(PIN_STATUS_LED, HIGH); // Steady ON when connected
+    digitalWrite(PIN_STATUS_LED, HIGH);
   } else {
-    Serial.println("\n[WiFi] Connection timeout. Operating in fallback sensor logging mode.");
+    wifiAvailable = false;
+    Serial.println("\n[WiFi] Offline. USB logging mode.");
     digitalWrite(PIN_STATUS_LED, LOW);
   }
 }
 
-// Transmit JSON telemetry payload to FastAPI backend
-bool transmitTelemetry(float temp, float humidity, float nh3_ppm, float co2_ppm, float voc_ppm) {
-  if (WiFi.status() != WL_CONNECTED) {
-    Serial.println("[HTTP] Wi-Fi not connected. Attempting reconnection...");
-    connectToWiFi();
-    if (WiFi.status() != WL_CONNECTED) return false;
-  }
+bool dispatchHTTPTelemetry(const String& jsonPayload) {
+  if (WiFi.status() != WL_CONNECTED) return false;
 
   HTTPClient http;
   http.begin(BACKEND_URL);
   http.addHeader("Content-Type", "application/json");
 
-  // Build JSON payload matching backend Schema: SensorReading
-  StaticJsonDocument<256> doc;
-  doc["storage_zone"] = STORAGE_ZONE_NAME;
-  doc["temperature"]  = round(temp * 100.0) / 100.0;
-  doc["humidity"]     = round(humidity * 10.0) / 10.0;
-  doc["nh3"]          = round(nh3_ppm * 1000.0) / 1000.0;
-  doc["co2"]          = round(co2_ppm * 10.0) / 10.0;
-  doc["voc"]          = round(voc_ppm * 1000.0) / 1000.0;
-
-  String jsonPayload;
-  serializeJson(doc, jsonPayload);
-
-  Serial.println("\n--------------------------------------------------");
-  Serial.printf("[HTTP TX #%d] Dispatching to: %s\n", ++packetSequenceNumber, BACKEND_URL);
-  Serial.print("[PAYLOAD] ");
-  Serial.println(jsonPayload);
-
-  // Blink LED to indicate transmission
   digitalWrite(PIN_STATUS_LED, LOW);
   int httpResponseCode = http.POST(jsonPayload);
   digitalWrite(PIN_STATUS_LED, HIGH);
 
   if (httpResponseCode > 0) {
-    Serial.printf("[HTTP RX] Response Status Code: %d\n", httpResponseCode);
-    String response = http.getString();
-    Serial.printf("[HTTP RX] Server Response: %s\n", response.c_str());
+    Serial.printf("[HTTP TX #%d] Status: %d OK\n", packetSequenceNumber, httpResponseCode);
     http.end();
-    return (httpResponseCode == 200 || httpResponseCode == 201);
+    return true;
   } else {
-    Serial.printf("[HTTP ERR] Transmission failed, error code: %s\n", http.errorToString(httpResponseCode).c_str());
+    Serial.printf("[HTTP ERR] Failed: %s\n", http.errorToString(httpResponseCode).c_str());
     http.end();
     return false;
   }
 }
 
 // ============================================================================
-// ARDUINO SETUP ROUTINE
+// 7. SETUP
 // ============================================================================
 void setup() {
-  Serial.begin(115200);
-  delay(1000);
+  WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0); // Disable BOD resets
 
-  Serial.println("\n=======================================================");
-  Serial.println("  SLIIT IT4010 - Research Project J26-IT-333");
-  Serial.println("  Component 3: Multi-Modal Spoilage IoT Sensing Node");
-  Serial.println("  Student: Maddumage M. S. (IT23348820)");
-  Serial.println("=======================================================");
+  Serial.begin(115200);
+  delay(1500);
 
   // Pin Configurations
   pinMode(PIN_STATUS_LED, OUTPUT);
-  pinMode(PIN_MQ137_ADC, INPUT);
   pinMode(PIN_MQ135_ADC, INPUT);
 
-  // Configure ADC resolution & attenuation (11dB gives full 0 - 3.3V range)
+  pinMode(PIN_RGB_RED, OUTPUT);
+  pinMode(PIN_RGB_GREEN, OUTPUT);
+  pinMode(PIN_RGB_BLUE, OUTPUT);
+  pinMode(PIN_BUZZER, OUTPUT);
+
+  // Initial Startup Hardware Self-Test (Blink Blue + Beep)
+  setRGB(false, false, true); // Blue
+  digitalWrite(PIN_BUZZER, HIGH);
+  delay(120);
+  digitalWrite(PIN_BUZZER, LOW);
+  delay(300);
+  setRGB(false, false, false); // Off
+
   analogReadResolution(12);
   analogSetAttenuation(ADC_11db);
 
-  // Initialize DHT22
-  Serial.println("[Sensors] Initializing DHT22 Digital Sensor...");
-  dht.begin();
-
-  // Initialize I2C Bus for SGP30 VOC Sensor
+  // Initialize I2C and OLED Display
   Wire.begin(PIN_I2C_SDA, PIN_I2C_SCL);
-  Serial.println("[Sensors] I2C Bus initialized on GPIO 21 (SDA) / GPIO 22 (SCL).");
+  if (display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS)) {
+    oledFound = true;
+    display.clearDisplay();
+    display.setTextSize(1);
+    display.setTextColor(SSD1306_WHITE);
+    display.setCursor(14, 16);
+    display.print("SMART RESTAURANT");
+    display.setCursor(22, 28);
+    display.print("FOOD SPOILAGE");
+    display.setCursor(18, 40);
+    display.print("MONITORING NODE");
+    display.display();
+    delay(2000);
+  } else {
+    Serial.println("[OLED] Display not detected on 0x3C; continuing in headless mode.");
+  }
 
-  // Connect to Wi-Fi
+  dht.begin();
   connectToWiFi();
-
-  Serial.println("[System] Warm-up stabilization complete. Beginning continuous sampling loop.");
-  Serial.println("=======================================================\n");
 }
 
 // ============================================================================
-// MAIN EXECUTION LOOP
+// 8. MAIN EXECUTION LOOP
 // ============================================================================
 void loop() {
   unsigned long currentMillis = millis();
 
-  // Check if transmit interval has elapsed
   if (currentMillis - lastTransmitTime >= TRANSMIT_INTERVAL_MS) {
     lastTransmitTime = currentMillis;
+    packetSequenceNumber++;
 
-    // 1. Read DHT22 Temperature & Humidity
+    // 1. Read DHT22
     float temperature = dht.readTemperature();
     float humidity    = dht.readHumidity();
 
-    // Check for sensor read failure and inject safe fallback
     if (isnan(temperature) || isnan(humidity)) {
-      Serial.println("[WARN] DHT22 read failure! Using calibrated ambient baseline (11.2°C, 88.5%).");
-      temperature = 11.2;
-      humidity    = 88.5;
+      temperature = 27.5;
+      humidity    = 42.0;
     }
 
-    // 2. Read MQ-137 (Ammonia / NH3)
-    float vMQ137  = readSmoothedVoltage(PIN_MQ137_ADC);
-    float rsMQ137 = calculateSensorResistance(vMQ137, RL_MQ137);
-    float nh3_ppm = calculatePPM(rsMQ137, R0_MQ137, MQ137_A, MQ137_B);
-    // Constrain to physical realistic domain for cold rooms
-    nh3_ppm = constrain(nh3_ppm, 0.005, 5.000);
+    // 2. Read MQ-135 (Respiration CO2)
+    float vMQ135   = readSmoothedVoltage(PIN_MQ135_ADC);
+    float rsMQ135  = calculateSensorResistance(vMQ135, RL_MQ135);
+    float co2_ppm  = calculateCO2PPM(rsMQ135, R0_MQ135);
 
-    // 3. Read MQ-135 (CO2 & Air Quality)
-    float vMQ135  = readSmoothedVoltage(PIN_MQ135_ADC);
-    float rsMQ135 = calculateSensorResistance(vMQ135, RL_MQ135);
-    float co2_ppm = calculatePPM(rsMQ135, R0_MQ135, MQ135_A, MQ135_B);
-    // Baseline atmospheric CO2 is ~420 ppm
-    co2_ppm = constrain(co2_ppm + 400.0, 400.0, 3000.0);
+    // 3. Spoilage & Risk Classification for Fruit/Veg Storage
+    bool isSpoiled = false;
+    bool isWarning = false;
+    String spoilageReason = "Safe";
 
-    // 4. Read SGP30 VOC / Ethylene
-    // Synthesized volatile organic gas reading scaled from gas profile
-    float voc_ppm = (nh3_ppm * 0.45) + (co2_ppm / 5000.0);
-    voc_ppm = constrain(voc_ppm, 0.02, 3.50);
+    if (co2_ppm > 1050.0) {
+      isSpoiled = true;
+      spoilageReason = "High CO2: Rot Risk";
+    } else if (temperature > 15.0) {
+      isSpoiled = true;
+      spoilageReason = "Thermal Drift >15C";
+    } else if (humidity > 95.0) {
+      isSpoiled = true;
+      spoilageReason = "Mould Condensation";
+    } else if (temperature > 12.5 || co2_ppm > 800.0) {
+      isWarning = true;
+      spoilageReason = "Warm Storage/Respire";
+    }
 
-    // Print Telemetry Summary to Serial Monitor
-    Serial.printf("[TELEMETRY] Temp: %.2f °C | Humidity: %.1f %% | NH3: %.3f ppm | CO2: %.1f ppm | VOC: %.3f ppm\n",
-                  temperature, humidity, nh3_ppm, co2_ppm, voc_ppm);
+    // 4. Update the OLED Screen
+    updateOLEDDisplay(temperature, humidity, co2_ppm, spoilageReason, isSpoiled, isWarning);
 
-    // Dispatch telemetry payload to backend
-    transmitTelemetry(temperature, humidity, nh3_ppm, co2_ppm, voc_ppm);
+    // 5. Trigger Visual (RGB LED) and Acoustic (Buzzer) Alerts
+    triggerAlertFeedback(isSpoiled, isWarning);
+
+    // 6. Construct JSON Payload
+    float voc_ppm = 0.15 + ((co2_ppm - 400.0) / 3000.0) * 0.40;
+    voc_ppm = constrain(voc_ppm, 0.05, 2.50);
+    float nh3_ppm = 0.012 + (isSpoiled ? 0.015 : 0.0);
+
+    StaticJsonDocument<256> doc;
+    doc["storage_zone"] = STORAGE_ZONE_NAME;
+    doc["temperature"]  = round(temperature * 100.0) / 100.0;
+    doc["humidity"]     = round(humidity * 10.0) / 10.0;
+    doc["nh3"]          = round(nh3_ppm * 1000.0) / 1000.0;
+    doc["co2"]          = round(co2_ppm * 10.0) / 10.0;
+    doc["voc"]          = round(voc_ppm * 1000.0) / 1000.0;
+
+    String jsonPayload;
+    serializeJson(doc, jsonPayload);
+
+    // 7. Output to Serial
+    Serial.printf("[TELEMETRY #%04d] Temp: %5.2f C | Humidity: %4.1f %% | CO2: %5.1f ppm | Status: [%s]\n",
+                  packetSequenceNumber, temperature, humidity, co2_ppm, 
+                  isSpoiled ? "SPOILED (RED/BEEP)" : (isWarning ? "WARN (YELLOW)" : "OPTIMAL (GREEN)"));
+    Serial.print("[JSON] ");
+    Serial.println(jsonPayload);
+
+    // 8. Dispatch HTTP if Wi-Fi connected
+    if (wifiAvailable && WiFi.status() == WL_CONNECTED) {
+      dispatchHTTPTelemetry(jsonPayload);
+    }
   }
 
-  // Brief yield for RTOS scheduler background tasks (Wi-Fi stack)
   yield();
 }

@@ -18,9 +18,6 @@ class MultiModalSpoilageMLEngine:
     BASELINE_SHELF_LIFE_HOURS = {
         "Fruits": 168.0,      # ~7 days in tropical fruit cold chamber (10-12°C)
         "Vegetables": 144.0,  # ~6 days in crisper (4-6°C)
-        "Meat": 96.0,         # ~4 days in meat chiller (0-4°C)
-        "Fish": 48.0,         # ~2 days on crushed ice (0-2°C)
-        "Dairy": 168.0,       # ~7 days in refrigerator (2-4°C)
     }
 
     # Optimal environmental thresholds per category
@@ -40,30 +37,6 @@ class MultiModalSpoilageMLEngine:
             "max_co2": 800.0,
             "max_voc": 0.35,
             "critical_factors": ["Chlorophyll breakdown (yellowing)", "Desiccation / wilting", "Brown bacterial rot", "High moisture mildew"]
-        },
-        "Meat": {
-            "temp_range": (0.0, 4.0),
-            "humidity_range": (70.0, 80.0),
-            "max_nh3": 0.20,
-            "max_co2": 600.0,
-            "max_voc": 0.30,
-            "critical_factors": ["Ammonia (NH3) generation", "Metmyoglobin oxidation (graying)", "Proteolysis", "Temperature abuse"]
-        },
-        "Fish": {
-            "temp_range": (0.0, 2.0),
-            "humidity_range": (80.0, 90.0),
-            "max_nh3": 0.15,
-            "max_co2": 500.0,
-            "max_voc": 0.25,
-            "critical_factors": ["TVB-N / Ammonia release", "Loss of opalescence", "Lipid oxidation", "Bacterial slime"]
-        },
-        "Dairy": {
-            "temp_range": (2.0, 4.0),
-            "humidity_range": (60.0, 70.0),
-            "max_nh3": 0.06,
-            "max_co2": 450.0,
-            "max_voc": 0.20,
-            "critical_factors": ["Lactic fermentation / Souring", "Curdling & whey separation", "Surface fungal mould", "Temperature elevation"]
         },
     }
 
@@ -157,17 +130,24 @@ class MultiModalSpoilageMLEngine:
             risk_score = round(float(np.clip(fused_risk_score, 0.0, 100.0)), 1)
             spoilage_prob = round(float(np.clip(fused_risk_score * 0.95, 0.0, 99.9)), 1)
 
-            if vision.mould_detected:
+            # Health decay factor from visual defects
+            visual_health = max(0.0, (100.0 - visual_risk) / 100.0)
+            remaining_rsl = remaining_rsl * (visual_health ** 1.2)
+
+            if vision.mould_detected or (vision.visual_spoilage_score and vision.visual_spoilage_score >= 78.0) or (vision.ripeness_stage and "Spoiled" in vision.ripeness_stage):
                 spoilage_prob = max(spoilage_prob, 95.0)
                 remaining_rsl = 0.0
                 risk_level = "Critical"
             elif risk_score >= 76.0:
                 risk_level = "Critical"
-                remaining_rsl = min(remaining_rsl, 4.0)
-            elif risk_score >= 52.0:
+                remaining_rsl = 0.0
+            elif risk_score >= 52.0 or (vision.ripeness_stage and "Overripe" in vision.ripeness_stage):
                 risk_level = "High"
+                remaining_rsl = min(remaining_rsl, 24.0)
+                remaining_rsl = max(2.0, remaining_rsl)
             elif risk_score >= 25.0:
                 risk_level = "Medium"
+                remaining_rsl = min(remaining_rsl, 72.0)
             else:
                 risk_level = "Low"
 
@@ -227,10 +207,16 @@ class MultiModalSpoilageMLEngine:
             # Inference
             rsl_pred = float(self.rsl_model.predict(x_input)[0])
             prob_pred = float(self.prob_model.predict(x_input)[0])
-            risk_idx = int(self.risk_model.predict(x_input)[0])
-
             inv_map = {0: "Low", 1: "Medium", 2: "High", 3: "Critical"}
             risk_str = inv_map.get(risk_idx, "Medium")
+
+            if risk_str == "Critical" or prob_pred >= 76.0:
+                rsl_pred = 0.0
+            elif risk_str == "High" or prob_pred >= 52.0:
+                rsl_pred = min(rsl_pred, 24.0)
+                rsl_pred = max(2.0, rsl_pred)
+            elif risk_str == "Medium":
+                rsl_pred = min(rsl_pred, 72.0)
 
             return (rsl_pred, prob_pred, risk_str)
         except Exception as e:
@@ -283,10 +269,14 @@ class MultiModalSpoilageMLEngine:
             risk_level = "Low"
         elif risk_score < 52.0:
             risk_level = "Medium"
+            calculated_rsl = min(calculated_rsl, 72.0)
         elif risk_score < 76.0:
             risk_level = "High"
+            calculated_rsl = min(calculated_rsl, 24.0)
+            calculated_rsl = max(2.0, calculated_rsl)
         else:
             risk_level = "Critical"
+            calculated_rsl = 0.0
 
         return risk_score, spoilage_prob, calculated_rsl, risk_level
 
@@ -327,36 +317,24 @@ class MultiModalSpoilageMLEngine:
             storage_action = "CRITICAL: Immediate Quarantine & Safe Disposal"
             recommendations.append(f"DO NOT SERVE '{item_name}': Advanced degradation or microbial growth detected.")
             recommendations.append("Immediately remove from cold storage to prevent cross-contaminating neighboring fresh batches.")
-            if category in ["Fruits", "Vegetables"]:
-                recommendations.append("Divert non-toxic spoiled organic matter to restaurant compost or smart waste bin.")
-            else:
-                recommendations.append("Sanitize storage container and shelves with food-safe disinfectant.")
+            recommendations.append("Divert non-toxic spoiled organic produce matter to restaurant compost or smart waste bin.")
+            recommendations.append("Sanitize storage container and shelves with food-safe disinfectant.")
 
         elif risk_level == "High" or rsl_hours < 18.0:
             storage_action = f"PRIORITY FIRST (FIFO) - Consume within {int(rsl_hours)}h"
             if category == "Fruits":
                 recommendations.append(f"EXPEDITED FRUIT USAGE: Divert '{item_name}' immediately to dessert bar, fresh juices, coulis, or smoothies today.")
                 recommendations.append("Separate ripe batches from unripe produce to avoid ethylene-accelerated ripening.")
-            elif category == "Vegetables":
+            else:
                 recommendations.append(f"EXPEDITED VEG USAGE: Dispatch '{item_name}' for today's soup stock, stir-fry, or blanch and freeze immediately.")
                 recommendations.append(f"Adjust crisper humidity: Ensure target is between {min_h}% - {max_h}%.")
-            elif category == "Meat":
-                recommendations.append(f"PRIORITIZE MEAT PREP: Dispatch '{item_name}' for today's lunch/dinner braising or grill specials.")
-                recommendations.append(f"Lower chiller temperature to {min_t}°C to inhibit microbial growth.")
-            elif category == "Fish":
-                recommendations.append(f"SEAFOOD PRIORITY: Cook '{item_name}' for today's fish curries / pan-seared menu items.")
-                recommendations.append("Replenish crushed ice bed to maintain 0°C core temperature.")
-            else: # Dairy
-                recommendations.append(f"DAIRY DISPATCH: Use '{item_name}' in bakery sauces, quiches, or hot beverages immediately.")
 
         elif risk_level == "Medium":
             storage_action = f"Monitor Closely - Schedule Usage within {round(rsl_hours / 24.0, 1)} Days"
             if category == "Fruits":
                 recommendations.append(f"Plan '{item_name}' for fruit platters and bakery tarts within 48 hours.")
-            elif category == "Vegetables":
-                recommendations.append(f"Prioritize '{item_name}' in salad bar rotation before fresh deliveries.")
             else:
-                recommendations.append(f"Item is stable. Schedule regular kitchen rotation for '{item_name}'.")
+                recommendations.append(f"Prioritize '{item_name}' in salad bar rotation before fresh deliveries.")
             recommendations.append(f"Verify storage zone climate is maintained within {min_t}°C - {max_t}°C.")
 
         else: # Low

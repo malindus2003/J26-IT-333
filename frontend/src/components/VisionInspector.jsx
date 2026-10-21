@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { 
   Camera, 
   Upload, 
@@ -15,9 +15,6 @@ import {
   ShieldAlert, 
   Apple, 
   Carrot, 
-  Milk, 
-  Fish, 
-  Beef,
   Clock,
   Hourglass,
   Calendar,
@@ -31,18 +28,37 @@ import {
   Grid,
   List,
   X,
-  Check
+  Check,
+  Plus,
+  Boxes,
+  Trash2,
+  Pencil,
+  Cpu,
+  Wifi,
+  Radio,
+  RefreshCw,
+  History,
+  Award,
+  Info,
+  ShieldCheck,
+  Database,
+  Thermometer,
+  Droplets,
+  Send,
+  ChefHat,
+  Flame,
+  Activity,
+  Gauge,
+  Wind,
+  BookOpen
 } from 'lucide-react';
 import axios from 'axios';
 
-// Comprehensive high-resolution photographic presets across ALL 5 food categories
+// High-resolution photographic presets for Fruit and Vegetable quality inspection
 // Automatic SVG fallback generator for offline / broken image handling
 const getFallbackSvg = (name, category, icon) => {
-  const bg = category === 'Fruits' ? '%23059669' :
-             category === 'Vegetables' ? '%2310b981' :
-             category === 'Dairy' ? '%230284c7' :
-             category === 'Fish' ? '%230d9488' : '%23e11d48';
-  return `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300" viewBox="0 0 400 300"><rect width="100%" height="100%" fill="${bg}" fill-opacity="0.14"/><text x="50%" y="42%" dominant-baseline="middle" text-anchor="middle" font-size="56">${encodeURIComponent(icon || '🍎')}</text><text x="50%" y="68%" dominant-baseline="middle" text-anchor="middle" font-family="sans-serif" font-size="16" font-weight="bold" fill="%23334155">${encodeURIComponent(name || 'Food Specimen')}</text><text x="50%" y="82%" dominant-baseline="middle" text-anchor="middle" font-family="sans-serif" font-size="12" font-weight="600" fill="%2364748b">${encodeURIComponent(category || 'Perishable')}</text></svg>`;
+  const bg = category === 'Fruits' ? '%23059669' : '%2310b981';
+  return `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300" viewBox="0 0 400 300"><rect width="100%" height="100%" fill="${bg}" fill-opacity="0.14"/><text x="50%" y="42%" dominant-baseline="middle" text-anchor="middle" font-size="56">${encodeURIComponent(icon || '🍎')}</text><text x="50%" y="68%" dominant-baseline="middle" text-anchor="middle" font-family="sans-serif" font-size="16" font-weight="bold" fill="%23334155">${encodeURIComponent(name || 'Food Specimen')}</text><text x="50%" y="82%" dominant-baseline="middle" text-anchor="middle" font-family="sans-serif" font-size="12" font-weight="600" fill="%2364748b">${encodeURIComponent(category || 'Produce')}</text></svg>`;
 };
 
 const SAMPLE_PRESETS = [
@@ -52,6 +68,10 @@ const SAMPLE_PRESETS = [
     name: "Embul Banana (Ambul Kesel)",
     category: "Fruits",
     icon: "🍌",
+    identified_produce: "Banana",
+    produce_confidence: 96.5,
+    produce_icon: "🍌",
+    scientific_name: "Musa acuminata",
     container: "Container #C-101 (Zone 1: Fruit Chiller 11°C)",
     imageUrl: "/images/specimens/banana_fresh.jpg",
     remoteFallbackUrl: "https://images.unsplash.com/photo-1571771894821-ce9b6c11b08e?w=600&auto=format&fit=crop&q=80",
@@ -78,6 +98,10 @@ const SAMPLE_PRESETS = [
     name: "Overripe Ambul Kesel (Senescent)",
     category: "Fruits",
     icon: "🍌",
+    identified_produce: "Banana",
+    produce_confidence: 94.8,
+    produce_icon: "🍌",
+    scientific_name: "Musa acuminata",
     container: "Container #C-102 (Zone 4: Ambient Kitchen Rack)",
     imageUrl: "/images/specimens/banana_overripe.jpg",
     remoteFallbackUrl: "https://images.unsplash.com/photo-1571771894821-ce9b6c11b08e?w=600&auto=format&fit=crop&q=80",
@@ -100,10 +124,76 @@ const SAMPLE_PRESETS = [
     ]
   },
   {
+    id: "peach_rotting",
+    name: "Senescent Peach (Brown Rot Softening)",
+    category: "Fruits",
+    icon: "🍑",
+    identified_produce: "Peach",
+    produce_confidence: 96.5,
+    produce_icon: "🍑",
+    scientific_name: "Prunus persica",
+    container: "Container #C-106 (Ambient Produce Tray)",
+    imageUrl: "/images/specimens/peach_rotting.jpg",
+    remoteFallbackUrl: "https://images.unsplash.com/photo-1523049673857-eb18f1d7b578?w=600&auto=format&fit=crop&q=80",
+    ripeness_stage: "Overripe / Softening (Use Today)",
+    ripeness_percent: 47,
+    visual_spoilage_score: 60.0,
+    risk_level: "High",
+    discoloration_score: 13.7,
+    mould_detected: false,
+    mould_coverage: 0.0,
+    texture_degradation: 62.0,
+    baseline_shelf_life_hours: 120.0,
+    remaining_shelf_life_hours: 16.5,
+    detected_defects: [
+      "Senescent sunken necrotic lesion / brown rot discoloration (13.7%)",
+      "Epidermal texture wrinkling & soft tissue breakdown"
+    ],
+    bounding_boxes: [
+      { label: "SENESCENCE BROWNING", type: "overripe", x: 48, y: 23, width: 20, height: 38, color: "#f59e0b" },
+      { label: "SENESCENCE BROWNING", type: "overripe", x: 27, y: 19, width: 15, height: 32, color: "#f59e0b" }
+    ]
+  },
+  {
+    id: "strawberry_fresh",
+    name: "Fresh Garden Strawberry",
+    category: "Fruits",
+    icon: "🍓",
+    identified_produce: "Strawberry",
+    produce_confidence: 72.8,
+    produce_icon: "🍓",
+    scientific_name: "Fragaria × ananassa",
+    container: "Container #C-107 (Zone 1: Fruit Chiller 4°C)",
+    imageUrl: "/images/specimens/strawberry_fresh.jpg",
+    remoteFallbackUrl: "https://images.unsplash.com/photo-1464965911861-746a04b4bca6?w=600&auto=format&fit=crop&q=80",
+    ripeness_stage: "Ripe / Optimal (Grade A)",
+    ripeness_percent: 15,
+    visual_spoilage_score: 8.5,
+    risk_level: "Low",
+    discoloration_score: 1.2,
+    mould_detected: false,
+    mould_coverage: 0.0,
+    mould_confidence: 2.9,
+    texture_degradation: 4.0,
+    baseline_shelf_life_hours: 120.0,
+    remaining_shelf_life_hours: 91.3,
+    detected_defects: [
+      "Firm epidermal achenes",
+      "Vibrant anthocyanin pigmentation (No fungal growth)"
+    ],
+    bounding_boxes: [
+      { label: "HEALTHY TISSUE", type: "fresh", x: 20, y: 18, width: 60, height: 64, color: "#10b981" }
+    ]
+  },
+  {
     id: "rotten_fruit_mould",
     name: "Rotten Fruit (Botrytis Mould Colony)",
     category: "Fruits",
-    icon: "🍎",
+    icon: "🍓",
+    identified_produce: "Strawberry",
+    produce_confidence: 91.2,
+    produce_icon: "🍓",
+    scientific_name: "Fragaria × ananassa",
     container: "Container #C-104 (Quarantine Vault)",
     imageUrl: "/images/specimens/strawberries_mould.jpg",
     remoteFallbackUrl: "https://images.unsplash.com/photo-1543158181-e6f9f6712055?w=600&auto=format&fit=crop&q=80",
@@ -131,6 +221,10 @@ const SAMPLE_PRESETS = [
     name: "Karthakolomban Mango (Ripe)",
     category: "Fruits",
     icon: "🥭",
+    identified_produce: "Mango",
+    produce_confidence: 95.0,
+    produce_icon: "🥭",
+    scientific_name: "Mangifera indica",
     container: "Container #C-103 (Zone 1: Tropical Fruit Chiller)",
     imageUrl: "/images/specimens/mango_ripe.jpg",
     remoteFallbackUrl: "https://images.unsplash.com/photo-1553279768-865429fa0078?w=600&auto=format&fit=crop&q=80",
@@ -152,6 +246,37 @@ const SAMPLE_PRESETS = [
       { label: "PEAK CAROTENOID RIPENESS", type: "fresh", x: 20, y: 15, width: 60, height: 65, color: "#10b981" }
     ]
   },
+  {
+    id: "avocado_overripe",
+    name: "Overripe Avocado (Butter Fruit)",
+    category: "Fruits",
+    icon: "🥑",
+    identified_produce: "Avocado",
+    produce_confidence: 96.0,
+    produce_icon: "🥑",
+    scientific_name: "Persea americana",
+    container: "Container #C-105 (Zone 4: Ambient Kitchen Rack)",
+    imageUrl: "/images/specimens/avocado_overripe.jpg",
+    remoteFallbackUrl: "https://images.unsplash.com/photo-1523049673857-eb18f1d7b578?w=600&auto=format&fit=crop&q=80",
+    ripeness_stage: "Overripe / Softening (Use Today)",
+    ripeness_percent: 44,
+    visual_spoilage_score: 63.5,
+    risk_level: "High",
+    discoloration_score: 30.2,
+    mould_detected: false,
+    mould_coverage: 0.0,
+    texture_degradation: 68.0,
+    baseline_shelf_life_hours: 96.0,
+    remaining_shelf_life_hours: 18.0,
+    detected_defects: [
+      "Loss of skin firmness & localized sunken browning (30.2%)",
+      "Pulp softening & high lipid cellular oxidation (Stage 3)"
+    ],
+    bounding_boxes: [
+      { label: "SENESCENCE BROWNING", type: "overripe", x: 0, y: 37, width: 82, height: 51, color: "#f59e0b" },
+      { label: "SENESCENCE BROWNING", type: "overripe", x: 55, y: 41, width: 44, height: 58, color: "#f59e0b" }
+    ]
+  },
 
   // 2. Vegetables (3 presets: Wilted, Crisp, Softening)
   {
@@ -159,6 +284,10 @@ const SAMPLE_PRESETS = [
     name: "Wilted Yellowing Spinach",
     category: "Vegetables",
     icon: "🥬",
+    identified_produce: "Spinach / Leafy Greens",
+    produce_confidence: 97.4,
+    produce_icon: "🥬",
+    scientific_name: "Spinacia oleracea",
     container: "Container #C-205 (Veg Crisper)",
     imageUrl: "/images/specimens/spinach_wilted.jpg",
     remoteFallbackUrl: "https://images.unsplash.com/photo-1576045057995-568f588f82fb?w=600&auto=format&fit=crop&q=80",
@@ -186,6 +315,10 @@ const SAMPLE_PRESETS = [
     name: "Fresh Romaine Lettuce",
     category: "Vegetables",
     icon: "🥗",
+    identified_produce: "Spinach / Leafy Greens",
+    produce_confidence: 93.8,
+    produce_icon: "🥗",
+    scientific_name: "Lactuca sativa",
     container: "Container #C-201 (Veg Crisper)",
     imageUrl: "/images/specimens/lettuce_crisp.jpg",
     remoteFallbackUrl: "https://images.unsplash.com/photo-1622206151226-18ca2c9ab4a1?w=600&auto=format&fit=crop&q=80",
@@ -209,6 +342,10 @@ const SAMPLE_PRESETS = [
     name: "Overripe Soft Tomato",
     category: "Vegetables",
     icon: "🍅",
+    identified_produce: "Tomato",
+    produce_confidence: 96.2,
+    produce_icon: "🍅",
+    scientific_name: "Solanum lycopersicum",
     container: "Container #C-204 (Veg Crisper)",
     imageUrl: "/images/specimens/tomato_overripe.jpg",
     remoteFallbackUrl: "https://images.unsplash.com/photo-1592924357228-91a4daadcfea?w=600&auto=format&fit=crop&q=80",
@@ -229,253 +366,707 @@ const SAMPLE_PRESETS = [
     bounding_boxes: [
       { label: "SOFTENING TISSUE", type: "overripe", x: 28, y: 25, width: 48, height: 50, color: "#f59e0b" }
     ]
-  },
-
-  // 3. Dairy (3 presets: Mouldy Cheese, Fresh Milk, Curdled Sour Cream)
-  {
-    id: "cheese_mouldy",
-    name: "Mouldy Aged Cheese",
-    category: "Dairy",
-    icon: "🧀",
-    container: "Container #C-302 (Dairy Fridge)",
-    imageUrl: "/images/specimens/cheese_mouldy.jpg",
-    remoteFallbackUrl: "https://images.unsplash.com/photo-1452195100486-9cc805987862?w=600&auto=format&fit=crop&q=80",
-    ripeness_stage: "Spoiled / Sour",
-    ripeness_percent: 95,
-    visual_spoilage_score: 88,
-    risk_level: "Critical",
-    discoloration_score: 30,
-    mould_detected: true,
-    mould_coverage: 16.0,
-    texture_degradation: 45,
-    baseline_shelf_life_hours: 168.0,
-    remaining_shelf_life_hours: 0.0,
-    detected_defects: [
-      "Uncontrolled surface fungal mycelium",
-      "Yellow curd acidification"
-    ],
-    bounding_boxes: [
-      { label: "FUNGAL MYCELIUM PATCH", type: "spoilage", x: 30, y: 30, width: 42, height: 40, color: "#ef4444" }
-    ]
-  },
-  {
-    id: "milk_fresh",
-    name: "Fresh Whole Milk",
-    category: "Dairy",
-    icon: "🥛",
-    container: "Container #C-301 (Dairy Fridge)",
-    imageUrl: "/images/specimens/milk_fresh.jpg",
-    remoteFallbackUrl: "https://images.unsplash.com/photo-1550583724-b2692b85b150?w=600&auto=format&fit=crop&q=80",
-    ripeness_stage: "Optimal Fresh",
-    ripeness_percent: 25,
-    visual_spoilage_score: 6,
-    risk_level: "Low",
-    discoloration_score: 1,
-    mould_detected: false,
-    mould_coverage: 0.0,
-    texture_degradation: 2,
-    baseline_shelf_life_hours: 168.0,
-    remaining_shelf_life_hours: 142.0,
-    detected_defects: [],
-    bounding_boxes: [
-      { label: "STABLE LACTIC HOMOGENEITY", type: "fresh", x: 20, y: 20, width: 60, height: 60, color: "#10b981" }
-    ]
-  },
-  {
-    id: "yogurt_curdled",
-    name: "Curdled Sour Cream / Milk",
-    category: "Dairy",
-    icon: "🥣",
-    container: "Container #C-304 (Dairy Fridge)",
-    imageUrl: "/images/specimens/yogurt_curdled.jpg",
-    remoteFallbackUrl: "https://images.unsplash.com/photo-1488477181946-6428a0291777?w=600&auto=format&fit=crop&q=80",
-    ripeness_stage: "Curdled / Sour Spoilage",
-    ripeness_percent: 92,
-    visual_spoilage_score: 84,
-    risk_level: "Critical",
-    discoloration_score: 28,
-    mould_detected: false,
-    mould_coverage: 0.0,
-    texture_degradation: 60,
-    baseline_shelf_life_hours: 96.0,
-    remaining_shelf_life_hours: 0.0,
-    detected_defects: [
-      "Severe whey syneresis & casein curd separation",
-      "Lactic acidification coagulum breakdown"
-    ],
-    bounding_boxes: [
-      { label: "CASEIN CURDLING SEPARATION", type: "spoilage", x: 25, y: 30, width: 50, height: 45, color: "#ef4444" }
-    ]
-  },
-
-  // 4. Fish & Seafood (3 presets: Fresh Salmon, Spoiled Tuna, Fresh Prawns)
-  {
-    id: "salmon_fresh",
-    name: "Fresh Atlantic Salmon",
-    category: "Fish",
-    icon: "🐟",
-    container: "Container #C-501 (Seafood Ice)",
-    imageUrl: "/images/specimens/salmon_fresh.jpg",
-    remoteFallbackUrl: "https://images.unsplash.com/photo-1519708227418-c8fd9a32b7a2?w=600&auto=format&fit=crop&q=80",
-    ripeness_stage: "Prime Sea-Fresh",
-    ripeness_percent: 30,
-    visual_spoilage_score: 12,
-    risk_level: "Low",
-    discoloration_score: 4,
-    mould_detected: false,
-    mould_coverage: 0.0,
-    texture_degradation: 8,
-    baseline_shelf_life_hours: 48.0,
-    remaining_shelf_life_hours: 38.0,
-    detected_defects: [],
-    bounding_boxes: [
-      { label: "OPTIMAL ASTAXANTHIN TRANSLUCENCY", type: "fresh", x: 22, y: 20, width: 56, height: 60, color: "#10b981" }
-    ]
-  },
-  {
-    id: "tuna_oxidized",
-    name: "Oxidized Grey Tuna Steak",
-    category: "Fish",
-    icon: "🐟",
-    container: "Container #C-503 (Seafood Ice)",
-    imageUrl: "/images/specimens/tuna_oxidized.jpg",
-    remoteFallbackUrl: "https://images.unsplash.com/photo-1534422298391-e4f8c172dddb?w=600&auto=format&fit=crop&q=80",
-    ripeness_stage: "Oxidized / Bacterial Spoilage",
-    ripeness_percent: 94,
-    visual_spoilage_score: 88,
-    risk_level: "Critical",
-    discoloration_score: 46,
-    mould_detected: false,
-    mould_coverage: 0.0,
-    texture_degradation: 68,
-    baseline_shelf_life_hours: 48.0,
-    remaining_shelf_life_hours: 0.0,
-    detected_defects: [
-      "Deep myoglobin oxidation (grey-brown coloration)",
-      "Volatile amine off-odour breakdown",
-      "Muscle tissue softening & slime formation"
-    ],
-    bounding_boxes: [
-      { label: "TMA DECOMPOSITION SPOT", type: "spoilage", x: 26, y: 30, width: 48, height: 42, color: "#ef4444" }
-    ]
-  },
-  {
-    id: "prawns_fresh",
-    name: "Fresh Sea King Prawns",
-    category: "Fish",
-    icon: "🦐",
-    container: "Container #C-502 (Seafood Ice)",
-    imageUrl: "/images/specimens/prawns_fresh.jpg",
-    remoteFallbackUrl: "https://images.unsplash.com/photo-1565680018434-b513d5e5fd47?w=600&auto=format&fit=crop&q=80",
-    ripeness_stage: "Prime Sea-Fresh",
-    ripeness_percent: 28,
-    visual_spoilage_score: 10,
-    risk_level: "Low",
-    discoloration_score: 2,
-    mould_detected: false,
-    mould_coverage: 0.0,
-    texture_degradation: 5,
-    baseline_shelf_life_hours: 48.0,
-    remaining_shelf_life_hours: 40.0,
-    detected_defects: [],
-    bounding_boxes: [
-      { label: "FIRM TRANSLUCENT EXOSKELETON", type: "fresh", x: 20, y: 22, width: 60, height: 56, color: "#10b981" }
-    ]
-  },
-
-  // 5. Meat & Poultry (3 presets: Prime Beef, Fresh Chicken, Oxidized Meat)
-  {
-    id: "beef_fresh",
-    name: "Fresh Beef Sirloin",
-    category: "Meat",
-    icon: "🥩",
-    container: "Container #C-401 (Meat Chiller)",
-    imageUrl: "/images/specimens/beef_fresh.jpg",
-    remoteFallbackUrl: "https://images.unsplash.com/photo-1603048588665-791ca8aea617?w=600&auto=format&fit=crop&q=80",
-    ripeness_stage: "Fresh Cut (Optimal)",
-    ripeness_percent: 35,
-    visual_spoilage_score: 14,
-    risk_level: "Low",
-    discoloration_score: 5,
-    mould_detected: false,
-    mould_coverage: 0.0,
-    texture_degradation: 10,
-    baseline_shelf_life_hours: 96.0,
-    remaining_shelf_life_hours: 76.0,
-    detected_defects: [],
-    bounding_boxes: [
-      { label: "HEALTHY OXYMYOGLOBIN RED", type: "fresh", x: 25, y: 25, width: 50, height: 50, color: "#10b981" }
-    ]
-  },
-  {
-    id: "chicken_fresh",
-    name: "Raw Fresh Chicken Breast",
-    category: "Meat",
-    icon: "🍗",
-    container: "Container #C-402 (Meat Chiller)",
-    imageUrl: "/images/specimens/chicken_fresh.jpg",
-    remoteFallbackUrl: "https://images.unsplash.com/photo-1604503468506-a8da13d82791?w=600&auto=format&fit=crop&q=80",
-    ripeness_stage: "Prime Fresh Cut",
-    ripeness_percent: 30,
-    visual_spoilage_score: 12,
-    risk_level: "Low",
-    discoloration_score: 3,
-    mould_detected: false,
-    mould_coverage: 0.0,
-    texture_degradation: 6,
-    baseline_shelf_life_hours: 72.0,
-    remaining_shelf_life_hours: 58.0,
-    detected_defects: [],
-    bounding_boxes: [
-      { label: "HEALTHY PINK FLESH TURGOR", type: "fresh", x: 22, y: 20, width: 56, height: 60, color: "#10b981" }
-    ]
-  },
-  {
-    id: "meat_oxidized",
-    name: "Oxidized Discolored Meat",
-    category: "Meat",
-    icon: "🍖",
-    container: "Container #C-403 (Meat Chiller)",
-    imageUrl: "/images/specimens/meat_oxidized.jpg",
-    remoteFallbackUrl: "https://images.unsplash.com/photo-1544025162-d76694265947?w=600&auto=format&fit=crop&q=80",
-    ripeness_stage: "Oxidized / High Spoilage Risk",
-    ripeness_percent: 90,
-    visual_spoilage_score: 80,
-    risk_level: "High",
-    discoloration_score: 44,
-    mould_detected: false,
-    mould_coverage: 0.0,
-    texture_degradation: 55,
-    baseline_shelf_life_hours: 96.0,
-    remaining_shelf_life_hours: 8.5,
-    detected_defects: [
-      "Metmyoglobin surface discoloration (dull grey/brown)",
-      "Aerobic bacterial slime degradation"
-    ],
-    bounding_boxes: [
-      { label: "OXIDATIVE BROWNING", type: "spoilage", x: 24, y: 28, width: 55, height: 48, color: "#ef4444" }
-    ]
   }
 ];
 
-export default function VisionInspector({ onInspectionComplete }) {
+const DEFAULT_SYSTEM_STORAGES = [
+  {
+    id: "storage-1",
+    name: "Storage 1: Tropical Chiller",
+    category: "Chilled Chamber (Fruit & Veg)",
+    target_temp: 11.0,
+    current_temp: 11.4,
+    target_humidity: 89.0,
+    current_humidity: 90.2,
+    voc: 0.32,
+    co2: 415.0,
+    nh3: 0.02,
+    status: "optimal",
+    node_id: "ESP32-NODE-01 (Active)",
+    assignedProduce: {
+      presetId: "banana_embul_fresh",
+      produceName: "Embul Banana (Ambul Kesel)",
+      category: "Fruits",
+      imageUrl: "/images/specimens/banana_fresh.jpg",
+      cvResult: SAMPLE_PRESETS[0]
+    }
+  }
+];
+
+const getStorageInspection = (storage) => {
+  if (storage?.assignedProduce?.cvResult) {
+    return storage.assignedProduce;
+  }
+  const preset = SAMPLE_PRESETS.find(p => p.id === storage?.assignedProduce?.presetId) || SAMPLE_PRESETS[0];
+  return {
+    presetId: preset.id,
+    produceName: preset.name,
+    category: preset.category,
+    imageUrl: preset.imageUrl,
+    cvResult: preset
+  };
+};
+
+export default function VisionInspector({ zones = [], onRefreshTelemetry, onInspectionComplete, isDarkMode, targetProduce }) {
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState("all");
   const [selectedRiskFilter, setSelectedRiskFilter] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
   const [viewMode, setViewMode] = useState("compact"); // 'compact' | 'grid'
   const [specimenDropdownOpen, setSpecimenDropdownOpen] = useState(false);
-  
-  const [selectedPresetId, setSelectedPresetId] = useState(SAMPLE_PRESETS[0].id);
+  // Storage Chamber Management (Each storage has its own scoped produce inspection & RSL telemetry)
+  const [storages, setStorages] = useState(() => {
+    try {
+      const saved = localStorage.getItem('smart_restaurant_storages');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0 && parsed[0]?.id && parsed[0]?.name) {
+          return parsed.map((s, idx) => {
+            if (!s.assignedProduce || !s.assignedProduce.cvResult) {
+              const defaultPreset = SAMPLE_PRESETS[idx % SAMPLE_PRESETS.length] || SAMPLE_PRESETS[0];
+              return {
+                ...s,
+                assignedProduce: {
+                  presetId: defaultPreset.id,
+                  produceName: defaultPreset.name,
+                  category: defaultPreset.category,
+                  imageUrl: defaultPreset.imageUrl,
+                  cvResult: defaultPreset
+                }
+              };
+            }
+            return s;
+          });
+        }
+      }
+    } catch {}
+    return DEFAULT_SYSTEM_STORAGES;
+  });
+  const [selectedStorageId, setSelectedStorageId] = useState("storage-1");
+  const [isAddStorageModalOpen, setIsAddStorageModalOpen] = useState(false);
+  const [isChangeProduceModalOpen, setIsChangeProduceModalOpen] = useState(false);
+  const [newStorageForm, setNewStorageForm] = useState({
+    name: "",
+    category: "Chilled Cold Room (1°C - 5°C)",
+    target_temp: "4.0",
+    target_humidity: "85",
+    node_id: "",
+    preset_id: "lettuce_crisp"
+  });
+
+    const handleAddStorage = (e) => {
+    e.preventDefault();
+    if (!newStorageForm.name.trim()) return;
+    const selectedPreset = SAMPLE_PRESETS.find(p => p.id === newStorageForm.preset_id) || SAMPLE_PRESETS[5] || SAMPLE_PRESETS[0];
+    const newStorage = {
+      id: `storage-${Date.now()}`,
+      name: newStorageForm.name.trim(),
+      category: newStorageForm.category,
+      target_temp: parseFloat(newStorageForm.target_temp) || 4.0,
+      current_temp: parseFloat(newStorageForm.target_temp) || 4.0,
+      target_humidity: parseFloat(newStorageForm.target_humidity) || 85.0,
+      current_humidity: parseFloat(newStorageForm.target_humidity) || 85.0,
+      voc: 0.18,
+      status: "optimal",
+      node_id: newStorageForm.node_id.trim() || `ESP32-NODE-0${storages.length + 1}`,
+      assignedProduce: {
+        presetId: selectedPreset.id,
+        produceName: selectedPreset.name,
+        category: selectedPreset.category,
+        imageUrl: selectedPreset.imageUrl,
+        cvResult: selectedPreset
+      }
+    };
+    const updated = [...storages, newStorage];
+    setStorages(updated);
+    try {
+      localStorage.setItem('smart_restaurant_storages', JSON.stringify(updated));
+    } catch {}
+
+    // Immediately select and assign view to the newly created storage
+    setSelectedStorageId(newStorage.id);
+    setCurrentContainerName(newStorage.name);
+    setSelectedPresetId(selectedPreset.id);
+    setPreviewImage(selectedPreset.imageUrl);
+    setCvResult(selectedPreset);
+    if (onInspectionComplete) {
+      onInspectionComplete(selectedPreset);
+    }
+
+    setIsAddStorageModalOpen(false);
+    setNewStorageForm({
+      name: "",
+      category: "Chilled Cold Room (1°C - 5°C)",
+      target_temp: "4.0",
+      target_humidity: "85",
+      node_id: "",
+      preset_id: "lettuce_crisp"
+    });
+  };
+
+  const handleDeleteCustomStorage = (storageId, e) => {
+    e.stopPropagation();
+    if (storageId === "storage-1") return; // Primary Storage 1 cannot be deleted
+    const updated = storages.filter(s => s.id !== storageId);
+    setStorages(updated);
+    try {
+      localStorage.setItem('smart_restaurant_storages', JSON.stringify(updated));
+    } catch {}
+    setSelectedStorageId("storage-1");
+    const primaryContainer = storages[0]?.containers[0]?.name || "Container #C-101 (Zone 1: Fruit Chiller 11°C)";
+    setCurrentContainerName(primaryContainer);
+  };
+  // Edit & Delete Storage State
+  const [editingStorage, setEditingStorage] = useState(null);
+  const [editStorageForm, setEditStorageForm] = useState({
+    name: "",
+    category: "Chilled Cold Room (1°C - 5°C)",
+    target_temp: "4.0",
+    current_temp: "4.0",
+    target_humidity: "85",
+    current_humidity: "85",
+    node_id: "",
+    preset_id: ""
+  });
+  const [storageToDelete, setStorageToDelete] = useState(null);
+
+  // Switch active storage chamber and load its assigned produce & telemetry
+  const handleSelectStorage = (storage) => {
+    setSelectedStorageId(storage.id);
+    setCurrentContainerName(storage.name);
+    const insp = getStorageInspection(storage);
+    setSelectedPresetId(insp.presetId);
+    setPreviewImage(insp.imageUrl);
+    setCvResult(insp.cvResult);
+    if (onInspectionComplete) {
+      onInspectionComplete(insp.cvResult);
+    }
+  };
+
+  // Update the currently active storage's assigned produce
+  const updateActiveStorageInspection = (presetOrCvResult, imageUrl) => {
+    const updated = storages.map(s => {
+      if (s.id === selectedStorageId) {
+        return {
+          ...s,
+          assignedProduce: {
+            presetId: presetOrCvResult.id || s.assignedProduce?.presetId || null,
+            produceName: presetOrCvResult.identified_produce || presetOrCvResult.name || s.assignedProduce?.produceName || "Produce",
+            category: presetOrCvResult.category || s.assignedProduce?.category || "Fruits",
+            imageUrl: imageUrl || presetOrCvResult.imageUrl || s.assignedProduce?.imageUrl,
+            cvResult: presetOrCvResult
+          }
+        };
+      }
+      return s;
+    });
+    setStorages(updated);
+    try {
+      localStorage.setItem('smart_restaurant_storages', JSON.stringify(updated));
+    } catch {}
+  };
+
+  const handleOpenEditStorage = (storage, e) => {
+    e.stopPropagation();
+    setEditingStorage(storage);
+    const insp = getStorageInspection(storage);
+    setEditStorageForm({
+      name: storage.name || "",
+      category: storage.category || "Chilled Cold Room (1°C - 5°C)",
+      target_temp: String(storage.target_temp ?? 4.0),
+      current_temp: String(storage.current_temp ?? storage.target_temp ?? 4.0),
+      target_humidity: String(storage.target_humidity ?? 85.0),
+      current_humidity: String(storage.current_humidity ?? storage.target_humidity ?? 85.0),
+      node_id: storage.node_id || "",
+      preset_id: insp.presetId || SAMPLE_PRESETS[0].id
+    });
+  };
+
+  const handleUpdateStorage = (e) => {
+    e.preventDefault();
+    if (!editingStorage || !editStorageForm.name.trim()) return;
+
+    const chosenPreset = SAMPLE_PRESETS.find(p => p.id === editStorageForm.preset_id);
+
+    const updated = storages.map(s => {
+      if (s.id === editingStorage.id) {
+        const currentInsp = getStorageInspection(s);
+        const newInsp = chosenPreset ? {
+          presetId: chosenPreset.id,
+          produceName: chosenPreset.name,
+          category: chosenPreset.category,
+          imageUrl: chosenPreset.imageUrl,
+          cvResult: chosenPreset
+        } : currentInsp;
+
+        return {
+          ...s,
+          name: editStorageForm.name.trim(),
+          category: editStorageForm.category,
+          target_temp: parseFloat(editStorageForm.target_temp) || s.target_temp,
+          current_temp: parseFloat(editStorageForm.current_temp) || s.current_temp,
+          target_humidity: parseFloat(editStorageForm.target_humidity) || s.target_humidity,
+          current_humidity: parseFloat(editStorageForm.current_humidity) || s.current_humidity,
+          node_id: editStorageForm.node_id.trim() || s.node_id,
+          assignedProduce: newInsp
+        };
+      }
+      return s;
+    });
+
+    setStorages(updated);
+    try {
+      localStorage.setItem('smart_restaurant_storages', JSON.stringify(updated));
+    } catch {}
+
+    if (selectedStorageId === editingStorage.id) {
+      setCurrentContainerName(editStorageForm.name.trim());
+      if (chosenPreset) {
+        setSelectedPresetId(chosenPreset.id);
+        setPreviewImage(chosenPreset.imageUrl);
+        setCvResult(chosenPreset);
+        if (onInspectionComplete) onInspectionComplete(chosenPreset);
+      }
+    }
+    setEditingStorage(null);
+  };
+
+  const handlePromptDeleteStorage = (storage, e) => {
+    e.stopPropagation();
+    setStorageToDelete(storage);
+  };
+
+  const handleConfirmDeleteStorage = () => {
+    if (!storageToDelete) return;
+    if (storages.length <= 1) {
+      setStorageToDelete(null);
+      return;
+    }
+    const updated = storages.filter(s => s.id !== storageToDelete.id);
+    setStorages(updated);
+    try {
+      localStorage.setItem('smart_restaurant_storages', JSON.stringify(updated));
+    } catch {}
+
+    if (selectedStorageId === storageToDelete.id) {
+      const fallback = updated[0];
+      handleSelectStorage(fallback);
+    }
+    setStorageToDelete(null);
+  };
+
+const activeStorage = storages.find(s => s?.id === selectedStorageId) || storages[0] || DEFAULT_SYSTEM_STORAGES[0];
+  const [selectedPresetId, setSelectedPresetId] = useState(() => activeStorage?.assignedProduce?.presetId || SAMPLE_PRESETS[0].id);
   const [previewImage, setPreviewImage] = useState(SAMPLE_PRESETS[0].imageUrl);
-  const [currentContainerName, setCurrentContainerName] = useState(SAMPLE_PRESETS[0].container);
+  const [currentContainerName, setCurrentContainerName] = useState(SAMPLE_PRESETS[0]?.container || "Container #C-101 (Zone 1: Fruit Chiller 11°C)");
   const [analyzing, setAnalyzing] = useState(false);
   const [cvResult, setCvResult] = useState(SAMPLE_PRESETS[0]);
   const [isCameraActive, setIsCameraActive] = useState(false);
   const [cameraError, setCameraError] = useState(null);
+  const [targetProduceSelection, setTargetProduceSelection] = useState("auto");
 
-  // Interactive Dummy Simulation Slider (0% to 100%)
-  const [dummyLevel, setDummyLevel] = useState(92);
-  const [isManualOverride, setIsManualOverride] = useState(false);
+  // Auto-select specimen preset when navigating from Inventory or Executive hub
+  useEffect(() => {
+    if (!targetProduce) return;
+    const term = targetProduce.toLowerCase().trim();
+    const matchedPreset = SAMPLE_PRESETS.find(p => {
+      const pn = p.name.toLowerCase();
+      const pi = (p.identified_produce || "").toLowerCase();
+      const pid = p.id.toLowerCase();
+      return pn.includes(term) || term.includes(pn) || pi.includes(term) || term.includes(pi) ||
+        (term.includes("banana") && pid.includes("banana")) ||
+        (term.includes("mango") && pid.includes("mango")) ||
+        (term.includes("papaya") && (pid.includes("peach") || pid.includes("banana"))) ||
+        (term.includes("strawberr") && pid.includes("strawberr")) ||
+        (term.includes("tomato") && pid.includes("tomato")) ||
+        (term.includes("spinach") && pid.includes("spinach")) ||
+        (term.includes("kankun") && pid.includes("spinach")) ||
+        (term.includes("gotukola") && pid.includes("spinach")) ||
+        (term.includes("lettuce") && pid.includes("lettuce")) ||
+        (term.includes("avocado") && pid.includes("avocado"));
+    });
+    if (matchedPreset) {
+      setSelectedPresetId(matchedPreset.id);
+      setPreviewImage(matchedPreset.imageUrl);
+      setCvResult(matchedPreset);
+      if (onInspectionComplete) onInspectionComplete(matchedPreset);
+    }
+  }, [targetProduce]);
+
+  // Unified Multi-Modal Simulation Override for testing Fresh vs ~75% Spoilage
+  const [simulationSpoilageOverride, setSimulationSpoilageOverride] = useState(null);
+  const [dispatchedKds, setDispatchedKds] = useState(false);
+  const [toastMessage, setToastMessage] = useState(null);
+
+    // Live IoT Telemetry Synchronization State
+  const [isSyncingSensors, setIsSyncingSensors] = useState(false);
+  const [lastSensorSyncTime, setLastSensorSyncTime] = useState(() => new Date().toLocaleTimeString());
+  const [isSensorModalOpen, setIsSensorModalOpen] = useState(false);
+  const [sensorUpdateForm, setSensorUpdateForm] = useState({
+    temperature: 11.4,
+    humidity: 90.2,
+    voc: 0.32,
+    co2: 415.0,
+    nh3: 0.02
+  });
+
+  const updateStoragesWithLiveTelemetry = useCallback((liveZones) => {
+    if (!Array.isArray(liveZones) || liveZones.length === 0) return;
+    setStorages(prevStorages => {
+      let changed = false;
+      const updated = prevStorages.map((storage, idx) => {
+        const matchedZone = liveZones.find(z => 
+          z.id === storage.zone_id || 
+          z.id === storage.id || 
+          (storage.name && z.name && storage.name.toLowerCase().includes(z.name.toLowerCase().slice(0, 6))) ||
+          (idx === 0 && (z.id === 'zone-fruit' || z.name?.includes('Zone 1') || z.name?.includes('Storage 1') || z.name?.toLowerCase().includes('fruit'))) ||
+          (idx === 1 && (z.id === 'zone-veg' || z.name?.includes('Zone 2') || z.name?.includes('Storage 2') || z.name?.toLowerCase().includes('crisper') || z.name?.toLowerCase().includes('leafy'))) ||
+          (idx === 2 && (z.id === 'zone-root' || z.name?.includes('Zone 3') || z.name?.includes('Storage 3') || z.name?.toLowerCase().includes('root'))) ||
+          (idx === 3 && (z.id === 'zone-ambient' || z.name?.includes('Zone 4') || z.name?.includes('Storage 4') || z.name?.toLowerCase().includes('ambient')))
+        ) || liveZones[idx % liveZones.length];
+
+        if (!matchedZone) return storage;
+
+        const newTemp = matchedZone.current_temp !== undefined ? Number(matchedZone.current_temp) : storage.current_temp;
+        const newHumidity = matchedZone.current_humidity !== undefined ? Number(matchedZone.current_humidity) : storage.current_humidity;
+        const newVoc = matchedZone.voc !== undefined ? Number(matchedZone.voc) : storage.voc;
+        const newCo2 = matchedZone.co2 !== undefined ? Number(matchedZone.co2) : storage.co2;
+        const newNh3 = matchedZone.nh3 !== undefined ? Number(matchedZone.nh3) : storage.nh3;
+        const newStatus = matchedZone.status || storage.status;
+
+        if (
+          storage.current_temp !== newTemp ||
+          storage.current_humidity !== newHumidity ||
+          storage.voc !== newVoc ||
+          storage.co2 !== newCo2 ||
+          storage.nh3 !== newNh3 ||
+          storage.status !== newStatus
+        ) {
+          changed = true;
+          return {
+            ...storage,
+            current_temp: newTemp,
+            current_humidity: newHumidity,
+            voc: newVoc,
+            co2: newCo2,
+            nh3: newNh3,
+            status: newStatus
+          };
+        }
+        return storage;
+      });
+
+      if (changed) {
+        try {
+          localStorage.setItem('smart_restaurant_storages', JSON.stringify(updated));
+        } catch (e) {}
+        return updated;
+      }
+      return prevStorages;
+    });
+  }, []);
+
+  const fetchLiveSensors = useCallback(async () => {
+    setIsSyncingSensors(true);
+    try {
+      const res = await axios.get("http://localhost:8000/api/sensors/zones");
+      if (res.data?.zones) {
+        updateStoragesWithLiveTelemetry(res.data.zones);
+        setLastSensorSyncTime(new Date().toLocaleTimeString());
+      }
+    } catch (err) {
+      // silent fallback
+    } finally {
+      setIsSyncingSensors(false);
+    }
+  }, [updateStoragesWithLiveTelemetry]);
+
+  useEffect(() => {
+    fetchLiveSensors();
+    const timer = setInterval(fetchLiveSensors, 3000);
+    return () => clearInterval(timer);
+  }, [fetchLiveSensors]);
+
+  useEffect(() => {
+    if (zones && zones.length > 0) {
+      updateStoragesWithLiveTelemetry(zones);
+    }
+  }, [zones, updateStoragesWithLiveTelemetry]);
+
+  const handleTransmitTelemetry = async (e) => {
+    if (e) e.preventDefault();
+    try {
+      const payload = {
+        storage_zone: activeStorage?.name || "Zone 1: Tropical Fruit Chiller (11°C)",
+        temperature: Number(sensorUpdateForm.temperature),
+        humidity: Number(sensorUpdateForm.humidity),
+        voc: Number(sensorUpdateForm.voc),
+        co2: Number(sensorUpdateForm.co2),
+        nh3: Number(sensorUpdateForm.nh3)
+      };
+
+      await axios.post("http://localhost:8000/api/sensors/telemetry", payload);
+
+      setStorages(prev => {
+        const updated = prev.map(s => {
+          if (s.id === activeStorage.id) {
+            return {
+              ...s,
+              current_temp: payload.temperature,
+              current_humidity: payload.humidity,
+              voc: payload.voc,
+              co2: payload.co2,
+              nh3: payload.nh3,
+              status: (Math.abs(payload.temperature - (s.target_temp || 11)) > 3.5 || payload.voc > 0.6 || payload.nh3 > 0.04) ? 'warning' : 'optimal'
+            };
+          }
+          return s;
+        });
+        try {
+          localStorage.setItem('smart_restaurant_storages', JSON.stringify(updated));
+        } catch (e) {}
+        return updated;
+      });
+
+      setLastSensorSyncTime(new Date().toLocaleTimeString());
+      setIsSensorModalOpen(false);
+      showToast(`✓ Live telemetry transmitted to ${activeStorage.name} (${payload.temperature}°C, ${payload.voc} ppm VOC)!`);
+
+      if (onRefreshTelemetry) {
+        onRefreshTelemetry();
+      }
+    } catch (err) {
+      console.error("Failed to transmit telemetry:", err);
+      showToast("Error transmitting telemetry. Ensure backend is running.");
+    }
+  };
+
+  const applySensorPreset = (presetType) => {
+    if (presetType === 'optimal') {
+      setSensorUpdateForm({
+        temperature: Number(activeStorage?.target_temp || 11.0),
+        humidity: Number(activeStorage?.target_humidity || 89.0),
+        voc: 0.22,
+        co2: 430.0,
+        nh3: 0.015
+      });
+    } else if (presetType === 'door_ajar') {
+      setSensorUpdateForm({
+        temperature: Number(activeStorage?.target_temp || 11.0) + 9.5,
+        humidity: 74.0,
+        voc: 0.65,
+        co2: 890.0,
+        nh3: 0.032
+      });
+    } else if (presetType === 'near_spoil') {
+      setSensorUpdateForm({
+        temperature: 28.5,
+        humidity: 66.0,
+        voc: 1.85,
+        co2: 1350.0,
+        nh3: 0.065
+      });
+    }
+  };
+
+  const showToast = (msg) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 4000);
+  };
+
+  const handleToggleSimulation = () => {
+    if (simulationSpoilageOverride !== null) {
+      setSimulationSpoilageOverride(null);
+      showToast("Reset to real live inspection & sensor telemetry data.");
+    } else {
+      setSimulationSpoilageOverride(76.5);
+      showToast("Simulated ~76.5% Spoilage Threshold. Near-spoilage recipe directive activated!");
+    }
+  };
+
+  const handleDispatchKDSUnified = (recipeTitle, station) => {
+    setDispatchedKds(true);
+    showToast(`✓ "${recipeTitle}" dispatched to Kitchen KDS (${station})!`);
+  };
+
+  // Recipe Directive Generator for active produce when near spoil (~75%)
+  const getProduceRecipeDirective = (produceName, category, spoilageScore) => {
+    const name = (produceName || "Perishable Produce").toLowerCase();
+    const score = Math.round(spoilageScore);
+
+    if (name.includes("mango")) {
+      return {
+        recipeTitle: "Fresh Mango Nectar, Smoothies & Dessert Coulis",
+        station: "Bar & Beverage / Dessert Station",
+        prepTimeMinutes: 15,
+        yieldPortions: "12 - 14 Servings",
+        extendedShelfLife: "+5 Days Chilled / +3 Months Frozen",
+        wasteCost: 38.40,
+        directive: `Softening cuticle and high ethylene detected (${score}% spoilage). Divert ${produceName} immediately to bar cocktail prep and dessert coulis before fermentation sets in.`,
+        steps: [
+          "Peel skin and cut pulp away from seed; discard bruised epidermal spots.",
+          "Puree 70% of pulp in high-speed blender with lime juice and ginger syrup until silky smooth.",
+          "Decant half into bar dispensers for today's lunch brunch cocktails and mocktails.",
+          "Portion remaining coulis into 500ml vacuum bags and freeze for weekly mango cheesecake topping."
+        ]
+      };
+    } else if (name.includes("banana")) {
+      return {
+        recipeTitle: "Spiced Artisan Banana Bread & Breakfast Parfait",
+        station: "Bakery & Pastry Counter",
+        prepTimeMinutes: 25,
+        yieldPortions: "3 Signature Loaves (24 Slices)",
+        extendedShelfLife: "+4 Days Baked / +60 Days Frozen",
+        wasteCost: 26.00,
+        directive: `Senescent sugar spotting and high softening detected (${score}% spoilage). Peak natural fructose makes this ideal for zero-sugar added commercial baking.`,
+        steps: [
+          "Mash bananas with a fork; their high moisture creates an extra tender crumb.",
+          "Fold into batter with Ceylon cinnamon and fold gently with roasted walnuts.",
+          "Bake at 175°C for 50 minutes until golden brown.",
+          "Slice extra bananas into rounds and freeze flat on sheet trays for morning smoothie station."
+        ]
+      };
+    } else if (name.includes("strawberry") || name.includes("strawberr") || name.includes("berry")) {
+      return {
+        recipeTitle: "Warm Strawberry-Basil Compote & Waffle Glaze",
+        station: "Morning Grill & Dessert Bar",
+        prepTimeMinutes: 12,
+        yieldPortions: "10 Portions",
+        extendedShelfLife: "+6 Days Jarred & Chilled",
+        wasteCost: 32.00,
+        directive: `Tissue breakdown and softening detected (${score}% spoilage). Immediate heat reduction locks natural pectin and halts decomposition.`,
+        steps: [
+          "Rinse and hull strawberries, halving larger berries.",
+          "Simmer in wide saucepan with sugar and lemon juice over medium flame for 8-10 minutes.",
+          "Remove from heat, fold in fresh basil chiffonade for aroma, and let cool slightly.",
+          "Serve warm over morning waffles, vanilla bean ice cream, or chill for dessert buffet."
+        ]
+      };
+    } else if (name.includes("tomato")) {
+      return {
+        recipeTitle: "Slow-Roasted Garlic-Herb Tomato Marinara Base",
+        station: "Hot Line & Sauté Station",
+        prepTimeMinutes: 35,
+        yieldPortions: "16 - 18 Servings (2.5 Liters)",
+        extendedShelfLife: "+7 Days Chilled / +6 Months Frozen",
+        wasteCost: 28.50,
+        directive: `Overripe softening and skin cracking detected (${score}% spoilage). Peak acidity and natural lycopene sugars make this optimal for rich savory reduction sauces.`,
+        steps: [
+          "Toss quartered tomatoes with olive oil, crushed garlic, and fresh herbs.",
+          "Roast on hotel pans at 190°C for 25 minutes until blistered and caramelized.",
+          "Transfer to stockpot, simmer with cracked pepper for 10 minutes, and pulse with immersion blender.",
+          "Label as 'House Roasted Marinara Base' for pizza, pasta stations, and shakshuka service."
+        ]
+      };
+    } else if (name.includes("lettuce") || name.includes("spinach") || name.includes("green") || name.includes("salad")) {
+      return {
+        recipeTitle: "Velvety Green Herb Soup & Stock Reduction",
+        station: "Prep Kitchen & Soup Station",
+        prepTimeMinutes: 20,
+        yieldPortions: "12 Bowls",
+        extendedShelfLife: "+4 Days Chilled / +2 Months Frozen",
+        wasteCost: 19.80,
+        directive: `Cellular dehydration and wilting detected (${score}% spoilage). While unsuitable for raw salads, high chlorophyll and dietary fiber make exquisite velvet soups.`,
+        steps: [
+          "Blanch wilted greens in salted boiling water for 45 seconds, then shock in ice bath to preserve vibrant emerald green.",
+          "Sauté shallots and leeks, add potatoes and vegetable broth; simmer until tender.",
+          "Add blanched greens at the very end and blend immediately to retain bright green color.",
+          "Finish with extra virgin olive oil swirl and garlic croutons as soup of the day."
+        ]
+      };
+    } else if (name.includes("carrot")) {
+      return {
+        recipeTitle: "Pickled Ginger-Carrot Ribbons & Slaw Topping",
+        station: "Cold Larder & Garde Manger",
+        prepTimeMinutes: 15,
+        yieldPortions: "25 Portions (Garnish / Slaw)",
+        extendedShelfLife: "+30 Days (Pickled in Brine)",
+        wasteCost: 22.00,
+        directive: `Root flaccidity and surface moisture loss detected (${score}% spoilage). Acidic pickling brine will completely restore crisp texture.`,
+        steps: [
+          "Using a mandoline or Y-peeler, shave carrots into long thin ribbons.",
+          "Bring vinegar, water, sugar, and spices to a quick boil; pour hot pickling liquid over carrot ribbons.",
+          "Allow to cool to room temperature; the acidity crisps the carrots back to a crunch.",
+          "Use as signature condiment on banh mi, grain bowls, and grilled sandwiches."
+        ]
+      };
+    } else {
+      return {
+        recipeTitle: `Fresh ${produceName} Culinary Reduction`,
+        station: category === "Fruits" ? "Bar & Dessert Station" : "Prep Kitchen & Hot Line",
+        prepTimeMinutes: 18,
+        yieldPortions: "10 Servings",
+        extendedShelfLife: "+5 Days Chilled / +2 Months Frozen",
+        wasteCost: 24.00,
+        directive: `Produce softening detected (${score}% spoilage). Process into culinary reduction to prevent spoilage loss.`,
+        steps: [
+          `Trim and inspect ${produceName}; discard damaged surface areas.`,
+          "Process according to culinary style: blend for puree/coulis, or sauté for sauce base.",
+          "Season with citrus or salt to stabilize shelf life, cool and store at 2°C - 4°C."
+        ]
+      };
+    }
+  };
+
+
+  // ESP32-CAM Wi-Fi Hardware Node State
+  const [esp32Url, setEsp32Url] = useState(() => localStorage.getItem("esp32_cam_url") || "http://172.20.10.2/capture");
+  const [isEsp32ModalOpen, setIsEsp32ModalOpen] = useState(false);
+  const [esp32Loading, setEsp32Loading] = useState(false);
+  const [esp32Error, setEsp32Error] = useState(null);
+  const [esp32AutoPoll, setEsp32AutoPoll] = useState(false);
+  const [esp32PollInterval, setEsp32PollInterval] = useState(3600); // default 1 hour (3600s)
+  const [esp32LastCaptureTime, setEsp32LastCaptureTime] = useState(null);
+
+  // Inspection History & Telemetry State
+  const [inspectionHistory, setInspectionHistory] = useState([]);
+  const [isHistoryDrawerOpen, setIsHistoryDrawerOpen] = useState(false);
+
+  // Produce Encyclopedia Modal & Inspection Knowledge Base
+  const [isEncyclopediaModalOpen, setIsEncyclopediaModalOpen] = useState(false);
+  const [encyclopediaItems, setEncyclopediaItems] = useState([]);
+  const [encyclopediaLoading, setEncyclopediaLoading] = useState(false);
+  const [encyclopediaSearch, setEncyclopediaSearch] = useState('');
+  const [encyclopediaCategory, setEncyclopediaCategory] = useState('all');
+  const [selectedEncyclopediaProduce, setSelectedEncyclopediaProduce] = useState(null);
+
+  const fetchEncyclopedia = async (cat = 'all', q = '') => {
+    setEncyclopediaLoading(true);
+    try {
+      const url = `http://localhost:8000/api/vision/produce-encyclopedia?category=${cat}&search=${encodeURIComponent(q)}`;
+      const res = await axios.get(url);
+      if (res.data?.items) {
+        setEncyclopediaItems(res.data.items);
+        if (res.data.items.length > 0) {
+          setSelectedEncyclopediaProduce(prev => {
+            if (prev) {
+              const matched = res.data.items.find(i => i.produce_name === prev.produce_name);
+              return matched || res.data.items[0];
+            }
+            return res.data.items[0];
+          });
+        }
+      }
+    } catch (e) {
+      console.warn("Could not fetch produce encyclopedia:", e);
+    } finally {
+      setEncyclopediaLoading(false);
+    }
+  };
+
+  const fetchHistory = async () => {
+    try {
+      const res = await axios.get("http://localhost:8000/api/vision/history");
+      if (res.data?.history) {
+        setInspectionHistory(res.data.history);
+      }
+    } catch (e) {
+      // non-blocking fallback
+    }
+  };
+
+  useEffect(() => {
+    fetchHistory();
+  }, []);
 
   const fileInputRef = useRef(null);
   const videoRef = useRef(null);
@@ -536,12 +1127,11 @@ export default function VisionInspector({ onInspectionComplete }) {
   const handleSelectPreset = (preset) => {
     stopCamera();
     setSelectedPresetId(preset.id);
-    setCurrentContainerName(preset.container);
+    setCurrentContainerName(`${activeStorage?.name || 'Storage'} - ${preset.name}`);
     setPreviewImage(preset.imageUrl);
     setCvResult(preset);
-    setDummyLevel(preset.visual_spoilage_score);
-    setIsManualOverride(false);
     setSpecimenDropdownOpen(false);
+    updateActiveStorageInspection(preset, preset.imageUrl);
 
     if (onInspectionComplete) {
       onInspectionComplete(preset);
@@ -562,17 +1152,25 @@ export default function VisionInspector({ onInspectionComplete }) {
 
   const handleFileUpload = async (e) => {
     stopCamera();
-    const file = e.target.files[0];
+    const file = e.target.files?.[0];
     if (file) {
-      setCurrentContainerName("Uploaded Container Photo");
+      setCurrentContainerName("Scanning Uploaded Specimen...");
       setSelectedPresetId(null);
       const reader = new FileReader();
       reader.onload = async (event) => {
         const dataUrl = event.target.result;
         setPreviewImage(dataUrl);
+        setCvResult(prev => ({
+          ...prev,
+          bounding_boxes: [],
+          identified_produce: "Analyzing Specimen..."
+        }));
         await runBackendAnalysis(dataUrl, cvResult?.category || "Fruits");
       };
       reader.readAsDataURL(file);
+    }
+    if (e.target) {
+      e.target.value = '';
     }
   };
 
@@ -613,6 +1211,12 @@ export default function VisionInspector({ onInspectionComplete }) {
     const dataUrl = canvas.toDataURL("image/jpeg");
     stopCamera();
     setPreviewImage(dataUrl);
+    setCurrentContainerName("Scanning Captured Photo...");
+    setCvResult(prev => ({
+      ...prev,
+      bounding_boxes: [],
+      identified_produce: "Analyzing Specimen..."
+    }));
     runBackendAnalysis(dataUrl, cvResult?.category || "Fruits");
   };
 
@@ -622,141 +1226,125 @@ export default function VisionInspector({ onInspectionComplete }) {
       const formData = new FormData();
       formData.append("category", targetCategory);
       formData.append("image_base64", imageDataUrl);
+      if (targetProduceSelection && targetProduceSelection !== "auto") {
+        formData.append("expected_produce", targetProduceSelection);
+      }
 
       const res = await axios.post("http://localhost:8000/api/vision/inspect", formData);
-      setCvResult(res.data.features);
-      setDummyLevel(res.data.features.visual_spoilage_score || 50);
-      setIsManualOverride(false);
+      const feat = res.data.features || res.data;
+      setCvResult(feat);
+      updateActiveStorageInspection(feat, imageDataUrl);
+      if (feat.identified_produce) {
+        setCurrentContainerName(`Detected: ${feat.identified_produce} (${feat.category || targetCategory})`);
+      }
+      fetchHistory();
       if (onInspectionComplete) {
-        onInspectionComplete(res.data.features);
+        onInspectionComplete(feat);
       }
     } catch (err) {
       console.error("CV inspection error:", err);
+      setToastMessage("Vision API Error: Backend server is unreachable at http://localhost:8000. Please start the backend service.");
+      setTimeout(() => setToastMessage(null), 6000);
     } finally {
       setAnalyzing(false);
     }
   };
 
-  // Dynamic Remaining Shelf-Life & Spoilage Computation
+  const captureFromEsp32 = async (overrideUrl = null) => {
+    const targetUrl = (overrideUrl || esp32Url).trim();
+    if (!targetUrl) return;
+    localStorage.setItem("esp32_cam_url", targetUrl);
+    setEsp32Loading(true);
+    setEsp32Error(null);
+    stopCamera();
+    try {
+      const res = await axios.post("http://localhost:8000/api/vision/esp32/capture", {
+        camera_url: targetUrl,
+        category: cvResult?.category || "Fruits",
+        container_id: "ESP32-CAM Container Node"
+      });
+      const data = res.data;
+      const feat = data.features || data;
+      setCvResult(feat);
+      if (data.image_base64) {
+        setPreviewImage(data.image_base64);
+        updateActiveStorageInspection(feat, data.image_base64);
+      } else {
+        updateActiveStorageInspection(feat, previewImage);
+      }
+      setCurrentContainerName(`ESP32-CAM: ${feat.identified_produce || "Live Capture"} (${feat.category || "Produce"})`);
+      setSelectedPresetId(null);
+      setEsp32LastCaptureTime(new Date().toLocaleTimeString());
+      fetchHistory();
+      if (onInspectionComplete) {
+        onInspectionComplete(feat);
+      }
+    } catch (err) {
+      console.error("ESP32-CAM fetch error:", err);
+      const msg = err.response?.data?.detail || err.message || "Could not connect to ESP32-CAM module.";
+      setEsp32Error(msg);
+    } finally {
+      setEsp32Loading(false);
+    }
+  };
+
+  useEffect(() => {
+    let interval = null;
+    if (esp32AutoPoll && esp32Url) {
+      captureFromEsp32();
+      interval = setInterval(() => {
+        captureFromEsp32();
+      }, esp32PollInterval * 1000);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [esp32AutoPoll, esp32Url, esp32PollInterval]);
+
+  // Dynamic Remaining Shelf-Life & Spoilage Computation grounded on Model Outputs
   const computeRemainingShelfLife = (val, category, isMould) => {
     const baselines = {
       "Fruits": 120.0,
-      "Vegetables": 96.0,
-      "Meat": 96.0,
-      "Fish": 48.0,
-      "Dairy": 168.0
+      "Vegetables": 96.0
     };
-    const baseline = baselines[category] || 120.0;
+    const baseline = cvResult?.baseline_shelf_life_hours || baselines[category] || 120.0;
 
-    if (val >= 78 || isMould) {
-      return {
-        hours: 0.0,
-        days: 0.0,
-        percentage: 0,
-        action: "EXPIRED: Quarantine & Dispose Immediately",
-        safeDeadline: "Expired - Do not cook or serve",
-        decayRate: "Severe degradation (> 5.2x baseline decay)"
-      };
-    }
+    const h = cvResult?.remaining_shelf_life_hours !== undefined 
+      ? Math.round(cvResult.remaining_shelf_life_hours * 10) / 10 
+      : Math.round(baseline * Math.pow(Math.max(0, (100 - val) / 100), 1.3) * 10) / 10;
 
-    if (val < 25) {
-      const h = Math.round(baseline * (1.0 - (val / 100.0) * 0.5) * 10) / 10;
-      return {
-        hours: h,
-        days: Math.round((h / 24.0) * 10) / 10,
-        percentage: Math.round(100 - val),
-        action: "Optimal Quality (Standard FIFO Rotation)",
-        safeDeadline: `Safe for ~${Math.round(h / 24.0)} days in cold storage`,
-        decayRate: "Normal baseline metabolic aging (1.0x)"
-      };
-    }
+    const isExpired = h <= 0 || isMould || cvResult?.risk_level === 'Critical' || (cvResult?.ripeness_stage && cvResult.ripeness_stage.toLowerCase().includes('spoiled'));
+    const isUrgent = h < 24 || cvResult?.risk_level === 'High' || (cvResult?.ripeness_stage && cvResult.ripeness_stage.toLowerCase().includes('overripe'));
 
-    if (val < 55) {
-      const h = Math.round(baseline * 0.65 * (1.0 - ((val - 25) / 30) * 0.3) * 10) / 10;
-      return {
-        hours: h,
-        days: Math.round((h / 24.0) * 10) / 10,
-        percentage: Math.round(100 - val),
-        action: "Prime Culinary Quality (Cook within 2-3 days)",
-        safeDeadline: `Optimal flavor peak for next ${h} hours`,
-        decayRate: "Moderate respiration & ethylene activity (1.6x)"
-      };
-    }
+    const confInterval = cvResult?.rsl_confidence_interval || (
+      isExpired ? "0.0 hrs (Quarantine)" : `${Math.max(0, Math.round(h * 0.75))} - ${Math.round(h * 1.25)} hrs [90% CI]`
+    );
 
-    // Overripe / High Risk (55% - 77%)
-    const h = Math.round(baseline * 0.22 * (1.0 - ((val - 55) / 23) * 0.6) * 10) / 10;
     return {
-      hours: Math.max(2.0, h),
-      days: Math.round((h / 24.0) * 10) / 10,
-      percentage: Math.round(100 - val),
-      action: "PRIORITY CHEF USE (Cook / Divert Today)",
-      safeDeadline: `Must consume within ${Math.max(2, Math.round(h))} hours!`,
-      decayRate: "Accelerated cellular breakdown (3.4x decay)"
+      hours: isExpired ? 0.0 : h,
+      days: isExpired ? 0.0 : Math.round((h / 24.0) * 10) / 10,
+      percentage: isExpired ? 0 : Math.max(0, Math.min(100, Math.round(cvResult?.ripeness_percent || (100 - val)))),
+      confidenceInterval: confInterval,
+      action: isExpired 
+        ? "EXPIRED: Quarantine & Dispose Immediately" 
+        : (isUrgent ? "PRIORITY CHEF USE (Cook / Divert Today)" : (h > 48 ? "Optimal Quality (Standard FIFO Rotation)" : "Prime Culinary Quality (Cook within 2-3 days)")),
+      safeDeadline: isExpired 
+        ? "Expired - Do not cook or serve" 
+        : (isUrgent ? `Must consume within ${Math.max(2, Math.round(h))} hours!` : `Safe for ~${Math.max(1, Math.round(h / 24.0))} days in cold storage`),
+      decayRate: isExpired 
+        ? "Severe degradation (> 5.2x baseline decay)" 
+        : (isUrgent ? "Accelerated cellular breakdown (3.4x decay)" : "Normal baseline metabolic aging (1.0x)")
     };
-  };
-
-  const handleDummySliderChange = (newVal) => {
-    const val = Number(newVal);
-    setDummyLevel(val);
-    setIsManualOverride(true);
-
-    let stage = "Optimal Ripe (Prime Quality)";
-    let risk = "Low";
-    let mould = false;
-    let bboxes = [];
-    let defects = [];
-
-    if (val < 25) {
-      stage = "Unripe / Firm";
-      risk = "Low";
-      bboxes = [{ label: "UNRIPE (FIRM TEXTURE)", type: "fresh", x: 25, y: 25, width: 50, height: 50, color: "#10b981" }];
-    } else if (val < 55) {
-      stage = "Optimal Ripe (Prime Quality)";
-      risk = "Low";
-      bboxes = [{ label: "OPTIMAL RIPENESS", type: "fresh", x: 20, y: 20, width: 60, height: 60, color: "#10b981" }];
-    } else if (val < 78) {
-      stage = "Overripe / Wilted (Use Today)";
-      risk = "High";
-      bboxes = [{ label: "SENESCENCE BROWNING / WILTING", type: "overripe", x: 22, y: 25, width: 56, height: 50, color: "#f59e0b" }];
-      defects = ["Surface softening and enzymatic browning", "Loss of moisture / turgor"];
-    } else {
-      stage = "Spoiled / Rotten (Quarantine)";
-      risk = "Critical";
-      mould = true;
-      bboxes = [
-        { label: "MOULD SPORE PATCH", type: "spoilage", x: 28, y: 32, width: 44, height: 40, color: "#ef4444" },
-        { label: "DEEP TISSUE ROT", type: "spoilage", x: 55, y: 50, width: 30, height: 30, color: "#ef4444" }
-      ];
-      defects = ["Active fungal mould growth detected", "Severe microbial decomposition", "Deleterious odour / spoilage risk"];
-    }
-
-    const updated = {
-      ...cvResult,
-      ripeness_stage: stage,
-      ripeness_percent: val,
-      visual_spoilage_score: val,
-      risk_level: risk,
-      discoloration_score: Math.round(val * 0.45),
-      mould_detected: mould,
-      mould_coverage: mould ? Math.round((val - 75) * 0.6) : 0,
-      texture_degradation: Math.round(val * 0.7),
-      detected_defects: defects,
-      bounding_boxes: bboxes
-    };
-
-    setCvResult(updated);
-    if (onInspectionComplete) {
-      onInspectionComplete(updated);
-    }
   };
 
   const getRipenessStep = (stage) => {
     if (!stage) return 2;
     const s = stage.toLowerCase();
     if (s.includes("unripe")) return 1;
-    if (s.includes("optimal") || s.includes("fresh") || s.includes("prime") || s.includes("crisp")) return 2;
-    if (s.includes("overripe") || s.includes("wilted") || s.includes("soft")) return 3;
-    return 4; // Spoiled
+    if (s.includes("overripe") || s.includes("wilted") || s.includes("soft") || s.includes("grade c")) return 3;
+    if (s.includes("spoiled") || s.includes("mould") || s.includes("mold") || s.includes("rot") || s.includes("grade f")) return 4;
+    if (s.includes("optimal") || s.includes("fresh") || s.includes("prime") || s.includes("crisp") || s.includes("ripe") || s.includes("grade b") || s.includes("grade a")) return 2;
+    return 2;
   };
 
   const ripenessStep = cvResult ? getRipenessStep(cvResult.ripeness_stage) : 2;
@@ -764,15 +1352,16 @@ export default function VisionInspector({ onInspectionComplete }) {
   const getLevelColor = (val) => {
     if (val < 25) return { text: "text-emerald-800 dark:text-emerald-400", bg: "bg-emerald-600", border: "border-emerald-500", badge: "bg-emerald-100 dark:bg-emerald-950/60 text-emerald-950 dark:text-emerald-300 border border-emerald-400 dark:border-emerald-600", label: "LOW RISK (UNRIPE / FIRM)", colorHex: "#059669" };
     if (val < 55) return { text: "text-emerald-800 dark:text-emerald-400", bg: "bg-emerald-600", border: "border-emerald-500", badge: "bg-emerald-100 dark:bg-emerald-950/60 text-emerald-950 dark:text-emerald-300 border border-emerald-400 dark:border-emerald-600", label: "LOW RISK (OPTIMAL RIPE)", colorHex: "#047857" };
-    if (val < 78) return { text: "text-amber-800 dark:text-amber-400", bg: "bg-amber-600", border: "border-amber-500", badge: "bg-amber-100 dark:bg-amber-950/60 text-amber-950 dark:text-amber-300 border border-amber-400 dark:border-amber-600", label: "HIGH RISK (OVERRIPE / WILTED)", colorHex: "#d97706" };
+    if (val < 78) return { text: "text-amber-800 dark:text-amber-400", bg: "bg-amber-600", border: "border-amber-500", badge: "bg-amber-100 dark:bg-amber-950/60 text-amber-950 dark:text-amber-300 border border-amber-400 dark:border-amber-600", label: "HIGH RISK (OVERRIPE / SOFTENING)", colorHex: "#d97706" };
     return { text: "text-rose-800 dark:text-rose-400", bg: "bg-rose-600", border: "border-rose-500", badge: "bg-rose-100 dark:bg-rose-950/60 text-rose-950 dark:text-rose-300 border border-rose-400 dark:border-rose-600 animate-pulse", label: "CRITICAL RISK (SPOILED / MOULD)", colorHex: "#dc2626" };
   };
 
-  const levelTheme = getLevelColor(dummyLevel);
+  const visualScore = cvResult?.visual_spoilage_score !== undefined ? cvResult.visual_spoilage_score : 15;
+  const levelTheme = getLevelColor(visualScore);
 
-  // Active Shelf-Life Prediction Object
+  // Active Shelf-Life Prediction Object grounded directly on AI inference results
   const shelfLifePrediction = computeRemainingShelfLife(
-    dummyLevel,
+    visualScore,
     cvResult?.category || "Fruits",
     cvResult?.mould_detected || false
   );
@@ -785,425 +1374,860 @@ export default function VisionInspector({ onInspectionComplete }) {
         <div>
           <h2 className="text-lg font-extrabold text-slate-900 dark:text-white">Container Optical Scanner & Ripeness Assessor</h2>
           <p className="text-xs text-slate-600 dark:text-slate-400 mt-1 font-semibold">
-            Photographic inspection across Fruits, Vegetables, Dairy, Fish & Meat with Remaining Shelf-Life Prediction
+            Photographic inspection across Fruits & Vegetables with Remaining Shelf-Life Prediction
           </p>
         </div>
 
         {/* Action Buttons */}
         <div className="flex items-center gap-2">
-          {isCameraActive ? (
-            <button
-              onClick={stopCamera}
-              className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-md transition-colors"
-            >
-              <VideoOff className="h-4 w-4" /> Stop Live Camera
-            </button>
-          ) : (
-            <button
-              onClick={startCamera}
-              className="px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold flex items-center gap-1.5 shadow-md shadow-emerald-700/20 transition-colors"
-            >
-              <Video className="h-4 w-4" /> Open Container Camera
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={() => {
+              setIsEncyclopediaModalOpen(true);
+              fetchEncyclopedia(encyclopediaCategory, encyclopediaSearch);
+            }}
+            className="px-3 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold flex items-center gap-1.5 shadow-md shadow-emerald-700/20 transition-all cursor-pointer active:scale-95"
+            title="Open Produce Encyclopedia with Surface & Color Criteria for 47 Fruits & Vegetables"
+          >
+            <BookOpen className="h-4 w-4 text-emerald-200" />
+            <span>Produce Encyclopedia</span>
+            <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-emerald-900/90 text-emerald-200 font-mono font-bold">47</span>
+          </button>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setIsEsp32ModalOpen(true)}
+            className="px-3.5 py-2 rounded-xl bg-sky-700 hover:bg-sky-800 text-white text-xs font-bold flex items-center gap-1.5 shadow-md shadow-sky-700/20 transition-colors cursor-pointer"
+            title="Connect physical ESP32-CAM Wi-Fi camera node"
+          >
+            <Cpu className="h-4 w-4 text-sky-200" />
+            <span>ESP32-CAM</span>
+            {esp32AutoPoll && (
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            )}
+          </button>
         </div>
       </div>
 
-      {/* ─────────────────────────────────────────────────────────────
-          SECTION: STREAMLINED FOOD SPECIMEN SELECTOR & ORGANIZER
+            {/* ─────────────────────────────────────────────────────────────
+          SECTION: STORAGE CHAMBER SELECTOR & MULTI-STORAGE MANAGEMENT
           ───────────────────────────────────────────────────────────── */}
-      <div className="p-3 sm:p-4 rounded-xl sm:rounded-2xl bg-[#f8faf9] dark:bg-slate-850/80 border border-[#d1ded5] dark:border-slate-800 space-y-3 shadow-2xs">
+      <div className="p-4 sm:p-5 rounded-2xl bg-[#f8faf9] dark:bg-slate-800/80 border border-[#d1ded5] dark:border-slate-700 space-y-4 shadow-2xs">
         
-        {/* Top Active Specimen Bar + Dropdown Selector + Prev/Next Controls */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-2.5 border-b border-[#e1eae4] dark:border-slate-800">
-          
-          {/* Active Specimen Summary */}
-          {(() => {
-            const activePreset = SAMPLE_PRESETS.find(p => p.id === selectedPresetId) || SAMPLE_PRESETS[0];
+        {/* Top Header Row: Chamber Overview & Add Storage Trigger */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-[#e1eae4] dark:border-slate-800">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-black uppercase tracking-wider text-slate-900 dark:text-white flex items-center gap-1.5">
+                <Boxes className="h-4 w-4 text-emerald-700 dark:text-emerald-400" />
+                Active Storage Units
+              </span>
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700">
+                {storages.length} Configured
+              </span>
+            </div>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium mt-0.5">
+              Select a storage chamber to monitor telemetry, or register a new storage unit.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setIsAddStorageModalOpen(true)}
+            className="px-3.5 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 active:scale-95 text-white text-xs font-extrabold flex items-center gap-1.5 shadow-md shadow-emerald-700/20 transition-all cursor-pointer self-start sm:self-auto"
+          >
+            <Plus className="h-4 w-4" />
+            <span>Add Storage</span>
+          </button>
+        </div>
+
+        {/* Storage Units Cards Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          {storages.map((storage) => {
+            const isSelected = selectedStorageId === storage.id;
             return (
-              <div className="flex items-center gap-3 min-w-0">
-                <div className="w-12 h-12 rounded-xl overflow-hidden bg-white dark:bg-slate-900 border border-[#c6d7cd] dark:border-slate-700 flex-shrink-0 shadow-2xs relative">
-                  <img
-                    src={activePreset.imageUrl}
-                    alt={activePreset.name}
-                    onError={(e) => {
-                      e.currentTarget.onerror = null;
-                      e.currentTarget.src = getFallbackSvg(activePreset.name, activePreset.category, activePreset.icon);
-                    }}
-                    className="w-full h-full object-cover"
-                  />
-                  <span className="absolute bottom-0.5 right-0.5 text-[10px] leading-none">{activePreset.icon}</span>
-                </div>
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-xs sm:text-sm font-black text-slate-900 dark:text-white truncate">
-                      {activePreset.name}
-                    </span>
-                    <span className={`text-[9px] sm:text-[10px] font-black px-2 py-0.5 rounded-md border ${
-                      activePreset.risk_level === 'Critical'
-                        ? 'bg-rose-100 dark:bg-rose-950/60 text-rose-900 dark:text-rose-300 border-rose-400 animate-pulse'
-                        : activePreset.risk_level === 'High'
-                        ? 'bg-amber-100 dark:bg-amber-950/60 text-amber-900 dark:text-amber-300 border-amber-400'
-                        : 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-950 dark:text-emerald-300 border-emerald-400'
+              <div
+                key={storage.id}
+                onClick={() => handleSelectStorage(storage)} className={`p-3.5 rounded-2xl border transition-all cursor-pointer relative overflow-hidden group ${
+                  isSelected
+                    ? 'bg-emerald-50/90 dark:bg-emerald-950/50 border-emerald-600 dark:border-emerald-500 shadow-sm ring-1 ring-emerald-500/40'
+                    : 'bg-white dark:bg-slate-900 border-[#d1ded5] dark:border-slate-700 hover:border-emerald-400 hover:bg-emerald-50/30 dark:hover:bg-slate-800/60 shadow-2xs'
+                }`}
+              >
+                {/* Active indicator line */}
+                {isSelected && (
+                  <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 to-teal-500" />
+                )}
+
+                <div className="flex items-center justify-between gap-2 mb-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className={`p-2 rounded-xl flex-shrink-0 ${
+                      isSelected
+                        ? 'bg-emerald-700 text-white shadow-xs'
+                        : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700'
                     }`}>
-                      {activePreset.risk_level}: {activePreset.ripeness_stage.split('(')[0].trim()}
-                    </span>
+                      <Boxes className="h-4 w-4" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-xs font-black text-slate-900 dark:text-white truncate">
+                        {storage.name}
+                      </div>
+                      <div className="text-[10px] text-slate-500 dark:text-slate-400 truncate">
+                        {storage.category}
+                      </div>
+                    </div>
                   </div>
-                  <div className="text-[11px] text-slate-500 dark:text-slate-400 font-medium truncate mt-0.5">
-                    {activePreset.container} • <span className="text-emerald-700 dark:text-emerald-400 font-bold">{activePreset.remaining_shelf_life_hours}h RSL</span>
+
+                  {/* Edit & Delete Storage Action Buttons */}
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    <button
+                      type="button"
+                      onClick={(e) => handleOpenEditStorage(storage, e)}
+                      title={`Edit ${storage.name}`}
+                      className="p-1.5 rounded-lg text-slate-400 hover:text-emerald-700 dark:hover:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/60 transition-colors cursor-pointer"
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={(e) => handlePromptDeleteStorage(storage, e)}
+                      disabled={storages.length <= 1}
+                      title={storages.length <= 1 ? "At least one storage unit must remain active" : `Delete ${storage.name}`}
+                      className={`p-1.5 rounded-lg transition-colors ${
+                        storages.length <= 1
+                          ? 'text-slate-300 dark:text-slate-700 cursor-not-allowed opacity-40'
+                          : 'text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/60 cursor-pointer'
+                      }`}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
                   </div>
+                </div>
+
+                {/* Telemetry Summary Bar */}
+                <div className="grid grid-cols-3 gap-1.5 py-1.5 px-2 rounded-xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200/70 dark:border-slate-700 text-[10px] font-semibold text-slate-600 dark:text-slate-300">
+                  <div className="flex items-center gap-1">
+                    <Thermometer className="h-3 w-3 text-rose-500" />
+                    <span>{storage.current_temp}°C</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Droplets className="h-3 w-3 text-sky-500" />
+                    <span>{storage.current_humidity}%</span>
+                  </div>
+                  <div className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-bold truncate">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                    <span className="truncate">{storage.status}</span>
+                  </div>
+                </div>
+
+                {/* Hardware Node Badge */}
+                <div className="mt-2 flex items-center justify-between text-[10px] font-bold text-slate-500 dark:text-slate-400">
+                  <span>Hardware Node:</span>
+                  <span className="text-emerald-700 dark:text-emerald-400 font-mono text-[9px]">{storage.node_id}</span>
+                </div>
+
+                {/* Assigned Produce Pill */}
+                <div className="mt-2 pt-2 border-t border-slate-200/60 dark:border-slate-800 flex items-center justify-between text-[10px]">
+                  <span className="font-bold text-slate-500 dark:text-slate-400">Assigned Produce:</span>
+                  <span className="font-bold text-emerald-700 dark:text-emerald-400 flex items-center gap-1 truncate max-w-[140px]">
+                    <span>{storage.assignedProduce?.cvResult?.produce_icon || "🍎"}</span>
+                    <span className="truncate">{storage.assignedProduce?.produceName || "Embul Banana"}</span>
+                  </span>
                 </div>
               </div>
             );
-          })()}
-
-          {/* Quick Stepper & Dropdown Picker Controls */}
-          <div className="flex items-center gap-2 flex-shrink-0" ref={specimenDropdownRef}>
-            
-            {/* Previous / Next Stepper */}
-            <div className="flex items-center bg-white dark:bg-slate-900 rounded-xl border border-[#c6d7cd] dark:border-slate-700 p-0.5 shadow-2xs">
-              <button
-                type="button"
-                onClick={handlePrevPreset}
-                disabled={filteredPresets.length <= 1}
-                title="Previous Food Specimen"
-                className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-40 text-slate-700 dark:text-slate-200 transition-colors"
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </button>
-              <span className="text-[10px] font-mono font-bold px-2 text-slate-600 dark:text-slate-400 select-none">
-                {currentIndex >= 0 ? currentIndex + 1 : 1}/{filteredPresets.length || 1}
-              </span>
-              <button
-                type="button"
-                onClick={handleNextPreset}
-                disabled={filteredPresets.length <= 1}
-                title="Next Food Specimen"
-                className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-40 text-slate-700 dark:text-slate-200 transition-colors"
-              >
-                <ChevronRight className="h-4 w-4" />
-              </button>
-            </div>
-
-            {/* Quick Dropdown Picker Button */}
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => setSpecimenDropdownOpen(!specimenDropdownOpen)}
-                className="px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl border border-[#c6d7cd] dark:border-slate-700 bg-white dark:bg-slate-900 hover:border-emerald-600 text-slate-900 dark:text-white text-xs font-bold flex items-center gap-1.5 shadow-2xs transition-all"
-              >
-                <List className="h-3.5 w-3.5 text-emerald-700 dark:text-emerald-400" />
-                <span className="hidden sm:inline">Select Food Item</span>
-                <span className="sm:hidden">Select</span>
-                <ChevronDown className={`h-3.5 w-3.5 text-slate-500 transition-transform ${specimenDropdownOpen ? 'rotate-180 text-emerald-600' : ''}`} />
-              </button>
-
-              {/* Specimen Dropdown List */}
-              {specimenDropdownOpen && (
-                <div className="absolute right-0 mt-2 w-72 sm:w-84 max-h-96 overflow-y-auto rounded-2xl bg-white/98 dark:bg-slate-900/98 backdrop-blur-2xl border border-slate-200 dark:border-slate-800 shadow-2xl p-2 z-50 space-y-1 animate-fade-in no-scrollbar">
-                  <div className="px-3 py-1.5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
-                    <span className="text-[10px] uppercase font-black text-slate-400 tracking-wider">All 15 Food Presets</span>
-                    <span className="text-[10px] text-emerald-700 dark:text-emerald-400 font-bold">Organized by Category</span>
-                  </div>
-                  {SAMPLE_PRESETS.map((preset) => {
-                    const isSelected = preset.id === selectedPresetId;
-                    return (
-                      <button
-                        key={preset.id}
-                        type="button"
-                        onClick={() => handleSelectPreset(preset)}
-                        className={`w-full p-2 rounded-xl text-left transition-all flex items-center gap-2.5 ${
-                          isSelected
-                            ? 'bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-700/60'
-                            : 'hover:bg-slate-100 dark:hover:bg-slate-800/80 border border-transparent'
-                        }`}
-                      >
-                        <div className="w-9 h-9 rounded-lg overflow-hidden flex-shrink-0 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
-                          <img
-                            src={preset.imageUrl}
-                            alt={preset.name}
-                            onError={(e) => {
-                              e.currentTarget.onerror = null;
-                              e.currentTarget.src = getFallbackSvg(preset.name, preset.category, preset.icon);
-                            }}
-                            className="w-full h-full object-cover"
-                          />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between">
-                            <span className={`text-xs font-bold truncate ${isSelected ? 'text-emerald-900 dark:text-emerald-300' : 'text-slate-900 dark:text-white'}`}>
-                              {preset.icon} {preset.name}
-                            </span>
-                            <span className={`text-[9px] font-black px-1.5 py-0.2 rounded ${
-                              preset.risk_level === 'Critical' ? 'bg-rose-100 text-rose-800' :
-                              preset.risk_level === 'High' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'
-                            }`}>
-                              {preset.risk_level}
-                            </span>
-                          </div>
-                          <div className="text-[10px] text-slate-500 dark:text-slate-400 truncate">
-                            {preset.category} • {preset.remaining_shelf_life_hours}h left
-                          </div>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-
-            {/* View Mode Toggle: Compact Ribbon vs Full Grid */}
-            <button
-              type="button"
-              onClick={() => setViewMode(viewMode === 'compact' ? 'grid' : 'compact')}
-              className={`p-1.5 sm:p-2 rounded-xl border text-xs font-bold flex items-center gap-1 transition-all ${
-                viewMode === 'grid'
-                  ? 'bg-emerald-700 text-white border-emerald-700 shadow-sm'
-                  : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 border-[#c6d7cd] dark:border-slate-700 hover:border-emerald-500'
-              }`}
-              title={viewMode === 'compact' ? 'Expand to Full Grid' : 'Switch to Compact Ribbon'}
-            >
-              {viewMode === 'compact' ? <Grid className="h-4 w-4" /> : <List className="h-4 w-4" />}
-            </button>
-          </div>
+          })}
         </div>
+</div>
 
-        {/* Filter Toolbar: Search Bar + Category Pills + Spoilage Stage Filters */}
-        <div className="space-y-2">
-          <div className="flex flex-col sm:flex-row gap-2 items-center">
-            
-            {/* Live Search Input */}
-            <div className="relative flex-1 w-full">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
-              <input
-                type="text"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Search food item (e.g. banana, salmon, spinach, milk)..."
-                className="w-full pl-8.5 pr-8 py-1.5 sm:py-2 text-xs rounded-xl bg-white dark:bg-slate-900 border border-[#c6d7cd] dark:border-slate-700 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-emerald-600 shadow-2xs font-medium"
-              />
-              {searchTerm && (
+      {/* Modal: Add New Storage Chamber */}
+      {isAddStorageModalOpen && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm animate-fade-in"
+          role="dialog"
+          aria-modal="true"
+        >
+          <div className="w-full max-w-md rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl p-6 space-y-4 animate-slide-up">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300">
+                  <Boxes className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-slate-900 dark:text-white">
+                    Register New Storage Unit
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    Add cold room, crisper, or pantry storage
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsAddStorageModalOpen(false)}
+                className="p-1.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleAddStorage} className="space-y-3.5">
+              <div className="space-y-1">
+                <label className="text-[11px] font-extrabold uppercase text-slate-700 dark:text-slate-300 block">
+                  Storage Name
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Storage 2: Walk-In Crisper Vault"
+                  value={newStorageForm.name}
+                  onChange={(e) => setNewStorageForm({ ...newStorageForm, name: e.target.value })}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white text-xs font-semibold focus:outline-none focus:border-emerald-600"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[11px] font-extrabold uppercase text-slate-700 dark:text-slate-300 block">
+                  Chamber Category
+                </label>
+                <select
+                  value={newStorageForm.category}
+                  onChange={(e) => setNewStorageForm({ ...newStorageForm, category: e.target.value })}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white text-xs font-semibold focus:outline-none focus:border-emerald-600"
+                >
+                  <option value="Chilled Cold Room (1°C - 5°C)">Chilled Cold Room (1°C - 5°C)</option>
+                  <option value="Deep Freeze Vault (-18°C)">Deep Freeze Vault (-18°C)</option>
+                  <option value="Tropical Fruit Chiller (10°C - 12°C)">Tropical Fruit Chiller (10°C - 12°C)</option>
+                  <option value="High-Humidity Crisper (4°C - 8°C)">High-Humidity Crisper (4°C - 8°C)</option>
+                  <option value="Ambient Kitchen Prep Rack (25°C - 28°C)">Ambient Kitchen Prep Rack (25°C - 28°C)</option>
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-[11px] font-extrabold uppercase text-slate-700 dark:text-slate-300 block">
+                    Target Temp (°C)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    required
+                    value={newStorageForm.target_temp}
+                    onChange={(e) => setNewStorageForm({ ...newStorageForm, target_temp: e.target.value })}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white text-xs font-semibold focus:outline-none focus:border-emerald-600"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[11px] font-extrabold uppercase text-slate-700 dark:text-slate-300 block">
+                    Target Humidity (%)
+                  </label>
+                  <input
+                    type="number"
+                    required
+                    value={newStorageForm.target_humidity}
+                    onChange={(e) => setNewStorageForm({ ...newStorageForm, target_humidity: e.target.value })}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white text-xs font-semibold focus:outline-none focus:border-emerald-600"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[11px] font-extrabold uppercase text-slate-700 dark:text-slate-300 block">
+                  Hardware Node ID / ESP32 IP (Optional)
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. ESP32-NODE-02 or 192.168.1.150"
+                  value={newStorageForm.node_id}
+                  onChange={(e) => setNewStorageForm({ ...newStorageForm, node_id: e.target.value })}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white text-xs font-semibold focus:outline-none focus:border-emerald-600 font-mono"
+                />
+              </div>
+
+                            <div className="space-y-1">
+                <label className="text-[11px] font-extrabold uppercase text-slate-700 dark:text-slate-300 block">
+                  Assign Produce to Monitor in this Chamber
+                </label>
+                <select
+                  value={newStorageForm.preset_id}
+                  onChange={(e) => setNewStorageForm({ ...newStorageForm, preset_id: e.target.value })}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white text-xs font-semibold focus:outline-none focus:border-emerald-600"
+                >
+                  {SAMPLE_PRESETS.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.icon || '🍎'} {p.name} ({p.category} • {p.remaining_shelf_life_hours}h RSL)
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="pt-2 flex items-center justify-end gap-2.5">
                 <button
                   type="button"
-                  onClick={() => setSearchTerm('')}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 rounded text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                  onClick={() => setIsAddStorageModalOpen(false)}
+                  className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold transition-colors"
                 >
-                  <X className="h-3.5 w-3.5" />
+                  Cancel
                 </button>
-              )}
-            </div>
-
-            {/* Spoilage Stage / Risk Pills */}
-            <div className="flex items-center gap-1 w-full sm:w-auto overflow-x-auto no-scrollbar py-0.5 flex-shrink-0">
-              <span className="text-[10px] uppercase font-black text-slate-400 sm:hidden">Stage:</span>
-              {[
-                { id: "all", label: "All States" },
-                { id: "low", label: "🟢 Fresh" },
-                { id: "high", label: "⚠️ Overripe" },
-                { id: "critical", label: "🚨 Spoiled" }
-              ].map((rf) => (
                 <button
-                  key={rf.id}
-                  type="button"
-                  onClick={() => setSelectedRiskFilter(rf.id)}
-                  className={`px-2 py-1 rounded-lg text-[10px] sm:text-[11px] font-bold transition-all whitespace-nowrap border ${
-                    selectedRiskFilter === rf.id
-                      ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 border-slate-900 dark:border-white shadow-2xs'
-                      : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border-[#d1ded5] dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800'
-                  }`}
+                  type="submit"
+                  className="px-4 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold shadow-md shadow-emerald-700/20 transition-all active:scale-95"
                 >
-                  {rf.label}
+                  Save Storage Chamber
                 </button>
-              ))}
-            </div>
-          </div>
-
-          {/* 5-Category Filter Tabs */}
-          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
-            {[
-              { id: "all", label: "All Categories (15)", icon: null },
-              { id: "fruits", label: "Fruits (3)", icon: <Apple className="h-3 w-3" /> },
-              { id: "vegetables", label: "Vegetables (3)", icon: <Carrot className="h-3 w-3" /> },
-              { id: "dairy", label: "Dairy (3)", icon: <Milk className="h-3 w-3" /> },
-              { id: "fish", label: "Fish & Seafood (3)", icon: <Fish className="h-3 w-3" /> },
-              { id: "meat", label: "Meat & Poultry (3)", icon: <Beef className="h-3 w-3" /> },
-            ].map((cat) => (
-              <button
-                key={cat.id}
-                type="button"
-                onClick={() => handleCategoryFilterClick(cat.id)}
-                className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all flex items-center gap-1 whitespace-nowrap border ${
-                  selectedCategoryFilter === cat.id
-                    ? 'bg-emerald-700 text-white border-emerald-700 shadow-2xs'
-                    : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-[#d1ded5] dark:border-slate-700 hover:bg-emerald-50 dark:hover:bg-slate-800'
-                }`}
-              >
-                {cat.icon}
-                <span>{cat.label}</span>
-              </button>
-            ))}
+              </div>
+            </form>
           </div>
         </div>
-
-        {/* View Mode 1: Compact Horizontal Ribbon (Default - Zero vertical space wastage!) */}
-        {viewMode === 'compact' ? (
-          <div className="relative group">
-            {/* Scroll Left Navigator */}
-            <button
-              type="button"
-              onClick={() => scrollCarousel('left')}
-              className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-1.5 sm:-translate-x-3 w-7 h-7 rounded-full bg-white/95 dark:bg-slate-800/95 border border-slate-300 dark:border-slate-700 shadow-md flex items-center justify-center text-slate-700 dark:text-slate-200 z-10 hover:bg-emerald-50 cursor-pointer transition-transform active:scale-95"
-              title="Scroll left"
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </button>
-
-            {/* Horizontal Snap Scroll Container */}
-            <div
-              ref={carouselRef}
-              className="flex items-center gap-2.5 overflow-x-auto no-scrollbar py-1 px-1 scroll-smooth"
-            >
-              {filteredPresets.length === 0 ? (
-                <div className="w-full py-4 text-center text-xs text-slate-500 font-medium">
-                  No food items match your filter. Try adjusting your search query.
+      )}
+      {/* Modal: Edit Storage Chamber */}
+      {editingStorage && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm animate-fade-in"
+          role="dialog"
+          aria-modal="true"
+        >
+          <div className="w-full max-w-md rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl p-6 space-y-4 animate-slide-up">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300">
+                  <Pencil className="h-5 w-5" />
                 </div>
-              ) : (
-                filteredPresets.map((preset) => {
-                  const isSelected = selectedPresetId === preset.id;
+                <div>
+                  <h3 className="text-base font-black text-slate-900 dark:text-white">
+                    Edit Storage Unit
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    Update temperature targets, category, and telemetry node
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingStorage(null)}
+                className="p-1.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleUpdateStorage} className="space-y-3.5">
+              <div className="space-y-1">
+                <label className="text-[11px] font-extrabold uppercase text-slate-700 dark:text-slate-300 block">
+                  Storage Name
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={editStorageForm.name}
+                  onChange={(e) => setEditStorageForm({ ...editStorageForm, name: e.target.value })}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white text-xs font-semibold focus:outline-none focus:border-emerald-600"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[11px] font-extrabold uppercase text-slate-700 dark:text-slate-300 block">
+                  Chamber Category
+                </label>
+                <select
+                  value={editStorageForm.category}
+                  onChange={(e) => setEditStorageForm({ ...editStorageForm, category: e.target.value })}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white text-xs font-semibold focus:outline-none focus:border-emerald-600"
+                >
+                  <option value="Chilled Chamber (Fruit & Veg)">Chilled Chamber (Fruit & Veg)</option>
+                  <option value="Chilled Cold Room (1°C - 5°C)">Chilled Cold Room (1°C - 5°C)</option>
+                  <option value="Deep Freeze Vault (-18°C)">Deep Freeze Vault (-18°C)</option>
+                  <option value="Tropical Fruit Chiller (10°C - 12°C)">Tropical Fruit Chiller (10°C - 12°C)</option>
+                  <option value="High-Humidity Crisper (4°C - 8°C)">High-Humidity Crisper (4°C - 8°C)</option>
+                  <option value="Ambient Kitchen Prep Rack (25°C - 28°C)">Ambient Kitchen Prep Rack (25°C - 28°C)</option>
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-[11px] font-extrabold uppercase text-slate-700 dark:text-slate-300 block">
+                    Target Temp (°C)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    required
+                    value={editStorageForm.target_temp}
+                    onChange={(e) => setEditStorageForm({ ...editStorageForm, target_temp: e.target.value })}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white text-xs font-semibold focus:outline-none focus:border-emerald-600"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[11px] font-extrabold uppercase text-slate-700 dark:text-slate-300 block">
+                    Target Humidity (%)
+                  </label>
+                  <input
+                    type="number"
+                    required
+                    value={editStorageForm.target_humidity}
+                    onChange={(e) => setEditStorageForm({ ...editStorageForm, target_humidity: e.target.value })}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white text-xs font-semibold focus:outline-none focus:border-emerald-600"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[11px] font-extrabold uppercase text-slate-700 dark:text-slate-300 block">
+                  Hardware Node ID / ESP32 IP
+                </label>
+                <input
+                  type="text"
+                  value={editStorageForm.node_id}
+                  onChange={(e) => setEditStorageForm({ ...editStorageForm, node_id: e.target.value })}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white text-xs font-semibold focus:outline-none focus:border-emerald-600 font-mono"
+                />
+              </div>
+
+              <div className="pt-2 flex items-center justify-end gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setEditingStorage(null)}
+                  className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold shadow-md shadow-emerald-700/20 transition-all active:scale-95 cursor-pointer"
+                >
+                  Save Changes
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+
+      {/* Modal: Change Assigned Produce for Active Storage */}
+      {isChangeProduceModalOpen && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm animate-fade-in"
+          role="dialog"
+          aria-modal="true"
+        >
+          <div className="w-full max-w-2xl rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl p-6 space-y-4 animate-slide-up max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800 flex-shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300">
+                  <Apple className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-slate-900 dark:text-white">
+                    Assign Produce Specimen to {activeStorage?.name}
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    Select a produce batch to monitor with optical scanning & shelf-life prediction
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsChangeProduceModalOpen(false)}
+                className="p-1.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="overflow-y-auto space-y-2 pr-1 flex-1">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                {SAMPLE_PRESETS.map((preset) => {
+                  const isCur = cvResult?.id === preset.id;
                   return (
-                    <div
+                    <button
                       key={preset.id}
-                      onClick={() => handleSelectPreset(preset)}
-                      className={`flex-shrink-0 w-36 sm:w-40 p-2 rounded-xl border cursor-pointer transition-all flex flex-col items-center text-center ${
-                        isSelected
-                          ? 'bg-emerald-50 dark:bg-emerald-950/50 border-emerald-600 dark:border-emerald-500 ring-2 ring-emerald-500/50 shadow-sm'
-                          : 'bg-white dark:bg-slate-900 border-[#d1ded5] dark:border-slate-700 hover:border-emerald-400 dark:hover:border-emerald-500 shadow-2xs'
+                      type="button"
+                      onClick={() => {
+                        handleSelectPreset(preset);
+                        setIsChangeProduceModalOpen(false);
+                      }}
+                      className={`p-3 rounded-2xl border text-left transition-all flex items-start gap-3 cursor-pointer ${
+                        isCur
+                          ? 'bg-emerald-50 dark:bg-emerald-950/50 border-emerald-500 shadow-xs ring-1 ring-emerald-500/30'
+                          : 'bg-white dark:bg-slate-800/80 border-slate-200 dark:border-slate-700 hover:border-emerald-400 hover:bg-slate-50 dark:hover:bg-slate-800'
                       }`}
                     >
-                      <div className="w-full h-18 sm:h-20 rounded-lg overflow-hidden relative bg-slate-100 dark:bg-slate-950 mb-1.5 border border-slate-200 dark:border-slate-800">
-                        <img
-                          src={preset.imageUrl}
-                          alt={preset.name}
-                          loading="lazy"
-                          onError={(e) => {
-                            e.currentTarget.onerror = null;
-                            e.currentTarget.src = getFallbackSvg(preset.name, preset.category, preset.icon);
-                          }}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                        />
-                        <span className={`absolute top-1 right-1 text-[8px] font-black px-1.5 py-0.5 rounded shadow ${
-                          preset.risk_level === 'Critical'
-                            ? 'bg-rose-600 text-white'
-                            : preset.risk_level === 'High'
-                            ? 'bg-amber-500 text-white'
-                            : 'bg-emerald-700 text-white'
-                        }`}>
-                          {preset.risk_level}
-                        </span>
+                      <span className="text-2xl p-1.5 bg-slate-100 dark:bg-slate-700 rounded-xl flex-shrink-0">
+                        {preset.icon || '🍎'}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center justify-between gap-1">
+                          <span className="text-xs font-black text-slate-900 dark:text-white truncate">
+                            {preset.name}
+                          </span>
+                          <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full border ${
+                            preset.risk_level === 'Low'
+                              ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                              : preset.risk_level === 'High'
+                              ? 'bg-amber-100 text-amber-800 border-amber-300'
+                              : 'bg-rose-100 text-rose-800 border-rose-300'
+                          }`}>
+                            {preset.risk_level} Risk
+                          </span>
+                        </div>
+                        <div className="text-[10px] text-slate-500 dark:text-slate-400 truncate mt-0.5">
+                          {preset.category} • {preset.ripeness_stage}
+                        </div>
+                        <div className="text-[10px] font-bold text-emerald-700 dark:text-emerald-400 mt-1">
+                          Remaining Shelf-Life: {preset.remaining_shelf_life_hours}h
+                        </div>
                       </div>
-                      <span className="text-[11px] font-bold text-slate-900 dark:text-white line-clamp-1 flex items-center gap-1 w-full justify-center">
-                        <span>{preset.icon}</span> {preset.name}
-                      </span>
-                      <span className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold truncate w-full">
-                        {preset.category} • {preset.remaining_shelf_life_hours}h left
-                      </span>
-                    </div>
+                    </button>
                   );
-                })
-              )}
+                })}
+              </div>
             </div>
 
-            {/* Scroll Right Navigator */}
+            <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex justify-end flex-shrink-0">
+              <button
+                type="button"
+                onClick={() => setIsChangeProduceModalOpen(false)}
+                className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold transition-colors cursor-pointer"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Delete Storage Confirmation */}
+      {storageToDelete && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm animate-fade-in"
+          role="dialog"
+          aria-modal="true"
+        >
+          <div className="w-full max-w-md rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl p-6 space-y-4 animate-slide-up">
+            <div className="flex items-center gap-3">
+              <div className="p-3 rounded-2xl bg-rose-100 dark:bg-rose-950/70 text-rose-600 dark:text-rose-400 flex-shrink-0">
+                <Trash2 className="h-6 w-6" />
+              </div>
+              <div className="min-w-0">
+                <h3 className="text-base font-black text-slate-900 dark:text-white">
+                  Delete Storage Unit?
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  This action removes the storage chamber from monitoring.
+                </p>
+              </div>
+            </div>
+
+            <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-xs text-slate-700 dark:text-slate-300">
+              <div className="font-bold text-slate-900 dark:text-white">{storageToDelete.name}</div>
+              <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                {storageToDelete.category} • Node: {storageToDelete.node_id}
+              </div>
+            </div>
+
+            <p className="text-[11px] text-rose-600 dark:text-rose-400 font-medium">
+              Are you sure you want to remove this unit? Its telemetry data and configuration will be removed.
+            </p>
+
+            <div className="pt-2 flex items-center justify-end gap-2.5">
+              <button
+                type="button"
+                onClick={() => setStorageToDelete(null)}
+                className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDeleteStorage}
+                className="px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-md shadow-rose-600/20 transition-all active:scale-95 cursor-pointer flex items-center gap-1.5"
+              >
+                <Trash2 className="h-4 w-4" />
+                <span>Delete Storage</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+
+      {/* ─────────────────────────────────────────────────────────────
+          UNIFIED SECTION: OPTICAL COMPUTER VISION + IOT TELEMETRY
+          (Both hardware units operating in the same chamber)
+          ───────────────────────────────────────────────────────────── */}
+      
+      
+      {/* Modal: Live Telemetry Update & Simulation */}
+      {isSensorModalOpen && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm animate-fade-in"
+          role="dialog"
+          aria-modal="true"
+        >
+          <div className="w-full max-w-lg rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl p-6 space-y-4 animate-slide-up max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-sky-100 dark:bg-sky-950 text-sky-800 dark:text-sky-300">
+                  <Activity className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-slate-900 dark:text-white">
+                    Update Chamber Sensor Telemetry
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    {activeStorage?.name} • Node ID: {activeStorage?.node_id || "ESP32-NODE-01"}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsSensorModalOpen(false)}
+                className="p-1.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Quick 1-Click Presets */}
+            <div className="space-y-1.5">
+              <span className="text-[11px] font-extrabold uppercase text-slate-500 block">
+                Quick Simulation Presets:
+              </span>
+              <div className="grid grid-cols-3 gap-2">
+                <button
+                  type="button"
+                  onClick={() => applySensorPreset('optimal')}
+                  className="p-2 rounded-xl border border-emerald-300 dark:border-emerald-800 bg-emerald-50/60 dark:bg-emerald-950/40 text-emerald-900 dark:text-emerald-300 text-left hover:bg-emerald-100 transition-colors"
+                >
+                  <span className="text-[10px] font-bold block">1. Cold Chain Safe</span>
+                  <span className="text-[9px] text-emerald-700 dark:text-emerald-400 font-mono">11°C • 89% RH</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => applySensorPreset('door_ajar')}
+                  className="p-2 rounded-xl border border-amber-300 dark:border-amber-800 bg-amber-50/60 dark:bg-amber-950/40 text-amber-900 dark:text-amber-300 text-left hover:bg-amber-100 transition-colors"
+                >
+                  <span className="text-[10px] font-bold block">2. Temp Elevation</span>
+                  <span className="text-[9px] text-amber-700 dark:text-amber-400 font-mono">20.5°C • 74% RH</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => applySensorPreset('near_spoil')}
+                  className="p-2 rounded-xl border border-rose-300 dark:border-rose-800 bg-rose-50/60 dark:bg-rose-950/40 text-rose-900 dark:text-rose-300 text-left hover:bg-rose-100 transition-colors"
+                >
+                  <span className="text-[10px] font-bold block">3. Gas Spike (~75%)</span>
+                  <span className="text-[9px] text-rose-700 dark:text-rose-400 font-mono">28.5°C • 1.85 VOC</span>
+                </button>
+              </div>
+            </div>
+
+            <form onSubmit={handleTransmitTelemetry} className="space-y-4 pt-1">
+              
+              {/* Temperature */}
+              <div className="space-y-1">
+                <div className="flex items-center justify-between text-xs font-bold text-slate-700 dark:text-slate-300">
+                  <span className="flex items-center gap-1.5">
+                    <Thermometer className="h-4 w-4 text-rose-500" /> Temperature (°C)
+                  </span>
+                  <span className="font-mono text-sm font-black text-rose-600 dark:text-rose-400">
+                    {sensorUpdateForm.temperature}°C
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min="0"
+                  max="40"
+                  step="0.5"
+                  value={sensorUpdateForm.temperature}
+                  onChange={(e) => setSensorUpdateForm({ ...sensorUpdateForm, temperature: parseFloat(e.target.value) })}
+                  className="w-full accent-rose-600 h-2 bg-slate-200 dark:bg-slate-700 rounded-lg cursor-pointer"
+                />
+              </div>
+
+              {/* Humidity */}
+              <div className="space-y-1">
+                <div className="flex items-center justify-between text-xs font-bold text-slate-700 dark:text-slate-300">
+                  <span className="flex items-center gap-1.5">
+                    <Droplets className="h-4 w-4 text-sky-500" /> Relative Humidity (% RH)
+                  </span>
+                  <span className="font-mono text-sm font-black text-sky-600 dark:text-sky-400">
+                    {sensorUpdateForm.humidity}%
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min="30"
+                  max="100"
+                  step="1"
+                  value={sensorUpdateForm.humidity}
+                  onChange={(e) => setSensorUpdateForm({ ...sensorUpdateForm, humidity: parseFloat(e.target.value) })}
+                  className="w-full accent-sky-600 h-2 bg-slate-200 dark:bg-slate-700 rounded-lg cursor-pointer"
+                />
+              </div>
+
+              {/* VOC */}
+              <div className="space-y-1">
+                <div className="flex items-center justify-between text-xs font-bold text-slate-700 dark:text-slate-300">
+                  <span className="flex items-center gap-1.5">
+                    <Wind className="h-4 w-4 text-amber-500" /> VOC / Ethylene Ripening Gas (ppm)
+                  </span>
+                  <span className="font-mono text-sm font-black text-amber-600 dark:text-amber-400">
+                    {sensorUpdateForm.voc} ppm
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min="0.05"
+                  max="3.00"
+                  step="0.05"
+                  value={sensorUpdateForm.voc}
+                  onChange={(e) => setSensorUpdateForm({ ...sensorUpdateForm, voc: parseFloat(e.target.value) })}
+                  className="w-full accent-amber-600 h-2 bg-slate-200 dark:bg-slate-700 rounded-lg cursor-pointer"
+                />
+              </div>
+
+
+
+              {/* CO2 */}
+              <div className="space-y-1">
+                <div className="flex items-center justify-between text-xs font-bold text-slate-700 dark:text-slate-300">
+                  <span className="flex items-center gap-1.5">
+                    <Gauge className="h-4 w-4 text-emerald-500" /> Respiration CO₂ (ppm)
+                  </span>
+                  <span className="font-mono text-sm font-black text-emerald-600 dark:text-emerald-400">
+                    {sensorUpdateForm.co2} ppm
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min="350"
+                  max="2000"
+                  step="25"
+                  value={sensorUpdateForm.co2}
+                  onChange={(e) => setSensorUpdateForm({ ...sensorUpdateForm, co2: parseFloat(e.target.value) })}
+                  className="w-full accent-emerald-600 h-2 bg-slate-200 dark:bg-slate-700 rounded-lg cursor-pointer"
+                />
+              </div>
+
+              <div className="pt-2 flex items-center justify-end gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setIsSensorModalOpen(false)}
+                  className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2.5 rounded-xl bg-sky-700 hover:bg-sky-800 text-white text-xs font-bold shadow-md shadow-sky-700/20 transition-all active:scale-95 flex items-center gap-1.5"
+                >
+                  <Send className="h-3.5 w-3.5" />
+                  <span>Transmit to Chamber</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Toast Notification */}
+      {toastMessage && (
+        <div className="fixed top-5 right-5 z-50 px-4 py-3 rounded-2xl bg-slate-900 dark:bg-emerald-950 text-white text-xs font-bold shadow-2xl border border-emerald-500/50 flex items-center gap-2.5 animate-slide-down">
+          <CheckCircle2 className="h-4 w-4 text-emerald-400 flex-shrink-0" />
+          <span>{toastMessage}</span>
+        </div>
+      )}
+
+      {/* Chamber Header & Synchronization Banner */}
+      <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-emerald-50 via-teal-50/60 to-emerald-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 border border-emerald-200 dark:border-emerald-800 shadow-2xs space-y-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-2xl bg-emerald-700 text-white flex items-center justify-center shadow-md shadow-emerald-700/20 flex-shrink-0">
+              <Boxes className="h-5 w-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-sm sm:text-base font-black text-slate-900 dark:text-white">
+                  {activeStorage?.name}
+                </span>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-900 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700">
+                  Dual-Unit Synchronized Chamber
+                </span>
+                {simulationSpoilageOverride !== null && (
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950/80 text-amber-900 dark:text-amber-200 border border-amber-300 dark:border-amber-700">
+                    Simulation Override: ~{simulationSpoilageOverride}%
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
+                Optical Camera Sensor & 5-Parameter IoT Environmental Array are both installed in this storage chamber.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={() => scrollCarousel('right')}
-              className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1.5 sm:translate-x-3 w-7 h-7 rounded-full bg-white/95 dark:bg-slate-800/95 border border-slate-300 dark:border-slate-700 shadow-md flex items-center justify-center text-slate-700 dark:text-slate-200 z-10 hover:bg-emerald-50 cursor-pointer transition-transform active:scale-95"
-              title="Scroll right"
+              onClick={handleToggleSimulation}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 border transition-all cursor-pointer shadow-2xs ${
+                simulationSpoilageOverride !== null
+                  ? 'bg-amber-600 hover:bg-amber-700 text-white border-amber-600'
+                  : 'bg-white dark:bg-slate-800 hover:bg-amber-50 dark:hover:bg-slate-700 text-amber-900 dark:text-amber-300 border-amber-300 dark:border-amber-700'
+              }`}
+              title="Toggle simulated ~75% spoilage trigger to test Fresh vs Spoiled output"
             >
-              <ChevronRight className="h-4 w-4" />
+              <Flame className="h-3.5 w-3.5" />
+              <span>{simulationSpoilageOverride !== null ? "Reset to Live Data" : "Test ~75% Spoilage"}</span>
             </button>
           </div>
-        ) : (
-          /* View Mode 2: Full Grid View (Expanded upon toggle) */
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-2.5 pt-1 animate-fade-in">
-            {filteredPresets.map((preset) => {
-              const isSelected = selectedPresetId === preset.id;
-              return (
-                <div
-                  key={preset.id}
-                  onClick={() => handleSelectPreset(preset)}
-                  className={`p-2 rounded-xl border cursor-pointer transition-all flex flex-col items-center text-center group ${
-                    isSelected
-                      ? 'bg-emerald-50 dark:bg-emerald-950/50 border-emerald-600 dark:border-emerald-500 ring-2 ring-emerald-500/50 shadow-sm'
-                      : 'bg-white dark:bg-slate-900 border-[#d1ded5] dark:border-slate-700 hover:border-emerald-400 dark:hover:border-emerald-500 shadow-2xs'
-                  }`}
-                >
-                  <div className="w-full h-20 sm:h-24 rounded-lg overflow-hidden relative bg-slate-100 dark:bg-slate-950 mb-1 border border-[#d1ded5] dark:border-slate-700">
-                    <img
-                      src={preset.imageUrl}
-                      alt={preset.name}
-                      loading="lazy"
-                      onError={(e) => {
-                        e.currentTarget.onerror = null;
-                        e.currentTarget.src = getFallbackSvg(preset.name, preset.category, preset.icon);
-                      }}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                    />
-                    <span className={`absolute top-1 right-1 text-[8px] sm:text-[9px] font-black px-1.5 py-0.5 rounded shadow ${
-                      preset.risk_level === 'Critical'
-                        ? 'bg-rose-600 text-white'
-                        : preset.risk_level === 'High'
-                        ? 'bg-amber-500 text-white'
-                        : 'bg-emerald-700 text-white'
-                    }`}>
-                      {preset.risk_level}
-                    </span>
-                  </div>
-                  <span className="text-[11px] font-bold text-slate-900 dark:text-white line-clamp-1 flex items-center gap-1">
-                    <span>{preset.icon}</span> {preset.name}
-                  </span>
-                  <span className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold">{preset.category} • {preset.remaining_shelf_life_hours}h</span>
-                </div>
-              );
-            })}
-          </div>
-        )}
+        </div>
       </div>
 
-      {/* SECTION 2: Optical Inspection Workbench (Container Photo with Bounding Boxes + Sensory Diagnostics) */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6 pt-2">
+      {/* Row of the Two Synchronized Units in One Chamber */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6 pt-1">
         
-        {/* Real Photographic Container View with AI Bounding Box & Risk Overlay */}
-        <div className="lg:col-span-5 flex flex-col items-center justify-between p-3.5 sm:p-4 bg-[#f8faf9] dark:bg-slate-850 rounded-xl sm:rounded-2xl border border-[#d1ded5] dark:border-slate-800 relative dark:bg-slate-900/60 shadow-2xs">
+        {/* UNIT 1: Optical Camera View & CV Inspection (Left Side) */}
+        <div className="lg:col-span-6 flex flex-col justify-between p-4 sm:p-5 bg-[#f8faf9] dark:bg-slate-800/80 rounded-2xl border border-[#d1ded5] dark:border-slate-700 shadow-2xs space-y-3">
           
-          <div className="w-full flex items-center justify-between text-xs text-slate-700 dark:text-slate-300 pb-2 mb-2 border-b border-[#e1eae4] dark:border-slate-800">
-            <span className="font-bold flex items-center gap-1.5 text-slate-900 dark:text-white">
-              <Camera className="h-4 w-4 text-emerald-700 dark:text-emerald-400" /> {currentContainerName}
+          <div className="flex items-center justify-between pb-2 border-b border-[#e1eae4] dark:border-slate-800 text-xs">
+            <span className="font-extrabold flex items-center gap-1.5 text-slate-900 dark:text-white truncate">
+              <Camera className="h-4 w-4 text-emerald-700 dark:text-emerald-400 flex-shrink-0" />
+              <span>Unit 1: Optical Computer Vision Scanner</span>
             </span>
-            <span className="text-[10px] px-2.5 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 font-bold border border-emerald-200 dark:border-emerald-800">
-              Optical Sensor
+            <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-100 dark:bg-emerald-950/60 text-emerald-900 dark:text-emerald-300 font-bold border border-emerald-300 dark:border-emerald-700">
+              Camera Feed
             </span>
           </div>
 
-          {/* Risk Diagnostic Banner (Placed outside photo frame to prevent text overlapping with bounding boxes) */}
-          {cvResult && (
-            <div className={`w-full mb-2 px-3 py-2 rounded-xl border text-[11px] sm:text-xs font-bold flex items-center justify-between shadow-2xs ${
-              cvResult.risk_level === 'Critical'
-                ? 'bg-rose-50 text-rose-950 border-rose-300 dark:bg-rose-950/60 dark:text-rose-200 dark:border-rose-800'
-                : cvResult.risk_level === 'High'
-                ? 'bg-amber-50 text-amber-950 border-amber-300 dark:bg-amber-950/60 dark:text-amber-200 dark:border-amber-800'
-                : 'bg-emerald-50 text-emerald-950 border-emerald-300 dark:bg-emerald-950/60 dark:text-emerald-200 dark:border-emerald-800'
-            }`}>
-              <span className="flex items-center gap-1.5 truncate">
-                {cvResult.risk_level === 'Critical' ? <XCircle className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-rose-600 dark:text-rose-400 animate-pulse flex-shrink-0" /> : (cvResult.risk_level === 'High' ? <AlertTriangle className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-amber-600 dark:text-amber-400 flex-shrink-0" /> : <CheckCircle2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-emerald-600 dark:text-emerald-400 flex-shrink-0" />)}
-                <span>{cvResult.risk_level.toUpperCase()}: {cvResult.ripeness_stage.toUpperCase()}</span>
+          {/* Identified Produce & AI Confidence */}
+          {cvResult && cvResult.identified_produce && (
+            <div className="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-emerald-300 dark:border-emerald-700 shadow-2xs flex items-center justify-between">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <span className="text-2xl p-1 bg-slate-50 dark:bg-slate-800 rounded-lg flex-shrink-0">
+                  {cvResult.produce_icon || "🍎"}
+                </span>
+                <div className="min-w-0">
+                  <div className="text-xs font-black text-slate-900 dark:text-white truncate">
+                    {cvResult.identified_produce}
+                  </div>
+                  <div className="text-[10px] text-slate-500 dark:text-slate-400 truncate">
+                    {cvResult.category || "Produce"} • Lifecycle: {cvResult.ripeness_stage}
+                  </div>
+                </div>
+              </div>
+              <span className="text-xs font-black px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900 text-emerald-900 dark:text-emerald-100 border border-emerald-300 font-mono">
+                {cvResult.produce_confidence || 96.5}% Conf.
               </span>
-              <span className="font-mono text-[11px] sm:text-xs font-black flex-shrink-0 ml-2">{cvResult.visual_spoilage_score}% Spoilage</span>
             </div>
           )}
 
-          {isCameraActive ? (
-            <div className="relative w-full h-64 sm:h-72 lg:h-80 bg-black rounded-xl overflow-hidden flex flex-col items-center justify-center border border-emerald-600">
+          {/* Photographic Feed with AI Bounding Boxes */}
+          <div className="relative w-full h-64 sm:h-72 rounded-xl overflow-hidden shadow-sm border border-[#d1ded5] dark:border-slate-700 bg-slate-950 flex items-center justify-center">
+            {isCameraActive ? (
               <video
                 ref={videoRef}
                 autoPlay
@@ -1211,413 +2235,1408 @@ export default function VisionInspector({ onInspectionComplete }) {
                 muted
                 className="w-full h-full object-cover"
               />
-              <button
-                onClick={captureCameraFrame}
-                className="absolute bottom-3 px-4 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold shadow-xl flex items-center gap-2 cursor-pointer"
+            ) : previewImage ? (
+              <img
+                src={previewImage}
+                alt="Chamber Inspection Feed"
+                onError={(e) => {
+                  e.currentTarget.onerror = null;
+                  e.currentTarget.src = getFallbackSvg(cvResult?.name || 'Produce', cvResult?.category || 'Produce', cvResult?.icon || '🍎');
+                }}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <div className="text-slate-400 text-xs font-bold">No Image Available</div>
+            )}
+
+            {/* Analyzing Spinner Overlay */}
+            {analyzing && (
+              <div className="absolute inset-0 bg-slate-950/75 backdrop-blur-xs flex flex-col items-center justify-center gap-2 text-white z-20 animate-fade-in">
+                <RefreshCw className="h-8 w-8 text-emerald-400 animate-spin" />
+                <span className="text-xs font-bold tracking-wide">Analyzing Produce Quality...</span>
+                <span className="text-[10px] text-slate-300">Running rot detection, colour index & mould inspection</span>
+              </div>
+            )}
+
+            {/* Bounding box overlays */}
+            {!isCameraActive && !analyzing && cvResult?.bounding_boxes?.map((box, i) => (
+              <div
+                key={i}
+                style={{
+                  position: 'absolute',
+                  left: `${box.x}%`,
+                  top: `${box.y}%`,
+                  width: `${box.width}%`,
+                  height: `${box.height}%`,
+                  borderColor: box.color,
+                  borderWidth: '2px',
+                  borderStyle: 'dashed',
+                  backgroundColor: `${box.color}22`
+                }}
+                className="pointer-events-none rounded transition-all"
               >
-                <Camera className="h-4 w-4" /> Snap & Inspect Item
+                <span 
+                  style={{ backgroundColor: box.color }}
+                  className="absolute -top-5 left-0 px-1.5 py-0.2 text-[9px] font-black text-white rounded uppercase tracking-wider"
+                >
+                  {box.label}
+                </span>
+              </div>
+            ))}
+          </div>
+
+          {/* Optical Metrics Bar */}
+          <div className="grid grid-cols-3 gap-2 text-center text-xs">
+            <div className="p-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+              <span className="text-[10px] text-slate-500 dark:text-slate-400 font-bold block">Browning</span>
+              <span className="font-black text-slate-900 dark:text-white">{cvResult?.discoloration_score || 3.2}%</span>
+            </div>
+            <div className="p-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+              <span className="text-[10px] text-slate-500 dark:text-slate-400 font-bold block">Mould Colony</span>
+              <span className={`font-black ${cvResult?.mould_detected ? 'text-rose-600' : 'text-emerald-600'}`}>
+                {cvResult?.mould_detected ? 'Detected!' : '0% Clear'}
+              </span>
+            </div>
+            <div className="p-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+              <span className="text-[10px] text-slate-500 dark:text-slate-400 font-bold block">Tissue Degradation</span>
+              <span className="font-black text-slate-900 dark:text-white">{cvResult?.texture_degradation || 6}%</span>
+            </div>
+          </div>
+
+          {/* Surface Texture, Color & Spoilage Progression Diagnostics */}
+          {cvResult && (
+            <div className="p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-2 text-xs">
+              <div className="flex items-center justify-between pb-1.5 border-b border-slate-100 dark:border-slate-800">
+                <span className="font-extrabold text-slate-900 dark:text-white flex items-center gap-1.5">
+                  <Sliders className="h-3.5 w-3.5 text-emerald-600" />
+                  <span>Surface & Color Diagnostics</span>
+                </span>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+                  {cvResult.surface_analysis?.texture_type || "Intact Epidermis"}
+                </span>
+              </div>
+
+              {/* Surface Texture & Tactile Details */}
+              <div className="grid grid-cols-2 gap-2 text-[11px]">
+                <div className="p-2 rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-700/60">
+                  <div className="text-[10px] font-bold text-slate-500 dark:text-slate-400">Surface Texture</div>
+                  <div className="font-bold text-slate-800 dark:text-slate-200 truncate">
+                    {cvResult.surface_analysis?.texture_type || "Smooth Cuticle"}
+                  </div>
+                  <div className="text-[9px] text-slate-500 dark:text-slate-400 mt-0.5 line-clamp-1">
+                    {cvResult.surface_analysis?.tactile_feel || "Firm and resilient peel"}
+                  </div>
+                </div>
+
+                <div className="p-2 rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-700/60">
+                  <div className="text-[10px] font-bold text-slate-500 dark:text-slate-400">Color Profile</div>
+                  <div className="font-bold text-slate-800 dark:text-slate-200 truncate">
+                    {cvResult.color_profile_analysis?.primary_hue || "Varietal Pigment"}
+                  </div>
+                  <div className="text-[9px] text-emerald-700 dark:text-emerald-400 font-semibold mt-0.5 truncate">
+                    {cvResult.color_profile_analysis?.color_congruence || "Normal Spectrum"}
+                  </div>
+                </div>
+              </div>
+
+              {/* Biological Spoilage Stage & Pathogen Watch */}
+              <div className="p-2 rounded-lg bg-emerald-50/70 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 space-y-1">
+                <div className="flex items-center justify-between text-[10px]">
+                  <span className="font-extrabold text-emerald-900 dark:text-emerald-300">
+                    Spoilage Level: {cvResult.spoilage_level_detail?.stage_name || (visualScore > 75 ? "Spoiled / Quarantine" : (visualScore > 50 ? "Overripe ~75%" : "Optimal Fresh"))}
+                  </span>
+                  <span className="font-mono text-emerald-700 dark:text-emerald-400 font-bold">
+                    Score: {visualScore}%
+                  </span>
+                </div>
+                <p className="text-[10px] text-slate-600 dark:text-slate-300 leading-tight">
+                  {cvResult.spoilage_level_detail?.visual_cues || "Epidermal peel intact without necrotic rot spots. Cellular turgor pressure within optimal freshness threshold."}
+                </p>
+                {cvResult.spoilage_level_detail?.common_pathogens && (
+                  <div className="text-[9px] text-rose-700 dark:text-rose-400 font-semibold flex items-center gap-1">
+                    <ShieldAlert className="h-3 w-3 flex-shrink-0" />
+                    <span>Pathogen Watch: {cvResult.spoilage_level_detail.common_pathogens}</span>
+                  </div>
+                )}
+                {cvResult.spoilage_level_detail?.chef_action && (
+                  <div className="text-[9px] text-amber-800 dark:text-amber-300 font-medium bg-amber-100/60 dark:bg-amber-950/60 p-1 rounded border border-amber-300/40">
+                    👨‍🍳 {cvResult.spoilage_level_detail.chef_action}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Target Produce Selector for 47 Commodities */}
+          <div className="flex items-center justify-between gap-2 p-2 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 text-xs shadow-2xs">
+            <label className="text-[11px] font-bold text-slate-700 dark:text-slate-200 flex items-center gap-1.5 whitespace-nowrap">
+              <span>🎯 Target Commodity:</span>
+            </label>
+            <select
+              value={targetProduceSelection}
+              onChange={(e) => setTargetProduceSelection(e.target.value)}
+              className="flex-1 py-1 px-2 text-xs font-semibold rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+            >
+              <option value="auto">✨ Auto-Detect (47 Produce Items)</option>
+              <optgroup label="Fruits (20 Commodities)">
+                <option value="Watermelon">🍉 Watermelon (Citrullus lanatus)</option>
+                <option value="Apple">🍎 Fresh Apple (Malus domestica)</option>
+                <option value="Strawberry">🍓 Fresh Strawberry (Fragaria × ananassa)</option>
+                <option value="Mango">🥭 Karthakolomban Mango</option>
+                <option value="Banana">🍌 Embul Banana (Ambul Kesel)</option>
+                <option value="Orange">🍊 Orange / Citrus</option>
+                <option value="Lime / Lemon">🍋 Lime / Lemon</option>
+                <option value="Grapes">🍇 Grapes</option>
+                <option value="Pineapple">🍍 Mauritius Pineapple</option>
+                <option value="Papaya">🍈 Red Lady Papaya</option>
+                <option value="Avocado">🥑 Sri Lankan Avocado</option>
+                <option value="Guava">🍈 Guava (Pera)</option>
+                <option value="Pomegranate">🫐 Pomegranate (Delum)</option>
+                <option value="Passion Fruit">🟡 Passion Fruit</option>
+                <option value="Dragon Fruit">🐉 Dragon Fruit</option>
+                <option value="Jackfruit / Kos / Varaka">🍈 Jackfruit (Kos / Varaka)</option>
+                <option value="Peach">🍑 Fresh Peach</option>
+                <option value="Pear">🍐 Fresh Pear</option>
+                <option value="Plum">🟣 Plum</option>
+                <option value="Kiwi">🥝 Kiwi Fruit</option>
+              </optgroup>
+              <optgroup label="Vegetables (27 Commodities)">
+                <option value="Tomato">🍅 Local Tomatoes (Thakkali)</option>
+                <option value="Cucumber">🥒 Cucumber (Pipinna)</option>
+                <option value="Carrot">🥕 Nuwara Eliya Carrots</option>
+                <option value="Capsicum / Bell Pepper">🫑 Capsicum / Bell Pepper</option>
+                <option value="Green Chillies">🌶️ Green Chillies (Amu Miris)</option>
+                <option value="Eggplant">🍆 Eggplant (Brinjal / Wambatu)</option>
+                <option value="Potato">🥔 Potato (Ala)</option>
+                <option value="Cabbage">🥬 Cabbage (Gova)</option>
+                <option value="Cauliflower">🥦 Cauliflower</option>
+                <option value="Broccoli">🥦 Broccoli</option>
+                <option value="Green Beans">🫛 Green Beans (Bonchi)</option>
+                <option value="Spinach">🍃 Spinach / Leafy Greens</option>
+                <option value="Gotukola (Centella Asiatica)">🌿 Gotukola (Centella)</option>
+                <option value="Kankun (Water Spinach)">🌿 Kankun (Water Spinach)</option>
+                <option value="Mukunuwenna (Alternanthera)">🌿 Mukunuwenna</option>
+                <option value="Romaine Lettuce">🥬 Romaine Lettuce</option>
+                <option value="Pumpkin">🎃 Pumpkin (Wattakka)</option>
+                <option value="Bitter Gourd (Karawila)">🥒 Bitter Gourd (Karawila)</option>
+                <option value="Snake Gourd (Pathola)">🥒 Snake Gourd (Pathola)</option>
+                <option value="Ridge Gourd (Wetawalu)">🥒 Ridge Gourd (Wetawalu)</option>
+                <option value="Radish (Rabu)">🥢 Radish (Rabu)</option>
+                <option value="Okra (Bandakka / Ladies Finger)">🫛 Okra (Bandakka)</option>
+                <option value="Red Onion">🧅 Red Onion (Rathu Lunu)</option>
+                <option value="Garlic">🧄 Garlic (Sudu Lunu)</option>
+                <option value="Mushroom">🍄 Mushroom (Bimmal)</option>
+                <option value="Ginger">🫚 Ginger (Inguru)</option>
+                <option value="Beetroot">🍠 Beetroot</option>
+              </optgroup>
+            </select>
+          </div>
+
+          {/* Hidden File Input for Image Upload */}
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileUpload}
+            accept="image/*"
+            style={{ display: 'none' }}
+          />
+
+          {/* Camera Action Buttons */}
+          {isCameraActive ? (
+            <div className="flex items-center gap-2 pt-1 animate-fade-in">
+              <button
+                type="button"
+                onClick={captureCameraFrame}
+                className="flex-1 py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm cursor-pointer transition-all active:scale-95"
+              >
+                <Camera className="h-3.5 w-3.5" />
+                <span>Capture Frame</span>
+              </button>
+              <button
+                type="button"
+                onClick={stopCamera}
+                className="px-3 py-2 rounded-xl bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 text-slate-700 dark:text-slate-300 text-xs font-bold cursor-pointer transition-all active:scale-95"
+              >
+                Cancel
               </button>
             </div>
-          ) : previewImage ? (
-            <div className="relative w-full flex flex-col items-center">
-              
-              {/* Photo Frame with Clean Bounding Box Overlays */}
-              <div className="relative w-full h-64 sm:h-72 lg:h-80 rounded-xl overflow-hidden shadow-sm border border-[#d1ded5] dark:border-slate-700 bg-slate-100 dark:bg-slate-950 flex items-center justify-center">
-                <img
-                  src={previewImage}
-                  alt="Food Container Inspection"
-                  onError={(e) => {
-                    e.currentTarget.onerror = null;
-                    const curPreset = SAMPLE_PRESETS.find(p => p.id === selectedPresetId);
-                    if (curPreset?.remoteFallbackUrl && e.currentTarget.src !== curPreset.remoteFallbackUrl) {
-                      e.currentTarget.src = curPreset.remoteFallbackUrl;
-                    } else {
-                      e.currentTarget.src = getFallbackSvg(curPreset?.name || 'Container Inspection', curPreset?.category || 'Perishable', curPreset?.icon || '🔬');
-                    }
-                  }}
-                  className="w-full h-full object-cover"
-                />
-
-                {/* Simulated Computer Vision Detection Bounding Box on image */}
-                {cvResult?.bounding_boxes?.map((box, i) => (
-                  <div
-                    key={i}
-                    style={{
-                      position: 'absolute',
-                      left: `${box.x}%`,
-                      top: `${box.y}%`,
-                      width: `${box.width}%`,
-                      height: `${box.height}%`,
-                      borderColor: box.color,
-                    }}
-                    className="border-2 rounded-lg border-dashed bg-rose-500/20 pointer-events-none flex items-start justify-start p-1 z-10"
-                  >
-                    <span
-                      style={{ backgroundColor: box.color }}
-                      className="text-[9px] sm:text-[10px] font-black text-white px-1.5 py-0.5 rounded shadow uppercase"
-                    >
-                      {box.label}
-                    </span>
-                  </div>
-                ))}
-              </div>
-
-              {/* High-Visibility Action Buttons */}
-              <div className="w-full grid grid-cols-2 gap-2 mt-2.5">
-                <button
-                  onClick={() => fileInputRef.current.click()}
-                  className="w-full py-2 px-3 rounded-xl bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 border border-[#c6d7cd] dark:border-slate-700 text-[11px] sm:text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center justify-center gap-1.5 transition-all shadow-2xs cursor-pointer active:scale-98"
-                >
-                  <Upload className="h-3.5 w-3.5 text-emerald-700 dark:text-emerald-400" />
-                  <span>Upload Photo</span>
-                </button>
-                <button
-                  onClick={startCamera}
-                  className="w-full py-2 px-3 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-[11px] sm:text-xs font-bold flex items-center justify-center gap-1.5 shadow-md shadow-emerald-700/20 transition-all cursor-pointer active:scale-98"
-                >
-                  <Video className="h-3.5 w-3.5" />
-                  <span>Open Camera</span>
-                </button>
-              </div>
-            </div>
           ) : (
-            <div
-              onClick={() => fileInputRef.current.click()}
-              className="w-full h-64 sm:h-72 lg:h-80 border-2 border-dashed border-[#d1ded5] dark:border-slate-700 hover:border-emerald-600 rounded-xl flex flex-col items-center justify-center cursor-pointer transition-colors p-4 text-center bg-white dark:bg-slate-900"
-            >
-              <div className="p-3 rounded-full bg-emerald-50 dark:bg-slate-800 text-emerald-700 dark:text-emerald-400 mb-2">
-                <Camera className="h-6 w-6" />
-              </div>
-              <span className="text-xs font-bold text-slate-800 dark:text-slate-200">Upload Container Food Photo</span>
-            </div>
-          )}
+            <div className="flex items-center gap-2 pt-1">
+              <button
+                type="button"
+                disabled={analyzing}
+                onClick={() => {
+                  if (fileInputRef.current) {
+                    fileInputRef.current.click();
+                  }
+                }}
+                className="flex-1 py-2 px-3 rounded-xl bg-white hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 text-xs font-bold border border-slate-300 dark:border-slate-700 flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs transition-all active:scale-95 disabled:opacity-50"
+              >
+                {analyzing ? (
+                  <>
+                    <RefreshCw className="h-3.5 w-3.5 animate-spin text-emerald-600" />
+                    <span>Analyzing...</span>
+                  </>
+                ) : (
+                  <>
+                    <Upload className="h-3.5 w-3.5 text-slate-600 dark:text-slate-300" />
+                    <span>Upload Photo</span>
+                  </>
+                )}
+              </button>
 
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={handleFileUpload}
-          />
-        </div>
+              <button
+                type="button"
+                onClick={startCamera}
+                className="py-2 px-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold flex items-center justify-center gap-1 border border-slate-300 dark:border-slate-700 shadow-2xs cursor-pointer transition-all active:scale-95"
+                title="Open Live Device Camera"
+              >
+                <Camera className="h-3.5 w-3.5 text-slate-600 dark:text-slate-300" />
+                <span className="hidden sm:inline">Webcam</span>
+              </button>
 
-        {/* Ripeness Stage Progression & Diagnostic Assessment */}
-        <div className="lg:col-span-7 flex flex-col justify-between space-y-3 sm:space-y-4">
-          {cvResult && (
-            <div className="space-y-3 sm:space-y-4">
-              
-              {/* 4-Stage Ripeness Level Progression Bar */}
-              <div className="p-3.5 sm:p-5 rounded-xl sm:rounded-2xl bg-[#f8faf9] dark:bg-slate-850 border border-[#d1ded5] dark:border-slate-800 shadow-xs dark:bg-slate-900/60">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-[11px] sm:text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
-                    <Layers className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-emerald-700 dark:text-emerald-400" /> Lifecycle Stage:
-                  </span>
-                  <span className="text-[11px] sm:text-xs font-bold text-emerald-800 dark:text-emerald-400">
-                    Stage {ripenessStep} of 4: {cvResult.ripeness_stage}
-                  </span>
-                </div>
-
-                {/* 4 Steps Graphic - 2x2 on Mobile, 1x4 on Desktop */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 sm:gap-2 mt-2 sm:mt-3">
-                  
-                  {/* Step 1: Unripe */}
-                  <div className={`p-2.5 sm:p-3 rounded-xl border text-center transition-all ${
-                    ripenessStep === 1
-                      ? 'bg-emerald-100 dark:bg-emerald-950/60 border-emerald-600 text-emerald-950 dark:text-emerald-300 font-bold shadow-sm'
-                      : 'bg-white dark:bg-slate-900 border-[#d1ded5] dark:border-slate-800 text-slate-600 dark:text-slate-400'
-                  }`}>
-                    <span className="text-[9px] sm:text-[10px] block font-bold">Stage 1</span>
-                    <span className="text-xs sm:text-xs font-bold truncate block">🟢 Unripe</span>
-                  </div>
-
-                  {/* Step 2: Optimal Ripe */}
-                  <div className={`p-2.5 sm:p-3 rounded-xl border text-center transition-all ${
-                    ripenessStep === 2
-                      ? 'bg-emerald-100 dark:bg-emerald-950/60 border-emerald-600 text-emerald-950 dark:text-emerald-300 font-bold shadow-sm'
-                      : 'bg-white dark:bg-slate-900 border-[#d1ded5] dark:border-slate-800 text-slate-600 dark:text-slate-400'
-                  }`}>
-                    <span className="text-[9px] sm:text-[10px] block font-bold">Stage 2</span>
-                    <span className="text-xs sm:text-xs font-bold truncate block">✨ Optimal</span>
-                  </div>
-
-                  {/* Step 3: Overripe */}
-                  <div className={`p-2.5 sm:p-3 rounded-xl border text-center transition-all ${
-                    ripenessStep === 3
-                      ? 'bg-amber-100 dark:bg-amber-950/60 border-amber-600 text-amber-950 dark:text-amber-300 font-bold shadow-sm'
-                      : 'bg-white dark:bg-slate-900 border-[#d1ded5] dark:border-slate-800 text-slate-600 dark:text-slate-400'
-                  }`}>
-                    <span className="text-[9px] sm:text-[10px] block font-bold">Stage 3</span>
-                    <span className="text-xs sm:text-xs font-bold truncate block">⚠️ Overripe</span>
-                  </div>
-
-                  {/* Step 4: Spoiled / Rotten */}
-                  <div className={`p-2.5 sm:p-3 rounded-xl border text-center transition-all ${
-                    ripenessStep === 4
-                      ? 'bg-rose-100 dark:bg-rose-950/60 border-rose-600 text-rose-950 dark:text-rose-300 font-bold shadow-sm animate-pulse'
-                      : 'bg-white dark:bg-slate-900 border-[#d1ded5] dark:border-slate-800 text-slate-600 dark:text-slate-400'
-                  }`}>
-                    <span className="text-[9px] sm:text-[10px] block font-bold">Stage 4</span>
-                    <span className="text-xs sm:text-xs font-bold truncate block">🚨 Spoiled</span>
-                  </div>
-
-                </div>
-              </div>
-
-              {/* 4 Sensory Indicators - 2x2 on Mobile, 1x4 on Desktop */}
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
-                <div className="p-3 sm:p-3.5 rounded-xl bg-white dark:bg-slate-850 border border-[#d1ded5] dark:border-slate-800 shadow-xs dark:bg-slate-900/80">
-                  <span className="text-[10px] sm:text-xs font-semibold text-slate-600 dark:text-slate-400 block truncate">Surface Browning</span>
-                  <div className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white mt-0.5">{cvResult.discoloration_score}%</div>
-                </div>
-
-                <div className="p-3 sm:p-3.5 rounded-xl bg-white dark:bg-slate-850 border border-[#d1ded5] dark:border-slate-800 shadow-xs dark:bg-slate-900/80">
-                  <span className="text-[10px] sm:text-xs font-semibold text-slate-600 dark:text-slate-400 block truncate">Mould Colony</span>
-                  <div className="text-sm sm:text-lg font-bold mt-0.5 flex items-center gap-1">
-                    {cvResult.mould_detected ? (
-                      <span className="text-rose-700 dark:text-rose-400 flex items-center gap-1 text-xs sm:text-sm font-bold truncate">
-                        <AlertTriangle className="h-3.5 w-3.5" /> Detected ({cvResult.mould_coverage}%)
-                      </span>
-                    ) : (
-                      <span className="text-emerald-700 dark:text-emerald-400 flex items-center gap-1 text-xs sm:text-sm font-bold">
-                        <CheckCircle2 className="h-3.5 w-3.5" /> Clear (0%)
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                <div className="p-3 sm:p-3.5 rounded-xl bg-white dark:bg-slate-850 border border-[#d1ded5] dark:border-slate-800 shadow-xs dark:bg-slate-900/80">
-                  <span className="text-[10px] sm:text-xs font-semibold text-slate-600 dark:text-slate-400 block truncate">Tissue Breakdown</span>
-                  <div className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white mt-0.5">{cvResult.texture_degradation}%</div>
-                </div>
-
-                <div className="p-3 sm:p-3.5 rounded-xl bg-white dark:bg-slate-850 border border-[#d1ded5] dark:border-slate-800 shadow-xs dark:bg-slate-900/80">
-                  <span className="text-[10px] sm:text-xs font-semibold text-slate-600 dark:text-slate-400 block truncate">Defect Regions</span>
-                  <div className="text-sm sm:text-base font-bold text-emerald-800 dark:text-emerald-400 mt-0.5">
-                    {cvResult.bounding_boxes?.length || 0} Region(s)
-                  </div>
-                </div>
-              </div>
-
-              {/* Detected Spoilage Symptoms Box */}
-              {cvResult.detected_defects?.length > 0 ? (
-                <div className={`p-3 sm:p-4 rounded-xl border ${
-                  cvResult.risk_level === 'Critical'
-                    ? 'bg-rose-50 dark:bg-rose-950/40 border-rose-300 dark:border-rose-800 text-rose-950 dark:text-rose-200'
-                    : 'bg-amber-50 dark:bg-amber-950/40 border-amber-300 dark:border-amber-800 text-amber-950 dark:text-amber-200'
-                }`}>
-                  <span className={`text-[11px] sm:text-xs font-bold flex items-center gap-1.5 mb-1 ${
-                    cvResult.risk_level === 'Critical' ? 'text-rose-900 dark:text-rose-400' : 'text-amber-900 dark:text-amber-400'
-                  }`}>
-                    <AlertTriangle className="h-3.5 w-3.5" /> Identified Spoilage Symptoms:
-                  </span>
-                  <ul className="text-[11px] sm:text-xs space-y-0.5 list-disc list-inside font-medium">
-                    {cvResult.detected_defects.map((d, i) => (
-                      <li key={i}>{d}</li>
-                    ))}
-                  </ul>
-                </div>
-              ) : (
-                <div className="p-3 sm:p-4 rounded-xl border border-emerald-300 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/40 text-[11px] sm:text-xs text-emerald-950 dark:text-emerald-200 flex items-center gap-2 font-bold">
-                  <CheckCircle2 className="h-4 w-4 text-emerald-700 dark:text-emerald-400" />
-                  <span>No biological defects detected. Item in prime harvest condition.</span>
-                </div>
-              )}
-
+              <button
+                type="button"
+                onClick={() => setIsEsp32ModalOpen(true)}
+                className="flex-1 py-2 px-3 rounded-xl bg-sky-700 hover:bg-sky-800 text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm cursor-pointer transition-all active:scale-95"
+              >
+                <Cpu className="h-3.5 w-3.5 text-sky-200" />
+                <span>ESP32-CAM Node</span>
+              </button>
             </div>
           )}
         </div>
 
-      </div>
-
-      {/* SECTION 3: Multi-Modal Spoilage Level Simulation & Remaining Shelf-Life Output */}
-      <div className={`p-3.5 sm:p-5 rounded-xl sm:rounded-2xl bg-[#f8faf9] dark:bg-slate-850 border ${levelTheme.border} shadow-sm space-y-3 dark:bg-slate-800/60 mt-4`}>
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-3">
-          <div className="flex items-center gap-2">
-            <Sliders className={`h-4 w-4 sm:h-5 sm:w-5 ${levelTheme.text}`} />
-            <span className="text-[11px] sm:text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider">Ripeness & Spoilage Level Simulation:</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className={`px-2.5 sm:px-3 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-black flex items-center gap-1.5 shadow-sm ${levelTheme.badge}`}>
-              <span className={`h-2 w-2 rounded-full ${levelTheme.bg}`} />
-              {dummyLevel}% — {levelTheme.label}
-            </span>
-          </div>
-        </div>
-
-        {/* Custom Multi-Color Gradient Slider Track */}
-        <div className="mt-1 sm:mt-2 relative">
-          <div className="h-3.5 w-full rounded-full overflow-hidden bg-slate-200 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 relative">
-            {/* 4-Color Full Gradient Background */}
-            <div
-              className="absolute inset-0 h-full w-full opacity-60"
-              style={{
-                background: "linear-gradient(to right, #059669 0%, #10b981 35%, #f59e0b 70%, #dc2626 100%)"
-              }}
-            />
-            {/* Active Colored Fill Bar */}
-            <div
-              className="h-full rounded-full transition-all duration-150 shadow-sm"
-              style={{
-                width: `${dummyLevel}%`,
-                backgroundColor: levelTheme.colorHex
-              }}
-            />
-          </div>
-
-          {/* Range input layered cleanly over track */}
-          <input
-            type="range"
-            min="0"
-            max="100"
-            value={dummyLevel}
-            onChange={(e) => handleDummySliderChange(e.target.value)}
-            className="w-full h-3.5 absolute top-0 left-0 opacity-0 cursor-pointer"
-          />
-        </div>
-
-        {/* Interactive Milestone Clicker Buttons */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 sm:gap-2 pt-2 border-t border-[#e1eae4] dark:border-slate-700">
-          <button
-            type="button"
-            onClick={() => handleDummySliderChange(10)}
-            className={`py-1.5 sm:py-2 px-2 sm:px-3 rounded-xl text-[10px] sm:text-xs font-bold flex items-center justify-center gap-1 border transition-all ${
-              dummyLevel < 25
-                ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-950 dark:text-emerald-300 border-emerald-600 shadow-sm'
-                : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-[#d1ded5] dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800'
-            }`}
-          >
-            <span>🟢</span> 0%-25% Unripe
-          </button>
-
-          <button
-            type="button"
-            onClick={() => handleDummySliderChange(40)}
-            className={`py-1.5 sm:py-2 px-2 sm:px-3 rounded-xl text-[10px] sm:text-xs font-bold flex items-center justify-center gap-1 border transition-all ${
-              dummyLevel >= 25 && dummyLevel < 55
-                ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-950 dark:text-emerald-300 border-emerald-600 shadow-sm'
-                : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-[#d1ded5] dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800'
-            }`}
-          >
-            <span>✨</span> 35%-50% Optimal
-          </button>
-
-          <button
-            type="button"
-            onClick={() => handleDummySliderChange(72)}
-            className={`py-1.5 sm:py-2 px-2 sm:px-3 rounded-xl text-[10px] sm:text-xs font-bold flex items-center justify-center gap-1 border transition-all ${
-              dummyLevel >= 55 && dummyLevel < 78
-                ? 'bg-amber-100 dark:bg-amber-950/60 text-amber-950 dark:text-amber-300 border-amber-600 shadow-sm'
-                : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-[#d1ded5] dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800'
-            }`}
-          >
-            <span>⚠️</span> 70%-75% Overripe
-          </button>
-
-          <button
-            type="button"
-            onClick={() => handleDummySliderChange(94)}
-            className={`py-1.5 sm:py-2 px-2 sm:px-3 rounded-xl text-[10px] sm:text-xs font-bold flex items-center justify-center gap-1 border transition-all ${
-              dummyLevel >= 78
-                ? 'bg-rose-100 dark:bg-rose-950/60 text-rose-950 dark:text-rose-300 border-rose-600 shadow-sm animate-pulse'
-                : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-[#d1ded5] dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800'
-            }`}
-          >
-            <span>🚨</span> 90%-100% Spoiled
-          </button>
-        </div>
-      </div>
-
-      {/* SECTION 4: REMAINING SHELF-LIFE (RSL) PREDICTION HERO CARD */}
-      <div className="p-3.5 sm:p-5 rounded-xl sm:rounded-2xl bg-gradient-to-br from-[#ecfdf5] via-[#f0fdf4] to-white dark:from-slate-900 dark:via-slate-900 dark:to-slate-800 border border-emerald-400 dark:border-emerald-600/40 shadow-sm space-y-3 sm:space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 border-b border-emerald-200 dark:border-emerald-900/50 pb-3">
-          <div className="flex items-center gap-2">
-            <div className="p-1.5 sm:p-2 rounded-xl bg-emerald-600 text-white shadow-sm">
-              <Hourglass className="h-4 w-4 sm:h-5 sm:w-5" />
-            </div>
-            <div>
-              <h3 className="text-xs sm:text-sm font-extrabold text-emerald-950 dark:text-emerald-300 uppercase tracking-wider flex items-center gap-1.5">
-                Remaining Shelf-Life (RSL) Dynamic Prediction
-              </h3>
-              <span className="text-[11px] sm:text-xs text-emerald-800 dark:text-emerald-400 font-semibold">
-                AI Multi-Modal Degradation Model • {cvResult?.category || "Fruits"} Preservability
-              </span>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <span className={`px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-xl text-[11px] sm:text-xs font-black border ${
-              shelfLifePrediction.hours === 0
-                ? 'bg-rose-100 dark:bg-rose-950/60 text-rose-900 dark:text-rose-300 border-rose-400 animate-pulse'
-                : (shelfLifePrediction.hours < 20 ? 'bg-amber-100 dark:bg-amber-950/60 text-amber-900 dark:text-amber-300 border-amber-400' : 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-950 dark:text-emerald-300 border-emerald-400')
-            }`}>
-              {shelfLifePrediction.action}
-            </span>
-          </div>
-        </div>
-
-        {/* Shelf-Life Metric Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-3">
+        {/* UNIT 2: IoT Environmental Telemetry Array (Right Side) */}
+        <div className="lg:col-span-6 flex flex-col p-4 sm:p-5 bg-[#f8faf9] dark:bg-slate-800/80 rounded-2xl border border-[#d1ded5] dark:border-slate-700 shadow-2xs space-y-3.5">
           
-          {/* Main Countdown Gauge */}
-          <div className="p-3 sm:p-4 rounded-xl bg-white dark:bg-slate-800/90 border border-emerald-200 dark:border-emerald-900/40 shadow-sm space-y-1">
-            <span className="text-[11px] sm:text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1">
-              <Clock className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-emerald-600 dark:text-emerald-400" /> Usable Shelf-Life Remaining
-            </span>
-            <div className="flex items-baseline gap-2">
-              <span className={`text-2xl sm:text-3xl font-black ${
-                shelfLifePrediction.hours === 0 ? 'text-rose-600 dark:text-rose-400' : (shelfLifePrediction.hours < 20 ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-700 dark:text-emerald-400')
-              }`}>
-                {shelfLifePrediction.hours}
+          {/* Header Bar: Node Identification, Live Stream Status & Telemetry Controls */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-[#e1eae4] dark:border-slate-700/80 text-xs gap-2.5">
+            <div className="flex items-center gap-2.5">
+              <div className="p-2 rounded-xl bg-sky-100 dark:bg-sky-950/80 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800 flex-shrink-0 shadow-2xs">
+                <Activity className="h-4 w-4" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-extrabold text-slate-900 dark:text-white text-xs sm:text-sm">
+                    Unit 2: IoT Chamber Sensors
+                  </span>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-sky-100 dark:bg-sky-950 text-sky-800 dark:text-sky-300 border border-sky-200 dark:border-sky-800 font-mono">
+                    {activeStorage?.node_id || "ESP32-NODE-01"}
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
+                  Continuous micro-climate monitoring synchronized with vision analysis
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-1.5 flex-wrap self-end sm:self-auto">
+              <span className="inline-flex items-center gap-1.5 text-[10px] font-bold px-2 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700 shadow-2xs">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                <span>Live Stream</span>
               </span>
-              <span className="text-xs sm:text-sm font-bold text-slate-600 dark:text-slate-300">Hours</span>
-              {shelfLifePrediction.days > 0 && (
-                <span className="text-[10px] sm:text-xs font-bold text-emerald-800 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800">
-                  ~{shelfLifePrediction.days} Days
+              <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono font-medium px-2 py-1 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700">
+                {lastSensorSyncTime ? `${lastSensorSyncTime}` : 'Syncing...'}
+              </span>
+              <button
+                type="button"
+                onClick={fetchLiveSensors}
+                title="Refresh live sensor telemetry from chamber node"
+                className="p-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:text-emerald-600 dark:hover:text-emerald-400 hover:border-emerald-300 dark:hover:border-emerald-700 transition-all cursor-pointer shadow-2xs active:scale-95"
+              >
+                <RefreshCw className={`h-3 w-3 ${isSyncingSensors ? 'animate-spin text-emerald-500' : ''}`} />
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsSensorModalOpen(true)}
+                className="px-2.5 py-1 rounded-lg bg-sky-600 hover:bg-sky-700 text-white text-[10px] font-bold flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer shadow-xs"
+                title="Update or simulate chamber sensor readings"
+              >
+                <Sliders className="h-3 w-3" />
+                <span>Update Telemetry</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Environmental Micro-Climate Banner */}
+          <div className={`p-3 rounded-xl border shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 transition-all ${
+            activeStorage?.status === 'warning' || (Math.abs((activeStorage?.current_temp || 11) - (activeStorage?.target_temp || 11)) > 3.5) || ((activeStorage?.voc || 0) > 0.6)
+              ? 'bg-amber-50 dark:bg-amber-950/40 border-amber-300 dark:border-amber-800'
+              : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800'
+          }`}>
+            <div className="space-y-0.5">
+              <span className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400 block tracking-wider">
+                Chamber Micro-Climate Status
+              </span>
+              {activeStorage?.status === 'warning' || (Math.abs((activeStorage?.current_temp || 11) - (activeStorage?.target_temp || 11)) > 3.5) || ((activeStorage?.voc || 0) > 0.6) ? (
+                <span className="text-xs font-black text-amber-700 dark:text-amber-400 flex items-center gap-1.5">
+                  <AlertTriangle className="h-3.5 w-3.5 text-amber-500 animate-pulse flex-shrink-0" />
+                  <span>Thermal or Gas Stress Detected • Accelerated Decay Phase</span>
+                </span>
+              ) : (
+                <span className="text-xs font-black text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5">
+                  <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse flex-shrink-0" />
+                  <span>Optimal Cold Chain Storage • Safe Atmospheric Envelope</span>
                 </span>
               )}
             </div>
-            <p className="text-[10px] sm:text-[11px] text-slate-600 dark:text-slate-300 font-semibold">
-              {shelfLifePrediction.safeDeadline}
-            </p>
-          </div>
-
-          {/* Freshness & Quality Retention Score */}
-          <div className="p-3 sm:p-4 rounded-xl bg-white dark:bg-slate-800/90 border border-emerald-200 dark:border-emerald-900/40 shadow-sm space-y-1">
-            <span className="text-[11px] sm:text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1">
-              <Sparkles className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-emerald-600 dark:text-emerald-400" /> Freshness Index
-            </span>
-            <div className="flex items-baseline gap-2">
-              <span className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white">
-                {shelfLifePrediction.percentage}%
+            <div className="flex items-center gap-2 self-start sm:self-auto">
+              <span className="text-[11px] font-bold text-slate-600 dark:text-slate-300 font-mono px-2 py-0.5 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+                Target: {activeStorage?.target_temp || 11.0}°C • {activeStorage?.target_humidity || 89}% RH
               </span>
-              <span className="text-[10px] sm:text-xs font-bold text-slate-500 dark:text-slate-400">Score</span>
-            </div>
-            <div className="w-full bg-slate-100 dark:bg-slate-700 rounded-full h-1.5 sm:h-2 mt-1 overflow-hidden border border-slate-200 dark:border-slate-600">
-              <div 
-                className="h-full rounded-full transition-all duration-300"
-                style={{ 
-                  width: `${shelfLifePrediction.percentage}%`,
-                  backgroundColor: shelfLifePrediction.percentage > 50 ? '#059669' : (shelfLifePrediction.percentage > 20 ? '#d97706' : '#dc2626')
-                }}
-              />
             </div>
           </div>
 
-          {/* Biological Decay Multiplier */}
-          <div className="p-3 sm:p-4 rounded-xl bg-white dark:bg-slate-800/90 border border-emerald-200 dark:border-emerald-900/40 shadow-sm space-y-1">
-            <span className="text-[11px] sm:text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1">
-              <TrendingDown className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-emerald-600 dark:text-emerald-400" /> Degradation Rate
-            </span>
-            <div className="text-xs sm:text-sm font-bold text-slate-800 dark:text-slate-200 mt-1">
-              {shelfLifePrediction.decayRate}
+          {/* 4-Parameter IoT Telemetry Matrix (2x2 Grid) */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+            
+            {/* 1. Chamber Temperature */}
+            <div className="p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xs space-y-2 relative overflow-hidden transition-all hover:border-rose-300 dark:hover:border-rose-900 flex flex-col justify-between">
+              <div className="flex items-center justify-between text-xs">
+                <div className="flex items-center gap-1.5 font-bold text-slate-700 dark:text-slate-200">
+                  <div className="p-1 rounded-lg bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900">
+                    <Thermometer className="h-3.5 w-3.5" />
+                  </div>
+                  <span>Temperature</span>
+                </div>
+                <span className={`text-[10px] font-black px-2 py-0.5 rounded-full border ${
+                  Math.abs((activeStorage?.current_temp || 11.0) - (activeStorage?.target_temp || 11.0)) > 3.5
+                    ? 'bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800'
+                    : 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
+                }`}>
+                  {Math.abs((activeStorage?.current_temp || 11.0) - (activeStorage?.target_temp || 11.0)) > 3.5 ? 'Drift Alert' : 'Optimal'}
+                </span>
+              </div>
+
+              <div className="flex items-baseline justify-between pt-0.5">
+                <div className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">
+                  {activeStorage?.current_temp || 11.4}°C
+                </div>
+                <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 font-mono">
+                  Set: {activeStorage?.target_temp || 11.0}°C ({((activeStorage?.current_temp || 11.0) - (activeStorage?.target_temp || 11.0)) >= 0 ? `+${(((activeStorage?.current_temp || 11.0) - (activeStorage?.target_temp || 11.0))).toFixed(1)}` : (((activeStorage?.current_temp || 11.0) - (activeStorage?.target_temp || 11.0))).toFixed(1)}°C)
+                </span>
+              </div>
+
+              <div className="space-y-1">
+                <div className="w-full bg-slate-100 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                  <div 
+                    className={`h-full rounded-full transition-all duration-300 ${
+                      Math.abs((activeStorage?.current_temp || 11.0) - (activeStorage?.target_temp || 11.0)) > 3.5 ? 'bg-rose-500' : 'bg-emerald-500'
+                    }`}
+                    style={{ width: `${Math.min(100, Math.max(5, ((activeStorage?.current_temp || 11.0) / 35.0) * 100))}%` }}
+                  />
+                </div>
+                <div className="flex items-center justify-between text-[9px] text-slate-400 font-medium">
+                  <span>0°C Min</span>
+                  <span className="text-slate-600 dark:text-slate-300 font-bold">Target: {activeStorage?.target_temp || 11.0}°C</span>
+                  <span>35°C Max</span>
+                </div>
+              </div>
+
+              <div className="pt-1 border-t border-slate-100 dark:border-slate-800/80 text-[10px] text-slate-500 dark:text-slate-400 flex items-center justify-between">
+                <span>Sensor: DHT22 Digital</span>
+                <span className="text-emerald-600 dark:text-emerald-400 font-semibold">Cold Chain Stable</span>
+              </div>
             </div>
-            <p className="text-[10px] sm:text-[11px] text-slate-600 dark:text-slate-400 mt-1 font-medium">
-              Dynamic multi-modal fusion of visual ripeness ({dummyLevel}%) & storage parameters.
+
+            {/* 2. Relative Humidity */}
+            <div className="p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xs space-y-2 relative overflow-hidden transition-all hover:border-sky-300 dark:hover:border-sky-900 flex flex-col justify-between">
+              <div className="flex items-center justify-between text-xs">
+                <div className="flex items-center gap-1.5 font-bold text-slate-700 dark:text-slate-200">
+                  <div className="p-1 rounded-lg bg-sky-50 dark:bg-sky-950/60 text-sky-600 dark:text-sky-400 border border-sky-200 dark:border-sky-900">
+                    <Droplets className="h-3.5 w-3.5" />
+                  </div>
+                  <span>Rel. Humidity</span>
+                </div>
+                <span className={`text-[10px] font-black px-2 py-0.5 rounded-full border ${
+                  (activeStorage?.current_humidity || 90.0) < 70 || (activeStorage?.current_humidity || 90.0) > 96
+                    ? 'bg-amber-50 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border-amber-200 dark:border-amber-800'
+                    : 'bg-sky-50 dark:bg-sky-950/60 text-sky-800 dark:text-sky-300 border border-sky-200 dark:border-sky-800'
+                }`}>
+                  {(activeStorage?.current_humidity || 90.0) < 70 ? 'Dry' : ((activeStorage?.current_humidity || 90.0) > 96 ? 'Condensing' : 'Hydrated')}
+                </span>
+              </div>
+
+              <div className="flex items-baseline justify-between pt-0.5">
+                <div className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">
+                  {activeStorage?.current_humidity || 90.2}%
+                </div>
+                <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 font-mono">
+                  Target: {activeStorage?.target_humidity || 89}% RH
+                </span>
+              </div>
+
+              <div className="space-y-1">
+                <div className="w-full bg-slate-100 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-sky-500 rounded-full transition-all duration-300"
+                    style={{ width: `${Math.min(100, Math.max(10, activeStorage?.current_humidity || 90.0))}%` }}
+                  />
+                </div>
+                <div className="flex items-center justify-between text-[9px] text-slate-400 font-medium">
+                  <span>30% Dry</span>
+                  <span className="text-sky-700 dark:text-sky-400 font-bold">Crisper Safe Zone</span>
+                  <span>100% Sat</span>
+                </div>
+              </div>
+
+              <div className="pt-1 border-t border-slate-100 dark:border-slate-800/80 text-[10px] text-slate-500 dark:text-slate-400 flex items-center justify-between">
+                <span>Sensor: Capacitive Array</span>
+                <span className="text-sky-600 dark:text-sky-400 font-semibold">Turgor Preserved</span>
+              </div>
+            </div>
+
+            {/* 3. VOC & Ethylene */}
+            <div className="p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xs space-y-2 relative overflow-hidden transition-all hover:border-amber-300 dark:hover:border-amber-900 flex flex-col justify-between">
+              <div className="flex items-center justify-between text-xs">
+                <div className="flex items-center gap-1.5 font-bold text-slate-700 dark:text-slate-200">
+                  <div className="p-1 rounded-lg bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-900">
+                    <Wind className="h-3.5 w-3.5" />
+                  </div>
+                  <span>VOC & Ethylene</span>
+                </div>
+                <span className={`text-[10px] font-black px-2 py-0.5 rounded-full border ${
+                  (activeStorage?.voc || 0.32) > 0.60
+                    ? 'bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800'
+                    : ((activeStorage?.voc || 0.32) > 0.35 ? 'bg-amber-50 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border-amber-200 dark:border-amber-800' : 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800')
+                }`}>
+                  {(activeStorage?.voc || 0.32) > 0.60 ? 'High Decay' : ((activeStorage?.voc || 0.32) > 0.35 ? 'Ripening Gas' : 'Fresh Range')}
+                </span>
+              </div>
+
+              <div className="flex items-baseline justify-between pt-0.5">
+                <div className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">
+                  {activeStorage?.voc || 0.32} <span className="text-xs font-semibold text-slate-500">ppm</span>
+                </div>
+                <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 font-mono">
+                  Safe: &lt;0.40 ppm
+                </span>
+              </div>
+
+              <div className="space-y-1">
+                <div className="w-full bg-slate-100 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                  <div 
+                    className={`h-full rounded-full transition-all duration-300 ${
+                      (activeStorage?.voc || 0.32) > 0.60 ? 'bg-rose-500' : ((activeStorage?.voc || 0.32) > 0.35 ? 'bg-amber-500' : 'bg-emerald-500')
+                    }`}
+                    style={{ width: `${Math.min(100, Math.max(5, ((activeStorage?.voc || 0.32) / 2.0) * 100))}%` }}
+                  />
+                </div>
+                <div className="flex items-center justify-between text-[9px] text-slate-400 font-medium">
+                  <span>0.00 Clean</span>
+                  <span className="text-amber-700 dark:text-amber-400 font-bold">C₂H₄ Respiration</span>
+                  <span>2.00 Decay</span>
+                </div>
+              </div>
+
+              <div className="pt-1 border-t border-slate-100 dark:border-slate-800/80 text-[10px] text-slate-500 dark:text-slate-400 flex items-center justify-between">
+                <span>Sensor: MQ-135 Gas Cell</span>
+                <span className="text-amber-600 dark:text-amber-400 font-semibold">Sub-Senescence</span>
+              </div>
+            </div>
+
+            {/* 4. CO2 Respiration */}
+            <div className="p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xs space-y-2 relative overflow-hidden transition-all hover:border-emerald-300 dark:hover:border-emerald-900 flex flex-col justify-between">
+              <div className="flex items-center justify-between text-xs">
+                <div className="flex items-center gap-1.5 font-bold text-slate-700 dark:text-slate-200">
+                  <div className="p-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900">
+                    <Gauge className="h-3.5 w-3.5" />
+                  </div>
+                  <span>CO₂ Respiration</span>
+                </div>
+                <span className={`text-[10px] font-black px-2 py-0.5 rounded-full border ${
+                  (activeStorage?.co2 || 415) > 1000
+                    ? 'bg-amber-50 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border-amber-200 dark:border-amber-800'
+                    : 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
+                }`}>
+                  {(activeStorage?.co2 || 415) > 1000 ? 'Vent Required' : 'Aerobic Optimal'}
+                </span>
+              </div>
+
+              <div className="flex items-baseline justify-between pt-0.5">
+                <div className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">
+                  {activeStorage?.co2 || 415} <span className="text-xs font-semibold text-slate-500">ppm</span>
+                </div>
+                <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 font-mono">
+                  Ceiling: &lt;1000 ppm
+                </span>
+              </div>
+
+              <div className="space-y-1">
+                <div className="w-full bg-slate-100 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                  <div 
+                    className={`h-full rounded-full transition-all duration-300 ${
+                      (activeStorage?.co2 || 415) > 1000 ? 'bg-amber-500' : 'bg-emerald-500'
+                    }`}
+                    style={{ width: `${Math.min(100, Math.max(10, (((activeStorage?.co2 || 415) - 350) / 1200) * 100))}%` }}
+                  />
+                </div>
+                <div className="flex items-center justify-between text-[9px] text-slate-400 font-medium">
+                  <span>350 Ambient</span>
+                  <span className="text-emerald-700 dark:text-emerald-400 font-bold">NDIR Optical Array</span>
+                  <span>1500 Peak</span>
+                </div>
+              </div>
+
+              <div className="pt-1 border-t border-slate-100 dark:border-slate-800/80 text-[10px] text-slate-500 dark:text-slate-400 flex items-center justify-between">
+                <span>Sensor: NDIR Optical</span>
+                <span className="text-emerald-600 dark:text-emerald-400 font-semibold">Aerobic Dormancy</span>
+              </div>
+            </div>
+
+          </div>
+
+          {/* Chamber Atmosphere & Aeration Status Card */}
+          <div className="p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xs space-y-2 text-xs">
+            <div className="flex items-center justify-between pb-1.5 border-b border-slate-100 dark:border-slate-800">
+              <span className="font-extrabold text-slate-900 dark:text-white flex items-center gap-1.5">
+                <Zap className="h-3.5 w-3.5 text-amber-500" /> Chamber Atmosphere & Aeration Status
+              </span>
+              <span className="text-[10px] font-bold text-slate-400 font-mono">
+                Sensor Bus: I2C (0x3C) • DHT22/MQ-135 Array
+              </span>
+            </div>
+            <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed">
+              {activeStorage?.status === 'warning' || (Math.abs((activeStorage?.current_temp || 11.0) - (activeStorage?.target_temp || 11.0)) > 3.5)
+                ? `Elevated thermal respiration observed at ${activeStorage?.current_temp || 11.4}°C (${((activeStorage?.current_temp || 11.0) - (activeStorage?.target_temp || 11.0)).toFixed(1)}°C above setpoint). VOC ripening gas accumulation detected at ${activeStorage?.voc || 0.32} ppm.`
+                : `Optimal cold chain stability maintained at ${activeStorage?.current_temp || 11.4}°C (target: ${activeStorage?.target_temp || 11.0}°C). Relative humidity at ${activeStorage?.current_humidity || 90.2}% preserves cellular turgor pressure without surface condensation.`}
             </p>
           </div>
-
         </div>
+
       </div>
+      {/* ─────────────────────────────────────────────────────────────
+          MASTER FUSED QUALITY ASSESSMENT (CROSS-CHECKING BOTH UNITS)
+          "Output as Spoiled or Fresh and with Remaining Shelf Life"
+          ───────────────────────────────────────────────────────────── */}
+      {(() => {
+        // Calculation fusing 60% Optical Vision + 40% IoT Environmental Sensors
+        const tempDev = Math.max(0, (Number(activeStorage?.current_temp || 11.0) - Number(activeStorage?.target_temp || 11.0)));
+        const tempPenalty = tempDev * 3.5;
+        const vocExcess = Math.max(0, Number(activeStorage?.voc || 0.32) - 0.35);
+        const vocPenalty = vocExcess * 25.0;
+        
+        const co2Excess = Math.max(0, Number(activeStorage?.co2 || 450) - 900);
+        const co2Penalty = (co2Excess / 1000.0) * 20.0;
+        const curHum = Number(activeStorage?.current_humidity || 90.0);
+        const humPenalty = curHum < 75 ? (75 - curHum) * 0.8 : (curHum > 95 ? (curHum - 95) * 2.0 : 0);
+
+        const sensorScore = Math.min(100, Math.round(tempPenalty + vocPenalty + co2Penalty + humPenalty));
+
+        const simScore = simulationSpoilageOverride;
+        const visualScore = cvResult?.visual_spoilage_score || cvResult?.ripeness_percent || 15.0;
+
+        const fusedScore = simScore !== null 
+          ? simScore 
+          : Math.min(99.0, Math.round(((sensorScore * 0.40) + (visualScore * 0.60)) * 10) / 10);
+
+        const dynamicHours = Math.max(0, Math.round((shelfLifePrediction.hours * (1 - (sensorScore / 130.0))) * 10) / 10);
+        const fusedRsl = simScore !== null
+          ? (simScore >= 70 ? 14.0 : 115.0)
+          : (fusedScore >= 75 ? 0.0 : dynamicHours);
+
+        const isSpoiledState = fusedScore >= 75.0 || cvResult?.mould_detected || cvResult?.risk_level === 'Critical';
+        const isNearSpoilState = !isSpoiledState && (fusedScore >= 50.0 || fusedRsl <= 24.0 || cvResult?.risk_level === 'High');
+        const isFreshState = !isSpoiledState && !isNearSpoilState;
+
+
+
+        return (
+          <div className="p-5 sm:p-6 rounded-2xl bg-white dark:bg-slate-900 border-2 border-emerald-500/80 dark:border-emerald-500/60 shadow-lg space-y-5 animate-fade-in">
+            
+            {/* Master Header */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100 dark:border-slate-800">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] font-extrabold uppercase px-2.5 py-0.5 rounded-full bg-slate-900 text-white dark:bg-white dark:text-slate-900">
+                    Dual-Unit Fusion Output
+                  </span>
+                  <span className="text-xs font-bold text-slate-500 dark:text-slate-400">
+                    Cross-Checked: Camera Optical Inspection + IoT Environmental Telemetry
+                  </span>
+                </div>
+                <h3 className="text-base sm:text-lg font-black text-slate-900 dark:text-white mt-1">
+                  Comprehensive Produce Health & Usable Shelf-Life Verdict
+                </h3>
+              </div>
+
+              {/* Definitive Output Badge: FRESH vs NEAR-SPOIL vs SPOILED */}
+              <div>
+                {isFreshState && (
+                  <span className="px-4 py-2 rounded-2xl text-xs sm:text-sm font-black bg-emerald-100 text-emerald-950 dark:bg-emerald-950 dark:text-emerald-200 border-2 border-emerald-500 shadow-sm flex items-center gap-2">
+                    <CheckCircle2 className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-600 dark:text-emerald-400" />
+                    <span>STATUS: FRESH (Grade A Harvest)</span>
+                  </span>
+                )}
+                {isNearSpoilState && (
+                  <span className="px-4 py-2 rounded-2xl text-xs sm:text-sm font-black bg-amber-100 text-amber-950 dark:bg-amber-950 dark:text-amber-200 border-2 border-amber-500 shadow-sm flex items-center gap-2 animate-pulse">
+                    <AlertTriangle className="h-4 w-4 sm:h-5 sm:w-5 text-amber-600 dark:text-amber-400" />
+                    <span>STATUS: NEAR-SPOIL (~75% Threshold Reached)</span>
+                  </span>
+                )}
+                {isSpoiledState && (
+                  <span className="px-4 py-2 rounded-2xl text-xs sm:text-sm font-black bg-rose-100 text-rose-950 dark:bg-rose-950 dark:text-rose-200 border-2 border-rose-500 shadow-sm flex items-center gap-2 animate-pulse">
+                    <XCircle className="h-4 w-4 sm:h-5 sm:w-5 text-rose-600 dark:text-rose-400" />
+                    <span>STATUS: SPOILED / QUARANTINE</span>
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Core Metrics: Fused Spoilage % and Fused RSL */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              
+              {/* Spoilage Probability */}
+              <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 space-y-1">
+                <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase">
+                  Fused Spoilage Probability
+                </span>
+                <div className="flex items-baseline gap-2">
+                  <span className={`text-3xl font-black ${
+                    isSpoiledState ? 'text-rose-600' : (isNearSpoilState ? 'text-amber-600' : 'text-emerald-700 dark:text-emerald-400')
+                  }`}>
+                    {fusedScore}%
+                  </span>
+                  <span className="text-xs font-bold text-slate-500 dark:text-slate-400">60% Camera + 40% Sensors</span>
+                </div>
+                <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2 mt-2 overflow-hidden">
+                  <div
+                    className={`h-full rounded-full transition-all duration-300 ${
+                      isSpoiledState ? 'bg-rose-600' : (isNearSpoilState ? 'bg-amber-500' : 'bg-emerald-600')
+                    }`}
+                    style={{ width: `${Math.min(100, fusedScore)}%` }}
+                  />
+                </div>
+              </div>
+
+              {/* Remaining Shelf Life */}
+              <div className="p-4 rounded-xl bg-[#ecfdf5] dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 space-y-1">
+                <span className="text-xs font-bold text-emerald-900 dark:text-emerald-300 uppercase flex items-center gap-1.5">
+                  <Hourglass className="h-4 w-4 text-emerald-700 dark:text-emerald-400" /> Remaining Shelf-Life (RSL)
+                </span>
+                <div className="flex items-baseline gap-2">
+                  <span className="text-3xl font-black text-emerald-800 dark:text-emerald-300">
+                    {fusedRsl}
+                  </span>
+                  <span className="text-sm font-bold text-slate-600 dark:text-slate-400">Hours</span>
+                  {fusedRsl > 0 && (
+                    <span className="text-[11px] font-bold text-emerald-800 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-900 px-2 py-0.5 rounded-full border border-emerald-300 dark:border-emerald-700">
+                      ~{(fusedRsl / 24.0).toFixed(1)} Days Usable
+                    </span>
+                  )}
+                </div>
+                <p className="text-[11px] font-medium text-emerald-900 dark:text-emerald-300">
+                  {isSpoiledState 
+                    ? "Safe deadline expired. Do not cook or serve." 
+                    : (isNearSpoilState ? "Must consume or cook within 24 hours!" : "Safe for normal FIFO kitchen rotation.")}
+                </p>
+              </div>
+
+              {/* Degradation Rate */}
+              <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 space-y-1">
+                <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase flex items-center gap-1.5">
+                  <TrendingDown className="h-4 w-4 text-emerald-600 dark:text-emerald-400" /> Decay Multiplier
+                </span>
+                <div className="text-lg font-black text-slate-900 dark:text-white mt-1">
+                  {isSpoiledState ? "Severe breakdown (> 5.2x baseline)" : (isNearSpoilState ? "Accelerated cellular breakdown (3.4x)" : "Normal metabolic aging (1.0x)")}
+                </div>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
+                  Grounded on visual browning ({cvResult?.discoloration_score || 3.2}%) & chamber thermal baseline.
+                </p>
+              </div>
+
+            </div>
+
+            {/* Cross-Check Breakdown Table */}
+            <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-2.5 text-xs">
+              <span className="font-extrabold text-slate-900 dark:text-white uppercase tracking-wider block">
+                Unit Cross-Check Validation Details ({activeStorage?.name}):
+              </span>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 space-y-1">
+                  <span className="font-bold text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5">
+                    <Camera className="h-3.5 w-3.5" /> Unit 1: Optical Camera Findings:
+                  </span>
+                  <p className="text-slate-600 dark:text-slate-300 leading-relaxed">
+                    {cvResult?.detected_defects?.length > 0 
+                      ? cvResult.detected_defects.join(". ")
+                      : "Epidermal peel intact (Grade A), 3.2% localized surface browning, 0% fungal mould spores detected."}
+                  </p>
+                </div>
+                <div className="p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 space-y-1">
+                  <span className="font-bold text-sky-700 dark:text-sky-400 flex items-center gap-1.5">
+                    <Activity className="h-3.5 w-3.5" /> Unit 2: IoT Sensors Findings:
+                  </span>
+                  <p className="text-slate-600 dark:text-slate-300 leading-relaxed">
+                    Chamber temperature at {activeStorage?.current_temp || 11.4}°C (target: {activeStorage?.target_temp || 11.0}°C), relative humidity at {activeStorage?.current_humidity || 90.2}% RH, VOC ripening gas at {activeStorage?.voc || 0.32} ppm, CO2 respiration at {activeStorage?.co2 || 415} ppm.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+                      </div>
+        );
+      })()}
+
+
+      {/* ESP32-CAM Hardware Node Modal */}
+      {isEsp32ModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+          <div className="w-full max-w-lg bg-white dark:bg-slate-900 rounded-2xl border border-sky-500/40 shadow-2xl p-5 space-y-4 animate-in fade-in zoom-in-95 duration-150">
+            
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-sky-100 dark:bg-sky-950/80 text-sky-700 dark:text-sky-400">
+                  <Cpu className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm sm:text-base font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
+                    <span>ESP32-CAM Optical Hardware Node</span>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-sky-100 dark:bg-sky-950 text-sky-800 dark:text-sky-300 font-bold border border-sky-300 dark:border-sky-800">
+                      Component 3
+                    </span>
+                  </h3>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                    Direct Wi-Fi snapshot pull from your AI-Thinker ESP32-CAM module
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsEsp32ModalOpen(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* IP URL Input */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center justify-between">
+                <span>ESP32-CAM Snapshot URL</span>
+                <span className="text-[10px] font-normal text-slate-400">e.g. http://172.20.10.2/capture</span>
+              </label>
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <Wifi className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+                  <input
+                    type="text"
+                    value={esp32Url}
+                    onChange={(e) => setEsp32Url(e.target.value)}
+                    placeholder="http://172.20.10.2/capture"
+                    className="w-full pl-9 pr-3 py-2 text-xs font-mono font-bold rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-none focus:border-sky-600"
+                  />
+                </div>
+                <button
+                  onClick={() => captureFromEsp32()}
+                  disabled={esp32Loading}
+                  className="px-4 py-2 rounded-xl bg-sky-700 hover:bg-sky-800 disabled:opacity-50 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm cursor-pointer"
+                >
+                  {esp32Loading ? (
+                    <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Camera className="h-3.5 w-3.5" />
+                  )}
+                  <span>{esp32Loading ? "Pulling..." : "Snap Frame"}</span>
+                </button>
+              </div>
+              <p className="text-[10px] text-slate-500 dark:text-slate-400">
+                Ensure your laptop and ESP32-CAM are connected to the same Wi-Fi network or mobile phone hotspot.
+              </p>
+            </div>
+
+            {/* Error Message if any */}
+            {esp32Error && (
+              <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-300 dark:border-rose-800 text-rose-900 dark:text-rose-300 text-xs flex items-start gap-2">
+                <AlertTriangle className="h-4 w-4 text-rose-600 flex-shrink-0 mt-0.5" />
+                <div className="space-y-0.5">
+                  <strong className="block font-bold">Connection Failed</strong>
+                  <span>{esp32Error}</span>
+                </div>
+              </div>
+            )}
+
+            {/* Auto-Poll Controls with Configurable Frequency */}
+            <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 space-y-2.5">
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <span className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                    <Radio className={`h-3.5 w-3.5 ${esp32AutoPoll ? 'text-emerald-500 animate-pulse' : 'text-slate-400'}`} />
+                    Autonomous Container Surveillance
+                  </span>
+                  <span className="text-[10px] text-slate-500 dark:text-slate-400 block">
+                    {esp32LastCaptureTime ? `Last captured: ${esp32LastCaptureTime}` : "Periodic non-intrusive container quality assessment"}
+                  </span>
+                </div>
+                <button
+                  onClick={() => setEsp32AutoPoll(prev => !prev)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    esp32AutoPoll
+                      ? 'bg-emerald-600 text-white shadow-sm'
+                      : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-slate-600'
+                  }`}
+                >
+                  {esp32AutoPoll ? "Active (Stop)" : "Enable Auto-Capture"}
+                </button>
+              </div>
+
+              {/* Interval Selection: 15s (Demo), 15m, 1h (Standard), 4h */}
+              <div className="pt-2 border-t border-slate-200 dark:border-slate-700/60 flex items-center justify-between text-xs">
+                <span className="text-[11px] font-semibold text-slate-600 dark:text-slate-400 flex items-center gap-1">
+                  <Clock className="h-3 w-3 text-slate-400" /> Capture Frequency:
+                </span>
+                <div className="flex items-center gap-1">
+                  {[
+                    { label: "15s (Demo)", val: 15 },
+                    { label: "15m", val: 900 },
+                    { label: "1h (HACCP Standard)", val: 3600 },
+                    { label: "4h", val: 14400 }
+                  ].map(opt => (
+                    <button
+                      key={opt.val}
+                      onClick={() => setEsp32PollInterval(opt.val)}
+                      className={`px-2 py-0.5 rounded text-[10px] font-bold transition-colors cursor-pointer ${
+                        esp32PollInterval === opt.val
+                          ? 'bg-sky-600 text-white shadow-2xs'
+                          : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Firmware & Arduino Sketch Quick Links */}
+            <div className="p-3 rounded-xl bg-emerald-50/60 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/40 text-[11px] text-emerald-950 dark:text-emerald-200 space-y-1">
+              <strong className="block font-bold text-emerald-900 dark:text-emerald-300">
+                📄 Arduino Firmware & Circuit Guide:
+              </strong>
+              <div className="flex flex-col gap-1 text-[10px] text-slate-600 dark:text-slate-400 font-mono">
+                <span>• Sketch: <code>iot_firmware/esp32_cam_spoilage_node.ino</code></span>
+                <span>• Wiring: <code>iot_firmware/ESP32_CAM_SETUP_GUIDE.md</code></span>
+                <span>• Camera: AI-Thinker OV2640 (VGA 640x480 with Flash LED GPIO 4)</span>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="flex justify-end pt-2 border-t border-slate-200 dark:border-slate-800">
+              <button
+                onClick={() => setIsEsp32ModalOpen(false)}
+                className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-xs font-bold text-slate-700 dark:text-slate-300 cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* Inspection Audit History Modal */}
+      {isHistoryDrawerOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+          <div className="w-full max-w-3xl max-h-[85vh] bg-white dark:bg-slate-900 rounded-2xl border border-emerald-500/40 shadow-2xl p-5 space-y-4 flex flex-col animate-in fade-in zoom-in-95 duration-150">
+            
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-400">
+                  <History className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm sm:text-base font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
+                    <span>Inspection Audit Log & History</span>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 font-bold border border-emerald-300 dark:border-emerald-800">
+                      {inspectionHistory.length} Records
+                    </span>
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    Persistent inspection logs from manual uploads & ESP32-CAM autonomous optical scans
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={fetchHistory}
+                  className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400"
+                  title="Refresh Log"
+                >
+                  <RefreshCw className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsHistoryDrawerOpen(false)}
+                  className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* History Table Container */}
+            <div className="flex-1 overflow-y-auto space-y-2 pr-1">
+              {inspectionHistory.length === 0 ? (
+                <div className="text-center py-12 text-slate-500 dark:text-slate-400 space-y-2">
+                  <Database className="h-8 w-8 mx-auto text-slate-400" />
+                  <p className="text-sm font-bold">No inspection records logged yet.</p>
+                  <p className="text-xs">Upload a photograph or trigger an ESP32-CAM optical capture to record telemetry.</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {inspectionHistory.map((rec, idx) => (
+                    <div
+                      key={rec.analysis_id || idx}
+                      className="p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-[#f8faf9] dark:bg-slate-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs"
+                    >
+                      <div className="flex items-center gap-3">
+                        <span className="text-2xl">{rec.produce_icon || "🍎"}</span>
+                        <div>
+                          <div className="font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
+                            <span>{rec.produce || "Produce Item"}</span>
+                            <span className="text-[10px] text-slate-500 font-normal">
+                              ({rec.confidence || 0}% conf)
+                            </span>
+                          </div>
+                          <div className="text-[10px] text-slate-500 font-mono mt-0.5">
+                            {rec.analysis_id} • {rec.source} • {rec.timestamp ? new Date(rec.timestamp).toLocaleString() : ""}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-2 text-right">
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                          rec.risk_level === 'Critical'
+                            ? 'bg-rose-100 dark:bg-rose-950 text-rose-900 dark:text-rose-300 border-rose-300'
+                            : (rec.risk_level === 'High' ? 'bg-amber-100 dark:bg-amber-950 text-amber-900 dark:text-amber-300 border-amber-300' : 'bg-emerald-100 dark:bg-emerald-950 text-emerald-950 dark:text-emerald-300 border-emerald-300')
+                        }`}>
+                          {rec.stage}
+                        </span>
+
+                        <span className="px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-[10px] font-bold font-mono">
+                          RSL: {rec.rsl_hours}h
+                        </span>
+
+                        {rec.mould_detected && (
+                          <span className="px-1.5 py-0.5 rounded bg-rose-500 text-white text-[9px] font-black uppercase">
+                            Mould
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="flex items-center justify-between pt-3 border-t border-slate-200 dark:border-slate-800">
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    await axios.delete("http://localhost:8000/api/vision/history");
+                    setInspectionHistory([]);
+                  } catch (e) {
+                    console.error("Error clearing history:", e);
+                  }
+                }}
+                className="px-3 py-1.5 rounded-xl text-xs font-bold text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 cursor-pointer"
+              >
+                Clear Audit Log
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsHistoryDrawerOpen(false)}
+                className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-xs font-bold text-slate-700 dark:text-slate-300 cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* Produce Encyclopedia & Inspection Criteria Modal (47 Commodities) */}
+      {isEncyclopediaModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/65 backdrop-blur-xs">
+          <div className="w-full max-w-5xl max-h-[92vh] flex flex-col bg-white dark:bg-slate-900 rounded-3xl border border-emerald-500/40 shadow-2xl p-4 sm:p-6 space-y-4 animate-in fade-in zoom-in-95 duration-150 overflow-hidden">
+            
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3 flex-shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-2xl bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300">
+                  <BookOpen className="h-6 w-6" />
+                </div>
+                <div>
+                  <h3 className="text-base sm:text-lg font-black text-slate-900 dark:text-white flex items-center gap-2">
+                    <span>Produce Encyclopedia & Inspection Criteria</span>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 font-bold border border-emerald-300 dark:border-emerald-800 font-mono">
+                      47 Commodities
+                    </span>
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    Surface textures, color profiles, and 4-stage biological spoilage progression benchmarks
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setIsEncyclopediaModalOpen(false)}
+                className="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer transition-colors"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Filter and Search Bar */}
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 flex-shrink-0">
+              {/* Category Filter Pills */}
+              <div className="flex items-center gap-1.5 p-1 rounded-xl bg-slate-100 dark:bg-slate-800/80 w-full sm:w-auto">
+                {[
+                  { id: "all", label: "All Items", count: 47 },
+                  { id: "fruits", label: "Fruits", count: 20 },
+                  { id: "vegetables", label: "Vegetables", count: 27 },
+                ].map(tab => (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => {
+                      setEncyclopediaCategory(tab.id);
+                      fetchEncyclopedia(tab.id, encyclopediaSearch);
+                    }}
+                    className={`flex-1 sm:flex-none px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                      encyclopediaCategory === tab.id
+                        ? 'bg-emerald-700 text-white shadow-xs'
+                        : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
+                    }`}
+                  >
+                    <span>{tab.label}</span>
+                    <span className="ml-1.5 text-[10px] opacity-80 font-mono">({tab.count})</span>
+                  </button>
+                ))}
+              </div>
+
+              {/* Search Input */}
+              <div className="relative w-full sm:w-72">
+                <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+                <input
+                  type="text"
+                  value={encyclopediaSearch}
+                  onChange={(e) => {
+                    setEncyclopediaSearch(e.target.value);
+                    fetchEncyclopedia(encyclopediaCategory, e.target.value);
+                  }}
+                  placeholder="Search name, variety, pathogen..."
+                  className="w-full pl-9 pr-3 py-2 text-xs rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-none focus:border-emerald-600 font-medium"
+                />
+              </div>
+            </div>
+
+            {/* Main Content: Split Grid (List Left, Deep-Dive Right) */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 flex-1 min-h-0 overflow-hidden">
+              
+              {/* Left Column: Commodity Scroll List */}
+              <div className="lg:col-span-4 overflow-y-auto pr-1 space-y-1.5 custom-scrollbar max-h-[60vh] lg:max-h-[65vh]">
+                {encyclopediaLoading && encyclopediaItems.length === 0 ? (
+                  <div className="p-8 text-center text-xs text-slate-400">
+                    <RefreshCw className="h-6 w-6 animate-spin mx-auto text-emerald-600 mb-2" />
+                    Loading encyclopedia...
+                  </div>
+                ) : encyclopediaItems.length === 0 ? (
+                  <div className="p-8 text-center text-xs text-slate-400">
+                    No produce matching search criteria.
+                  </div>
+                ) : (
+                  encyclopediaItems.map((item) => {
+                    const isSelected = selectedEncyclopediaProduce?.produce_name === item.produce_name;
+                    return (
+                      <div
+                        key={item.produce_name}
+                        onClick={() => setSelectedEncyclopediaProduce(item)}
+                        className={`p-2.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between gap-2.5 ${
+                          isSelected
+                            ? 'bg-emerald-50/90 dark:bg-emerald-950/60 border-emerald-500 shadow-xs'
+                            : 'bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-800 hover:border-emerald-300 dark:hover:border-slate-700'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <span className="text-2xl p-1 bg-white dark:bg-slate-900 rounded-lg flex-shrink-0 shadow-2xs">
+                            {item.icon || "🍎"}
+                          </span>
+                          <div className="min-w-0">
+                            <div className="text-xs font-black text-slate-900 dark:text-white truncate">
+                              {item.short_name || item.produce_name}
+                            </div>
+                            <div className="text-[10px] text-slate-500 dark:text-slate-400 truncate italic">
+                              {item.scientific_name}
+                            </div>
+                          </div>
+                        </div>
+
+                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                          item.category === 'Fruits'
+                            ? 'bg-amber-100 dark:bg-amber-950/80 text-amber-900 dark:text-amber-300'
+                            : 'bg-emerald-100 dark:bg-emerald-950/80 text-emerald-900 dark:text-emerald-300'
+                        }`}>
+                          {item.category === 'Fruits' ? 'Fruit' : 'Veg'}
+                        </span>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+
+              {/* Right Column: Selected Produce Comprehensive Inspection Sheet */}
+              <div className="lg:col-span-8 overflow-y-auto pr-1 space-y-3.5 custom-scrollbar max-h-[60vh] lg:max-h-[65vh]">
+                {selectedEncyclopediaProduce ? (
+                  <div className="space-y-3.5">
+                    
+                    {/* Header Banner */}
+                    <div className="p-3.5 rounded-2xl bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-slate-800 dark:to-slate-800/60 border border-emerald-200 dark:border-slate-700 flex flex-wrap items-center justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <span className="text-3xl p-1.5 bg-white dark:bg-slate-900 rounded-2xl shadow-xs">
+                          {selectedEncyclopediaProduce.icon}
+                        </span>
+                        <div>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h4 className="text-sm sm:text-base font-black text-slate-900 dark:text-white">
+                              {selectedEncyclopediaProduce.produce_name}
+                            </h4>
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900 text-emerald-900 dark:text-emerald-100">
+                              {selectedEncyclopediaProduce.variety}
+                            </span>
+                          </div>
+                          <div className="text-xs text-slate-600 dark:text-slate-400 font-mono italic">
+                            {selectedEncyclopediaProduce.scientific_name} • Origin: {selectedEncyclopediaProduce.origin}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <div className="text-right text-[11px]">
+                          <span className="text-slate-400 font-medium block">Cold Shelf-Life</span>
+                          <span className="font-black text-emerald-700 dark:text-emerald-400 font-mono">
+                            {selectedEncyclopediaProduce.storage?.cold_shelf_hours}h (~{(selectedEncyclopediaProduce.storage?.cold_shelf_hours / 24).toFixed(0)}d)
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Section 1: Surface Texture & Optical Traits */}
+                    <div className="p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-2">
+                      <div className="flex items-center justify-between text-xs pb-1.5 border-b border-slate-100 dark:border-slate-800">
+                        <span className="font-extrabold text-slate-900 dark:text-white flex items-center gap-1.5">
+                          <Sliders className="h-4 w-4 text-emerald-600" />
+                          <span>1. Surface Texture & Cuticular Structure</span>
+                        </span>
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                          {selectedEncyclopediaProduce.surface?.gloss_level}
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                        <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-700">
+                          <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block">Texture Type</span>
+                          <span className="font-black text-slate-900 dark:text-white">
+                            {selectedEncyclopediaProduce.surface?.texture_type}
+                          </span>
+                          <p className="text-[11px] text-slate-600 dark:text-slate-300 mt-1 leading-relaxed">
+                            {selectedEncyclopediaProduce.surface?.tactile_feel}
+                          </p>
+                        </div>
+
+                        <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-700 space-y-1.5">
+                          <div className="flex items-center justify-between text-[11px]">
+                            <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400">Micro-Roughness Index</span>
+                            <span className="font-mono font-bold text-emerald-600">
+                              {selectedEncyclopediaProduce.surface?.roughness_score} / 10
+                            </span>
+                          </div>
+                          <div className="w-full bg-slate-200 dark:bg-slate-700 h-1.5 rounded-full overflow-hidden">
+                            <div 
+                              className="bg-emerald-600 h-full rounded-full" 
+                              style={{ width: `${(selectedEncyclopediaProduce.surface?.roughness_score / 10) * 100}%` }}
+                            />
+                          </div>
+                          <div className="flex items-center justify-between text-[9px] text-slate-400">
+                            <span>1 (Smooth Waxy)</span>
+                            <span>10 (Spiked/Warty)</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Section 2: Peel / Leaf Color Profile */}
+                    <div className="p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-2">
+                      <div className="flex items-center justify-between text-xs pb-1.5 border-b border-slate-100 dark:border-slate-800">
+                        <span className="font-extrabold text-slate-900 dark:text-white flex items-center gap-1.5">
+                          <Eye className="h-4 w-4 text-emerald-600" />
+                          <span>2. Peel / Leaf Color Profile & Pigments</span>
+                        </span>
+                        <span className="text-[10px] font-mono text-slate-500">
+                          {selectedEncyclopediaProduce.color?.hsv_range}
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                        <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-700">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400">Primary Hue:</span>
+                            <span className="font-bold text-slate-900 dark:text-white text-xs">
+                              {selectedEncyclopediaProduce.color?.primary_hue}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400">Secondary:</span>
+                            <span className="text-slate-700 dark:text-slate-300 text-xs">
+                              {selectedEncyclopediaProduce.color?.secondary_hue}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-slate-600 dark:text-slate-400 mt-1 italic">
+                            {selectedEncyclopediaProduce.color?.description}
+                          </p>
+                        </div>
+
+                        <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-700 space-y-1 text-xs">
+                          <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block">Baseline Natural Pigment Ranges</span>
+                          <div className="space-y-1 pt-1 text-[11px]">
+                            <div className="flex items-center justify-between">
+                              <span className="text-emerald-700 dark:text-emerald-400 font-medium">Chlorophyll Green:</span>
+                              <span className="font-mono font-bold">{selectedEncyclopediaProduce.color?.baseline_ratios?.green_pct?.join(' - ')}%</span>
+                            </div>
+                            <div className="flex items-center justify-between">
+                              <span className="text-amber-700 dark:text-amber-400 font-medium">Carotenoid Yellow:</span>
+                              <span className="font-mono font-bold">{selectedEncyclopediaProduce.color?.baseline_ratios?.yellow_pct?.join(' - ')}%</span>
+                            </div>
+                            <div className="flex items-center justify-between">
+                              <span className="text-rose-700 dark:text-rose-400 font-medium">Anthocyanin / Red:</span>
+                              <span className="font-mono font-bold">{selectedEncyclopediaProduce.color?.baseline_ratios?.red_pct?.join(' - ')}%</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Section 3: 4-Stage Spoilage Progression Guide */}
+                    <div className="p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-2.5">
+                      <div className="flex items-center justify-between text-xs pb-1.5 border-b border-slate-100 dark:border-slate-800">
+                        <span className="font-extrabold text-slate-900 dark:text-white flex items-center gap-1.5">
+                          <AlertTriangle className="h-4 w-4 text-amber-500" />
+                          <span>3. Biological Spoilage Progression Stages (0% to 100%)</span>
+                        </span>
+                        <span className="text-[10px] font-bold text-slate-400 font-mono">
+                          Target: {selectedEncyclopediaProduce.storage?.optimal_temp_c}°C • {selectedEncyclopediaProduce.storage?.optimal_humidity_pct}% RH
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 text-xs">
+                        
+                        {/* Stage 1: Fresh */}
+                        <div className="p-3 rounded-xl bg-emerald-50/70 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800 space-y-1">
+                          <div className="flex items-center justify-between text-[11px]">
+                            <span className="font-black text-emerald-900 dark:text-emerald-300 flex items-center gap-1">
+                              <span className="w-2 h-2 rounded-full bg-emerald-500" /> Stage 1: Fresh (0-25%)
+                            </span>
+                            <span className="font-mono text-[10px] font-bold text-emerald-700 dark:text-emerald-400">Grade A</span>
+                          </div>
+                          <p className="text-[11px] text-slate-700 dark:text-slate-300 leading-tight">
+                            {selectedEncyclopediaProduce.spoilage_progression?.fresh?.visual_cues}
+                          </p>
+                          <div className="text-[10px] font-medium text-emerald-800 dark:text-emerald-300 pt-0.5">
+                            Firmness: {selectedEncyclopediaProduce.spoilage_progression?.fresh?.firmness}
+                          </div>
+                        </div>
+
+                        {/* Stage 2: Optimal */}
+                        <div className="p-3 rounded-xl bg-sky-50/70 dark:bg-sky-950/40 border border-sky-300 dark:border-sky-800 space-y-1">
+                          <div className="flex items-center justify-between text-[11px]">
+                            <span className="font-black text-sky-900 dark:text-sky-300 flex items-center gap-1">
+                              <span className="w-2 h-2 rounded-full bg-sky-500" /> Stage 2: Peak Ripe (25-50%)
+                            </span>
+                            <span className="font-mono text-[10px] font-bold text-sky-700 dark:text-sky-400">Grade B</span>
+                          </div>
+                          <p className="text-[11px] text-slate-700 dark:text-slate-300 leading-tight">
+                            {selectedEncyclopediaProduce.spoilage_progression?.optimal?.visual_cues}
+                          </p>
+                          <div className="text-[10px] font-medium text-sky-800 dark:text-sky-300 pt-0.5">
+                            Firmness: {selectedEncyclopediaProduce.spoilage_progression?.optimal?.firmness}
+                          </div>
+                        </div>
+
+                        {/* Stage 3: Near Spoilage ~75% */}
+                        <div className="p-3 rounded-xl bg-amber-50/70 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 space-y-1">
+                          <div className="flex items-center justify-between text-[11px]">
+                            <span className="font-black text-amber-900 dark:text-amber-300 flex items-center gap-1">
+                              <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" /> Stage 3: Near-Spoil (~75%)
+                            </span>
+                            <span className="font-mono text-[10px] font-bold text-amber-700 dark:text-amber-400">Rescue Alert</span>
+                          </div>
+                          <p className="text-[11px] text-slate-700 dark:text-slate-300 leading-tight">
+                            {selectedEncyclopediaProduce.spoilage_progression?.near_spoilage?.visual_cues}
+                          </p>
+                          <div className="text-[10px] font-bold text-amber-800 dark:text-amber-300 bg-amber-100/80 dark:bg-amber-900/60 p-1 rounded mt-1">
+                            👨‍🍳 {selectedEncyclopediaProduce.spoilage_progression?.near_spoilage?.chef_action}
+                          </div>
+                        </div>
+
+                        {/* Stage 4: Spoiled Quarantine */}
+                        <div className="p-3 rounded-xl bg-rose-50/70 dark:bg-rose-950/40 border border-rose-300 dark:border-rose-800 space-y-1">
+                          <div className="flex items-center justify-between text-[11px]">
+                            <span className="font-black text-rose-900 dark:text-rose-300 flex items-center gap-1">
+                              <span className="w-2 h-2 rounded-full bg-rose-500" /> Stage 4: Spoiled (75-100%)
+                            </span>
+                            <span className="font-mono text-[10px] font-bold text-rose-700 dark:text-rose-400">Quarantine</span>
+                          </div>
+                          <p className="text-[11px] text-slate-700 dark:text-slate-300 leading-tight">
+                            {selectedEncyclopediaProduce.spoilage_progression?.spoiled?.visual_cues}
+                          </p>
+                          <div className="text-[10px] font-bold text-rose-800 dark:text-rose-300 pt-0.5">
+                            Pathogens: {selectedEncyclopediaProduce.spoilage_progression?.spoiled?.common_pathogens}
+                          </div>
+                        </div>
+
+                      </div>
+                    </div>
+
+                  </div>
+                ) : (
+                  <div className="p-12 text-center text-xs text-slate-400">
+                    Select a produce commodity on the left to inspect its surface texture, color, and spoilage progression criteria.
+                  </div>
+                )}
+              </div>
+
+            </div>
+
+            {/* Modal Footer */}
+            <div className="flex items-center justify-between pt-3 border-t border-slate-200 dark:border-slate-800 flex-shrink-0">
+              <div className="text-xs text-slate-500 dark:text-slate-400 hidden sm:block">
+                All 47 commodities calibrated with RGB/HSV color moments, Sobel/Laplacian gradients & decay kinetics.
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsEncyclopediaModalOpen(false)}
+                  className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-xs font-bold text-slate-700 dark:text-slate-300 cursor-pointer"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

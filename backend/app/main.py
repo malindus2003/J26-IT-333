@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from .routers import sensors, vision, predictions, inventory, recommendations, demand, kitchen, waste, orders, auth
+from .routers import sensors, vision, produce, predictions, inventory, recommendations, demand, kitchen, waste, orders, auth
 from .data.mock_data import STORAGE_ZONES
 from .routers.inventory import inventory_db
 from .routers.orders import orders_db
@@ -27,6 +27,7 @@ app.include_router(demand.router)           # Component 1 (Nanayakkara K.A.J.Y)
 app.include_router(kitchen.router)          # Component 2 (Pahesara H.H.D.S)
 app.include_router(sensors.router)          # Component 3 (Maddumage M. S - IoT)
 app.include_router(vision.router)           # Component 3 (Maddumage M. S - CV)
+app.include_router(produce.router)          # Component 3 (Produce Assessment & Models Status)
 app.include_router(predictions.router)      # Component 3 (Maddumage M. S - AI Fusion)
 app.include_router(recommendations.router)  # Component 3 (Maddumage M. S - Decisions)
 app.include_router(waste.router)            # Component 4 (Pathirana P.R.T)
@@ -52,10 +53,10 @@ def root():
 def get_dashboard_summary():
     """Aggregated cross-component KPIs for Executive Overview."""
     total_batches = len(inventory_db)
-    critical_items = sum(1 for i in inventory_db if i["risk_level"] == "Critical")
-    high_risk_items = sum(1 for i in inventory_db if i["risk_level"] == "High")
-    safe_items = sum(1 for i in inventory_db if i["risk_level"] in ["Low", "Medium"])
-    avg_spoilage_prob = round(sum(i["spoilage_prob"] for i in inventory_db) / max(1, total_batches), 1)
+    critical_items = sum(1 for i in inventory_db if i.get("risk_level") == "Critical" or i.get("is_quarantine"))
+    high_risk_items = sum(1 for i in inventory_db if i.get("is_smart_fifo_target") or i.get("risk_level") == "High")
+    safe_items = sum(1 for i in inventory_db if not i.get("is_quarantine") and not i.get("is_smart_fifo_target"))
+    avg_spoilage_prob = round(sum(i.get("spoilage_prob", 0.0) for i in inventory_db) / max(1, total_batches), 1)
 
     # Active Orders metrics
     active_orders_count = sum(1 for o in orders_db if o["status"] in ["pending", "in_prep"])
@@ -79,3 +80,8 @@ def get_dashboard_summary():
         "total_revenue_lkr": total_revenue_lkr,
         "system_health": "Optimal Operational Flow"
     }
+
+@app.get("/api/status")
+def get_system_status():
+    return {"status": "online", "message": "Smart Restaurant API Operational"}
+

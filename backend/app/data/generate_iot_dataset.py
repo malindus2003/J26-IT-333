@@ -18,82 +18,31 @@ from datetime import datetime, timedelta
 def generate_sri_lankan_iot_dataset(output_filepath, days=14, interval_mins=30):
     os.makedirs(os.path.dirname(output_filepath), exist_ok=True)
 
-    # 5 Food Zones & Sri Lankan produce specifications
+    # 4 Produce Storage Chambers & Authentic Sri Lankan Fruit & Vegetable Specifications
     ZONES_CONFIG = [
         {
-            "zone_id": "zone-meat",
-            "zone_name": "Zone 4: Walk-In Poultry & Meat Chiller",
-            "food_category": "Meat",
-            "food_item": "Fresh Broiler Chicken Cuts",
-            "batch_prefix": "MT-CMB",
-            "target_temp": 1.5,
-            "temp_std": 0.6,
-            "target_hum": 75.0,
-            "hum_std": 2.5,
-            "base_nh3": 0.05,
-            "base_co2": 450.0,
-            "base_voc": 0.15,
-            "max_shelf_life": 96.0, # 4 days fresh at 1.5°C
-            "nh3_sensitivity": 1.8, # High NH3 emission during protein proteolysis
-            "voc_sensitivity": 0.8
-        },
-        {
-            "zone_id": "zone-seafood",
-            "zone_name": "Zone 5: Deep Chill Seafood & Ice Vault",
-            "food_category": "Seafood",
-            "food_item": "Yellowfin Tuna (Kelawalla) & Prawns",
-            "batch_prefix": "SF-NEG",
-            "target_temp": 0.5,
-            "temp_std": 0.5,
-            "target_hum": 88.0,
-            "hum_std": 2.0,
-            "base_nh3": 0.08,
-            "base_co2": 420.0,
-            "base_voc": 0.20,
-            "max_shelf_life": 72.0, # 3 days fresh on ice
-            "nh3_sensitivity": 2.4, # Very rapid TMA / Ammonia formation
-            "voc_sensitivity": 1.2
-        },
-        {
-            "zone_id": "zone-dairy",
-            "zone_name": "Zone 3: Dairy & Pastry Refrigerator",
-            "food_category": "Dairy",
-            "food_item": "Pasteurized Whole Milk & Buffalo Curd",
-            "batch_prefix": "DY-KND",
-            "target_temp": 3.0,
-            "temp_std": 0.5,
-            "target_hum": 65.0,
-            "hum_std": 3.0,
-            "base_nh3": 0.02,
-            "base_co2": 410.0,
-            "base_voc": 0.08,
-            "max_shelf_life": 120.0, # 5 days
-            "nh3_sensitivity": 0.5,
-            "voc_sensitivity": 1.5 # Lactic acid / sour fermentation volatiles
-        },
-        {
             "zone_id": "zone-fruit",
-            "zone_name": "Zone 1: Tropical Fruit Chamber",
+            "zone_name": "Zone 1: Tropical Fruit Chiller (11°C)",
             "food_category": "Fruits",
-            "food_item": "Local Cavendish Bananas & Red Papaya",
-            "batch_prefix": "FR-GPH",
-            "target_temp": 9.0,
+            "food_item": "Ambul Kesel & Karthakolomban Mango",
+            "batch_prefix": "SL-FR-AMB",
+            "target_temp": 11.0,
             "temp_std": 0.8,
-            "target_hum": 90.0,
+            "target_hum": 88.0,
             "hum_std": 2.5,
-            "base_nh3": 0.01,
-            "base_co2": 750.0,
+            "base_nh3": 0.015,
+            "base_co2": 720.0,
             "base_voc": 0.35,
-            "max_shelf_life": 168.0, # 7 days
+            "max_shelf_life": 168.0,
             "nh3_sensitivity": 0.2,
-            "voc_sensitivity": 2.5 # Heavy ethylene & ester off-gassing
+            "voc_sensitivity": 2.5
         },
         {
             "zone_id": "zone-veg",
-            "zone_name": "Zone 2: Leafy Greens & Vegetable Crisper",
+            "zone_name": "Zone 2: Leafy Greens & Crisper Vault (5°C)",
             "food_category": "Vegetables",
-            "food_item": "Gotukola, Kankun & Nuwara Eliya Carrots",
-            "batch_prefix": "VG-NWE",
+            "food_item": "Gotukola & Kankun (Water Spinach)",
+            "batch_prefix": "SL-VG-GTK",
             "target_temp": 5.0,
             "temp_std": 0.6,
             "target_hum": 92.0,
@@ -101,9 +50,43 @@ def generate_sri_lankan_iot_dataset(output_filepath, days=14, interval_mins=30):
             "base_nh3": 0.02,
             "base_co2": 580.0,
             "base_voc": 0.18,
-            "max_shelf_life": 144.0, # 6 days
+            "max_shelf_life": 120.0,
             "nh3_sensitivity": 0.3,
-            "voc_sensitivity": 1.4 # High respiration & moisture condensation
+            "voc_sensitivity": 1.4
+        },
+        {
+            "zone_id": "zone-root",
+            "zone_name": "Zone 3: Root & Solid Vegetable Vault (3.5°C)",
+            "food_category": "Vegetables",
+            "food_item": "Nuwara Eliya Carrots & Green Beans",
+            "batch_prefix": "SL-VG-CRT",
+            "target_temp": 3.5,
+            "temp_std": 0.5,
+            "target_hum": 85.0,
+            "hum_std": 2.0,
+            "base_nh3": 0.01,
+            "base_co2": 450.0,
+            "base_voc": 0.12,
+            "max_shelf_life": 192.0,
+            "nh3_sensitivity": 0.2,
+            "voc_sensitivity": 1.1
+        },
+        {
+            "zone_id": "zone-ambient",
+            "zone_name": "Zone 4: Ambient Kitchen & Pantry Rack (29°C)",
+            "food_category": "Fruits",
+            "food_item": "Red Lady Papaya & Mauritius Pineapple",
+            "batch_prefix": "SL-FR-PAP",
+            "target_temp": 28.5,
+            "temp_std": 1.2,
+            "target_hum": 78.0,
+            "hum_std": 3.0,
+            "base_nh3": 0.04,
+            "base_co2": 1100.0,
+            "base_voc": 1.2,
+            "max_shelf_life": 72.0,
+            "nh3_sensitivity": 0.4,
+            "voc_sensitivity": 3.2
         }
     ]
 

@@ -46,9 +46,19 @@ def ingest_esp32_telemetry(payload: SensorReading):
     Ingest real-time telemetry from ESP32 IoT microcontroller or hardware simulator.
     Updates the target zone's live sensor state.
     """
+    target_clean = payload.storage_zone.lower().strip()
     zone_match = None
     for zone in STORAGE_ZONES:
-        if zone["name"].lower() == payload.storage_zone.lower() or zone["id"] == payload.storage_zone:
+        zid = zone.get("id", "").lower()
+        zname = zone.get("name", "").lower()
+        if (target_clean == zid or 
+            target_clean == zname or 
+            target_clean in zname or 
+            zname in target_clean or
+            ("1" in target_clean and ("zone 1" in zname or "storage 1" in zname or "fruit" in zname)) or
+            ("2" in target_clean and ("zone 2" in zname or "storage 2" in zname or "veg" in zname)) or
+            ("3" in target_clean and ("zone 3" in zname or "storage 3" in zname or "root" in zname)) or
+            ("4" in target_clean and ("zone 4" in zname or "storage 4" in zname or "ambient" in zname))):
             zone_match = zone
             break
             
@@ -62,8 +72,15 @@ def ingest_esp32_telemetry(payload: SensorReading):
     zone_match["co2"] = round(payload.co2, 1)
     zone_match["voc"] = round(payload.voc, 3)
 
-    # Re-evaluate status
-    if payload.nh3 > 0.25 or payload.temperature > 5.0:
+    # Dynamic threshold evaluation calibrated for Fruit & Vegetable storage chambers
+    target_temp = zone_match.get("target_temp", 11.0)
+    temp_deviation = abs(payload.temperature - target_temp)
+    is_temp_warning = temp_deviation > 3.5  # Significant temperature deviation from setpoint
+    is_co2_warning = payload.co2 > 1100.0   # Produce respiration spike / ventilation required
+    is_humidity_warning = (payload.humidity > 96.0) or (payload.humidity < 70.0) # Condensation vs desiccation
+    is_nh3_warning = payload.nh3 > 0.05     # Soft rot / cellular tissue decay
+
+    if is_temp_warning or is_co2_warning or is_humidity_warning or is_nh3_warning:
         zone_match["status"] = "warning"
     else:
         zone_match["status"] = "optimal"

@@ -1,0 +1,21 @@
+{
+  "dataset_name": "Fruit Freshness Benchmark - Leakage-Free Foreground Multi-Modal Ingestion",
+  "total_samples": 3322,
+  "split_counts": {
+    "train": 2657,
+    "val": 332,
+    "test": 333
+  },
+  "species_distribution": {
+    "Apple": 941,
+    "Orange": 949,
+    "Banana": 1312,
+    "Strawberry": 120
+  },
+  "spoilage_distribution": {
+    "No visible spoilage detected": 2380,
+    "Significant visible spoilage": 942
+  },
+  "cross_split_hash_leakage": 0,
+  "feature_dimension": 42
+}

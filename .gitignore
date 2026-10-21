@@ -58,5 +58,6 @@ release/
 *.zip
 files/
 backend/app/data/public_benchmarks/fruit_freshness_images/
+backend/app/models/baseline_backup/
 backend/app/data/public_benchmarks/uci_gas_sensor_dataset/
-
+backend/app/data/public_benchmarks/strawberry_dataset/

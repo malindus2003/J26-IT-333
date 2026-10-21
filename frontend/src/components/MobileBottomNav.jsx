@@ -78,7 +78,7 @@ export default function MobileBottomNav({
                   className={`p-2 rounded-xl transition-all ${
                     isActive
                       ? 'bg-emerald-700 text-white shadow-md shadow-emerald-700/30 scale-105'
-                      : 'bg-[#f0f5f2] dark:bg-slate-850 text-slate-700 dark:text-slate-300'
+                      : 'bg-[#f0f5f2] dark:bg-slate-800 text-slate-700 dark:text-slate-300'
                   }`}
                 >
                   {React.cloneElement(m.icon, { className: 'h-4 w-4' })}
@@ -120,7 +120,7 @@ export default function MobileBottomNav({
                 className={`p-2 rounded-xl transition-all relative ${
                   activeOverflowModule || moreSheetOpen
                     ? 'bg-emerald-700 text-white shadow-md shadow-emerald-700/30 scale-105'
-                    : 'bg-[#f0f5f2] dark:bg-slate-850 text-slate-700 dark:text-slate-300'
+                    : 'bg-[#f0f5f2] dark:bg-slate-800 text-slate-700 dark:text-slate-300'
                 }`}
               >
                 {activeOverflowModule ? (
@@ -202,7 +202,7 @@ export default function MobileBottomNav({
                       className={`w-full p-3 rounded-2xl text-left transition-all flex items-center justify-between gap-3 cursor-pointer ${
                         isCurrent
                           ? 'bg-emerald-50 dark:bg-emerald-950/60 border-2 border-emerald-600 dark:border-emerald-500 shadow-sm'
-                          : 'bg-[#f7faf8] dark:bg-slate-850 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200/80 dark:border-slate-800'
+                          : 'bg-[#f7faf8] dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200/80 dark:border-slate-700'
                       }`}
                     >
                       <div className="flex items-center gap-3 min-w-0">
@@ -249,7 +249,7 @@ export default function MobileBottomNav({
             <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-2.5">
               
               {/* User Profile Info Card in Mobile Sheet */}
-              <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-850 border border-slate-200/80 dark:border-slate-800 flex items-center justify-between gap-3">
+              <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700 flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2.5 min-w-0">
                   <div className="p-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-xs flex-shrink-0">
                     {ROLES.find(r => r.id === currentRole)?.icon || <Crown className="h-4 w-4 text-emerald-500" />}

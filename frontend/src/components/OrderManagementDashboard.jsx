@@ -43,6 +43,7 @@ import AddMenuItemModal from './AddMenuItemModal';
 import AddReservationModal from './AddReservationModal';
 import axios from 'axios';
 
+import axios from 'axios';
 const DEFAULT_MENU = [
   {
     id: "menu-01",

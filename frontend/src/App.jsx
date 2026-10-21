@@ -3,7 +3,6 @@ import axios from 'axios';
 import { StatusBar, Style } from '@capacitor/status-bar';
 import Header, { getModulesForRole } from './components/Header';
 import MobileBottomNav from './components/MobileBottomNav';
-import StatsCards from './components/StatsCards';
 import StorageZoneTelemetry from './components/StorageZoneTelemetry';
 import VisionInspector from './components/VisionInspector';
 import MultiModalAssessor from './components/MultiModalAssessor';
@@ -11,43 +10,35 @@ import InventoryHealthTable from './components/InventoryHealthTable';
 import ActionRecommendations from './components/ActionRecommendations';
 import AlertNotificationCenter from './components/AlertNotificationCenter';
 import ESP32Simulator from './components/ESP32Simulator';
+import ErrorBoundary from './components/ErrorBoundary';
 import DemandForecastingDashboard from './components/DemandForecastingDashboard';
 import KitchenStaffDashboard from './components/KitchenStaffDashboard';
 import SmartWasteBinDashboard from './components/SmartWasteBinDashboard';
 import CentralExecutiveDashboard from './components/CentralExecutiveDashboard';
 import OrderManagementDashboard from './components/OrderManagementDashboard';
 import LoginScreen, { DEMO_CREDENTIALS } from './components/LoginScreen';
-import { Activity, LayoutDashboard, Camera, Cpu, ListFilter, AlertTriangle, Sparkles, X, TrendingUp, Users, Trash2, Layers, Check, ShoppingBag, Package, Truck, ShieldCheck, DollarSign, ChevronDown } from 'lucide-react';
+import { ChefHat, Activity, LayoutDashboard, Camera, Cpu, ListFilter, AlertTriangle, Sparkles, X, TrendingUp, Users, Trash2, Layers, Check, ShoppingBag, Package, Truck, ShieldCheck, DollarSign, ChevronDown } from 'lucide-react';
 import { DEFAULT_ZONES, DEFAULT_INVENTORY, DEFAULT_RECOMMENDATIONS, DEFAULT_DASHBOARD_STATS } from './data/mockData';
 
 // 4 Subparts of the Food Spoilage & Quality System for Dropdown Navigation
 const SPOILAGE_SUBPARTS = [
   {
     id: 'vision',
-    title: 'Optical Camera CV Scanner',
-    shortTitle: 'Optical Camera CV',
-    description: 'High-resolution photographic inspection, bounding box rot detection & visual ripeness scoring',
+    title: 'Integrated Vision & IoT Chamber Quality Inspector',
+    shortTitle: 'Vision + IoT Chamber',
+    description: 'Unified camera inspection & 5-parameter IoT sensor telemetry in Storage 1, cross-checking both units to output Fresh vs Spoiled status & RSL',
     icon: Camera,
-    badge: 'Computer Vision',
+    badge: 'Multi-Modal Fusion',
     badgeColor: 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-900 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700'
   },
   {
     id: 'assessor',
-    title: 'Multi-Modal Sensor Fusion Assessor',
-    shortTitle: 'AI Fusion Assessor',
-    description: 'XAI multi-modal fusion combining gas telemetry, thermal data & remaining shelf-life (RSL)',
-    icon: Cpu,
-    badge: 'XAI Predictive Model',
-    badgeColor: 'bg-blue-100 dark:bg-blue-950/60 text-blue-900 dark:text-blue-300 border-blue-300 dark:border-blue-700'
-  },
-  {
-    id: 'sensors',
-    title: 'Storage Zone IoT Telemetry',
-    shortTitle: 'Chamber IoT Telemetry',
-    description: 'Real-time NH3, CO2, VOC, humidity and temperature monitoring across 5 storage chambers',
-    icon: Activity,
-    badge: '5 Storage Chambers',
-    badgeColor: 'bg-teal-100 dark:bg-teal-950/60 text-teal-900 dark:text-teal-300 border-teal-300 dark:border-teal-700'
+    title: 'AI Culinary Divert & Recipe Directives',
+    shortTitle: 'AI Recipe Directives',
+    description: 'Zero-waste recipe recommendations, kitchen prep directives, and culinary divert for near-spoilage produce',
+    icon: ChefHat,
+    badge: 'Zero-Waste Chef AI',
+    badgeColor: 'bg-amber-100 dark:bg-amber-950/60 text-amber-900 dark:text-amber-300 border-amber-300 dark:border-amber-700'
   },
   {
     id: 'simulator',
@@ -56,7 +47,7 @@ const SPOILAGE_SUBPARTS = [
     description: 'Hardware simulation tool to test gas thresholds, anomaly alerts & sensor spikes',
     icon: Sparkles,
     badge: 'Hardware Test',
-    badgeColor: 'bg-amber-100 dark:bg-amber-950/60 text-amber-900 dark:text-amber-300 border-amber-300 dark:border-amber-700'
+    badgeColor: 'bg-teal-100 dark:bg-teal-950/60 text-teal-900 dark:text-teal-300 border-teal-300 dark:border-teal-700'
   }
 ];
 
@@ -113,7 +104,14 @@ export default function App() {
   // Spoilage Sub-Tabs: 'vision', 'assessor', 'sensors', 'simulator'
   const [spoilageSubTab, setSpoilageSubTab] = useState('vision');
   const [spoilageDropdownOpen, setSpoilageDropdownOpen] = useState(false);
+  const [targetProduceToInspect, setTargetProduceToInspect] = useState(null);
   const spoilageDropdownRef = useRef(null);
+
+  const handleNavigateToSpoilage = (produceName, subTab = 'vision') => {
+    setTargetProduceToInspect(produceName);
+    setSpoilageSubTab(subTab);
+    setActiveModule('spoilage');
+  };
   
   const [currentVisionFeatures, setCurrentVisionFeatures] = useState(null);
   const [showAlertsCenter, setShowAlertsCenter] = useState(false);
@@ -265,6 +263,7 @@ export default function App() {
             stats={stats}
             recommendations={recommendations}
             onNavigateModule={setActiveModule}
+            onNavigateToSpoilage={handleNavigateToSpoilage}
             onOpenAlertsCenter={() => setShowAlertsCenter(true)}
             onRefresh={fetchAllData}
             isDarkMode={isDarkMode}
@@ -299,7 +298,7 @@ export default function App() {
                     Perishable Inventory & Stock Valuation Matrix
                   </h2>
                   <p className="text-xs text-slate-600 dark:text-slate-300 mt-1 font-medium max-w-2xl leading-relaxed">
-                    Continuous monitoring of perishable food batches across 5 temperature-controlled chambers (Fruits, Veg, Dairy, Fish, Meat) with automated Smart FIFO consumption for orders.
+                    Continuous monitoring of perishable produce batches across 4 climate-controlled chambers (Fruits & Vegetables) with automated Smart FIFO consumption for orders.
                   </p>
                 </div>
               </div>
@@ -309,7 +308,7 @@ export default function App() {
                 <div className="p-3.5 rounded-xl bg-[#f8faf9] dark:bg-slate-800/80 border border-[#d1ded5] dark:border-slate-700">
                   <span className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400 block">Total Active Batches</span>
                   <div className="text-2xl font-black text-slate-900 dark:text-white mt-0.5">{inventoryItems.length}</div>
-                  <span className="text-[10px] text-emerald-700 dark:text-emerald-400 font-bold">Monitored 24/7 across 5 chambers</span>
+                  <span className="text-[10px] text-emerald-700 dark:text-emerald-400 font-bold">Monitored 24/7 across 4 chambers</span>
                 </div>
 
                 <div className="p-3.5 rounded-xl bg-[#f8faf9] dark:bg-slate-800/80 border border-[#d1ded5] dark:border-slate-700">
@@ -345,6 +344,8 @@ export default function App() {
               onRefresh={fetchAllData}
               isDarkMode={isDarkMode}
               onUpdateItems={setInventoryItems}
+              onNavigateToSpoilage={handleNavigateToSpoilage}
+              onNavigateModule={setActiveModule}
             />
           </div>
         )}
@@ -353,164 +354,129 @@ export default function App() {
         {activeModule === 'spoilage' && (
           <div className="space-y-4 sm:space-y-6">
             
-            {/* Spoilage Module Sub-Header & 4-Subpart Dropdown Navigation */}
-            <div className="glass-panel p-3.5 sm:p-5 rounded-xl sm:rounded-2xl bg-white dark:bg-slate-900 border border-[#d1ded5] dark:border-slate-800 shadow-sm space-y-3 sm:space-y-4">
-              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 sm:gap-4">
-                <div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="px-2.5 py-0.5 rounded-full text-[10px] sm:text-xs font-black bg-emerald-700 text-white shadow-xs flex items-center gap-1.5">
-                      <Cpu className="h-3 w-3 sm:h-3.5 sm:w-3.5" /> Component 3: Food Spoilage & Quality
-                    </span>
-                    <span className="text-[10px] text-slate-500 dark:text-slate-400 font-bold hidden sm:inline">
-                      • 4 Analytical Subparts
-                    </span>
+            {/* Redesigned Spoilage Module Sub-Header & 3-Subpart Navigation */}
+            <div className="glass-panel p-4 sm:p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-sm space-y-4">
+              
+              {/* Header: Clean Title & Live Status */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100 dark:border-slate-800">
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-2xl bg-gradient-to-br from-emerald-600 to-teal-700 flex items-center justify-center text-white shadow-md shadow-emerald-700/20 flex-shrink-0">
+                    <Cpu className="h-5 w-5" />
                   </div>
-                  <h2 className="text-base sm:text-xl font-black text-slate-900 dark:text-white tracking-tight mt-1">
-                    Multi-Modal Spoilage Detection & Remaining Shelf-Life (RSL)
-                  </h2>
-                  <p className="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400 mt-0.5 font-medium leading-relaxed">
-                    Fuses IoT gas & thermal sensor arrays with computer vision to prevent food waste and route expiring stock.
-                  </p>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h2 className="text-base sm:text-lg font-black text-slate-900 dark:text-white tracking-tight">
+                        Food Spoilage & Quality Assessment
+                      </h2>
+                      <span className="hidden sm:inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" /> Live Analysis Engine
+                      </span>
+                    </div>
+                    <p className="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400 font-medium">
+                      Multi-modal sensor fusion, optical rot classification, and remaining shelf-life (RSL) tracking.
+                    </p>
+                  </div>
                 </div>
 
-                {/* 4-Subpart Dropdown Selector */}
-                <div className="relative w-full lg:w-88" ref={spoilageDropdownRef}>
-                  <div className="text-[10px] font-black uppercase text-slate-500 dark:text-slate-400 mb-1 flex items-center justify-between">
-                    <span>Select Subpart (Dropdown)</span>
-                    <span className="text-emerald-700 dark:text-emerald-400 font-bold">4 Available</span>
-                  </div>
-
-                  {(() => {
-                    const activeSubpart = SPOILAGE_SUBPARTS.find(s => s.id === spoilageSubTab) || SPOILAGE_SUBPARTS[0];
-                    const ActiveIcon = activeSubpart.icon;
-                    return (
-                      <>
-                        <button
-                          type="button"
-                          onClick={() => setSpoilageDropdownOpen(!spoilageDropdownOpen)}
-                          className="w-full px-3.5 py-2.5 rounded-xl border border-[#c6d7cd] dark:border-slate-700 bg-[#f8faf9] dark:bg-slate-800 hover:border-emerald-600 dark:hover:border-emerald-500 flex items-center justify-between gap-2.5 shadow-2xs transition-all text-left group"
-                        >
-                          <div className="flex items-center gap-2.5 min-w-0">
-                            <div className="p-2 rounded-lg bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700 flex-shrink-0 group-hover:scale-105 transition-transform">
-                              <ActiveIcon className="h-4 w-4" />
-                            </div>
-                            <div className="min-w-0">
-                              <div className="text-[9px] uppercase font-black text-slate-400 dark:text-slate-400 leading-tight">
-                                Current Subpart View
-                              </div>
-                              <div className="text-xs font-black text-slate-900 dark:text-white truncate">
-                                {activeSubpart.title}
-                              </div>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2 flex-shrink-0">
-                            <span className={`hidden sm:inline-block text-[9px] font-black px-2 py-0.5 rounded-full border ${activeSubpart.badgeColor}`}>
-                              {activeSubpart.badge}
-                            </span>
-                            <ChevronDown className={`h-4 w-4 text-slate-500 transition-transform duration-200 ${spoilageDropdownOpen ? 'rotate-180 text-emerald-600' : ''}`} />
-                          </div>
-                        </button>
-
-                        {/* Dropdown Options Popup */}
-                        {spoilageDropdownOpen && (
-                          <div className="absolute right-0 left-0 lg:left-auto lg:right-0 mt-2 lg:w-96 rounded-2xl bg-white/98 dark:bg-slate-900/98 backdrop-blur-2xl border border-slate-200 dark:border-slate-800 shadow-2xl p-2 z-50 space-y-1 animate-fade-in">
-                            <div className="px-3 py-2 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
-                              <span className="text-[10px] uppercase font-black tracking-wider text-slate-400">
-                                4 Spoilage Subparts
-                              </span>
-                              <span className="text-[10px] font-bold text-emerald-700 dark:text-emerald-400">
-                                Tap to switch
-                              </span>
-                            </div>
-
-                            {SPOILAGE_SUBPARTS.map((part) => {
-                              const PartIcon = part.icon;
-                              const isSelected = part.id === spoilageSubTab;
-                              return (
-                                <button
-                                  key={part.id}
-                                  type="button"
-                                  onClick={() => {
-                                    setSpoilageSubTab(part.id);
-                                    setSpoilageDropdownOpen(false);
-                                  }}
-                                  className={`w-full p-2.5 rounded-xl text-left transition-all flex items-start gap-3 ${
-                                    isSelected
-                                      ? 'bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-700/60 shadow-2xs'
-                                      : 'hover:bg-slate-100 dark:hover:bg-slate-800/80 border border-transparent'
-                                  }`}
-                                >
-                                  <div className={`p-2 rounded-xl flex-shrink-0 mt-0.5 border ${
-                                    isSelected
-                                      ? 'bg-emerald-700 text-white border-emerald-700'
-                                      : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700'
-                                  }`}>
-                                    <PartIcon className="h-4 w-4" />
-                                  </div>
-                                  <div className="flex-1 min-w-0">
-                                    <div className="flex items-center justify-between gap-1">
-                                      <span className={`text-xs font-black truncate ${isSelected ? 'text-emerald-950 dark:text-emerald-200' : 'text-slate-900 dark:text-white'}`}>
-                                        {part.title}
-                                      </span>
-                                      {isSelected ? (
-                                        <span className="text-[10px] font-black px-1.5 py-0.5 rounded bg-emerald-700 text-white flex-shrink-0 flex items-center gap-1">
-                                          <Check className="h-3 w-3" /> Active
-                                        </span>
-                                      ) : (
-                                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full border flex-shrink-0 ${part.badgeColor}`}>
-                                          {part.badge}
-                                        </span>
-                                      )}
-                                    </div>
-                                    <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 line-clamp-2 leading-tight">
-                                      {part.description}
-                                    </p>
-                                  </div>
-                                </button>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </>
-                    );
-                  })()}
+                {/* Active Subpart Badge */}
+                <div className="flex items-center gap-2 self-start sm:self-auto">
+                  <span className="text-[11px] font-semibold text-slate-400 dark:text-slate-500 hidden md:inline">
+                    Active View:
+                  </span>
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700">
+                    {(() => {
+                      const cur = SPOILAGE_SUBPARTS.find(s => s.id === spoilageSubTab) || SPOILAGE_SUBPARTS[0];
+                      const CurIcon = cur.icon;
+                      return (
+                        <>
+                          <CurIcon className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                          <span>{cur.title}</span>
+                        </>
+                      );
+                    })()}
+                  </span>
                 </div>
               </div>
+
+              {/* 4 Interactive Subpart Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5 sm:gap-3">
+                {SPOILAGE_SUBPARTS.map((part) => {
+                  const PartIcon = part.icon;
+                  const isSelected = part.id === spoilageSubTab;
+                  return (
+                    <button
+                      key={part.id}
+                      type="button"
+                      onClick={() => setSpoilageSubTab(part.id)}
+                      className={`p-3.5 rounded-2xl border text-left transition-all duration-200 relative overflow-hidden group cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 ${
+                        isSelected
+                          ? 'bg-emerald-50/80 dark:bg-emerald-950/40 border-emerald-500 dark:border-emerald-600 shadow-md shadow-emerald-500/10 ring-1 ring-emerald-500/30'
+                          : 'bg-slate-50/70 dark:bg-slate-800/40 border-slate-200/80 dark:border-slate-800 hover:bg-white dark:hover:bg-slate-800/80 hover:border-slate-300 dark:hover:border-slate-700'
+                      }`}
+                    >
+                      {/* Active indicator bar along top edge */}
+                      {isSelected && (
+                        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 to-teal-500" />
+                      )}
+
+                      <div className="flex items-center justify-between gap-2 mb-2">
+                        <div className={`p-2 rounded-xl transition-transform group-hover:scale-105 ${
+                          isSelected
+                            ? 'bg-emerald-700 text-white shadow-xs'
+                            : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700'
+                        }`}>
+                          <PartIcon className="h-4 w-4" />
+                        </div>
+                        <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full border ${part.badgeColor}`}>
+                          {part.badge}
+                        </span>
+                      </div>
+
+                      <div className={`text-xs font-black truncate ${
+                        isSelected ? 'text-emerald-950 dark:text-emerald-200' : 'text-slate-900 dark:text-white'
+                      }`}>
+                        {part.shortTitle}
+                      </div>
+
+                      <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5 line-clamp-2 leading-tight">
+                        {part.description}
+                      </p>
+                    </button>
+                  );
+                })}
+              </div>
+
             </div>
 
             {/* Sub-View 1: Optical Camera Scanner & CV Bounding Box Inspector */}
             {spoilageSubTab === 'vision' && (
               <div className="space-y-4 sm:space-y-6 animate-fade-in">
-                <VisionInspector onInspectionComplete={handleVisionInspectionComplete} isDarkMode={isDarkMode} />
+                <ErrorBoundary fallbackTitle="Optical Camera CV Scanner Issue">
+                  <VisionInspector 
+                    zones={zones}
+                    onRefreshTelemetry={fetchAllData}
+                    onInspectionComplete={handleVisionInspectionComplete} 
+                    isDarkMode={isDarkMode} 
+                    targetProduce={targetProduceToInspect}
+                  />
+                </ErrorBoundary>
               </div>
             )}
 
             {/* Sub-View 2: Multi-Modal Sensor + Vision Fusion Assessor */}
             {spoilageSubTab === 'assessor' && (
               <div className="space-y-4 sm:space-y-6 animate-fade-in">
-                {/* Spoilage Risk & Batch Overview Cards */}
-                <StatsCards stats={stats} isDarkMode={isDarkMode} />
+
                 <MultiModalAssessor
                   currentVisionFeatures={currentVisionFeatures}
                   selectedZone={selectedZone}
                   isDarkMode={isDarkMode}
+                  targetProduce={targetProduceToInspect}
                 />
               </div>
             )}
 
-            {/* Sub-View 3: IoT Storage Telemetry */}
-            {spoilageSubTab === 'sensors' && (
-              <div className="space-y-4 sm:space-y-6 animate-fade-in">
-                <StorageZoneTelemetry
-                  zones={zones}
-                  selectedZoneId={selectedZoneId}
-                  onSelectZone={setSelectedZoneId}
-                  isDarkMode={isDarkMode}
-                />
-              </div>
-            )}
-
-            {/* Sub-View 4: ESP32 Hardware Simulator */}
+            {/* Sub-View 3: ESP32 Hardware Simulator */}
             {spoilageSubTab === 'simulator' && (
               <div className="space-y-4 sm:space-y-6 animate-fade-in">
                 <ESP32Simulator
@@ -547,6 +513,8 @@ export default function App() {
         onClose={() => setShowAlertsCenter(false)}
         recommendations={recommendations}
         onRefresh={fetchAllData}
+        onNavigateToSpoilage={handleNavigateToSpoilage}
+        onNavigateModule={setActiveModule}
       />
 
       {/* Clean Footer (hidden on mobile to make room for bottom dock) */}
