@@ -2838,23 +2838,40 @@ PRODUCE_ENCYCLOPEDIA: Dict[str, Dict[str, Any]] = {
 }
 
 def get_produce_profile(produce_key_or_name: str) -> Optional[Dict[str, Any]]:
-    """Retrieves full encyclopedia profile by exact name or fuzzy key."""
+    """Retrieves full encyclopedia profile by exact name, short name, or fuzzy key."""
     if not produce_key_or_name:
         return None
-    # 1. Exact match
+    # 1. Exact dictionary key match
     if produce_key_or_name in PRODUCE_ENCYCLOPEDIA:
         return PRODUCE_ENCYCLOPEDIA[produce_key_or_name]
     
-    # 2. Fuzzy / short name match
     name_clean = produce_key_or_name.lower().strip()
+    
+    # 2. Exact full_name match
     for full_name, profile in PRODUCE_ENCYCLOPEDIA.items():
         if name_clean == full_name.lower():
             return profile
+
+    # 3. Exact short_name match (e.g. "Apple", "Mango", "Watermelon")
+    for full_name, profile in PRODUCE_ENCYCLOPEDIA.items():
         if profile.get("short_name", "").lower() == name_clean:
             return profile
-        if name_clean in full_name.lower() or full_name.lower() in name_clean:
+
+    # 4. Word boundary match (e.g. "Apple" matches "Fresh Apple", NOT "Pineapple")
+    import re
+    pattern = r'\b' + re.escape(name_clean) + r'\b'
+    for full_name, profile in PRODUCE_ENCYCLOPEDIA.items():
+        if re.search(pattern, full_name.lower()) or re.search(pattern, profile.get("short_name", "").lower()):
             return profile
-        if profile.get("scientific_name", "").lower().startswith(name_clean):
+
+    # 5. Prefix match
+    for full_name, profile in PRODUCE_ENCYCLOPEDIA.items():
+        if profile.get("short_name", "").lower().startswith(name_clean) or full_name.lower().startswith(name_clean):
+            return profile
+
+    # 6. Fallback substring match
+    for full_name, profile in PRODUCE_ENCYCLOPEDIA.items():
+        if name_clean in full_name.lower() or full_name.lower() in name_clean:
             return profile
             
     return None

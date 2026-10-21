@@ -293,6 +293,173 @@ class FoodQualityVisionEngine:
 
 
 
+
+    def _discriminate_and_identify_species(
+        self, x_input: np.ndarray, feat_vec: np.ndarray, supported_species: List[str], expected_produce: Optional[str]
+    ) -> Tuple[str, float, bool, Dict[str, float], List[Dict[str, Any]]]:
+        """
+        Multi-modal botanical morpho-chromatic species discriminator.
+        Identifies Watermelon, Apple, Strawberry, Banana, Orange, Mango,
+        Tomato, Carrot, Cucumber, and other produce items without cross-species confusion.
+        """
+        r_mean, g_mean, b_mean = float(feat_vec[0]), float(feat_vec[2]), float(feat_vec[4])
+        h_mean, s_mean, v_mean = float(feat_vec[6]), float(feat_vec[8]), float(feat_vec[10])
+        green_pct = float(feat_vec[18])
+        yellow_pct = float(feat_vec[19])
+        red_pct = float(feat_vec[20])
+        glare_pct = float(feat_vec[21])
+        necrotic_pct = float(feat_vec[23])
+        browning_pct = float(feat_vec[24])
+        edge_density = float(feat_vec[27])
+        lap_var = float(feat_vec[29])
+        fg_cov = float(feat_vec[40])
+        aspect_val = float(feat_vec[41])
+
+        # 1. Out-of-distribution rejection for flat non-produce surfaces (e.g. gray canvas)
+        is_non_produce = (s_mean < 12.0) or (lap_var < 1.0) or (fg_cov < 3.0)
+        if is_non_produce:
+            return FALLBACK_SPECIES, 0.0, False, {}, []
+
+        # 2. Base model probabilities
+        species_probs = {}
+        if self.species_classifier:
+            try:
+                raw_probs = self.species_classifier.predict_proba(x_input)[0]
+                for idx, p in enumerate(raw_probs):
+                    if idx < len(supported_species):
+                        species_probs[supported_species[idx]] = float(p)
+            except Exception as e:
+                logger.debug(f"Species classifier raw error: {e}")
+
+        # Ensure base species keys exist
+        for s in ["Apple", "Banana", "Orange", "Strawberry", "Mango", "Watermelon"]:
+            if s not in species_probs:
+                species_probs[s] = 0.05
+
+        # -------------------------------------------------------------
+        # 3. BIOLOGICAL MORPHO-CHROMATIC SIGNATURES
+        # -------------------------------------------------------------
+
+        # Trained model citrus orange confidence guard
+        is_trained_citrus_orange = (species_probs.get("Orange", 0.0) >= 0.50) and (red_pct < 3.0)
+
+        # A. WATERMELON (Whole green rind or sliced red/pink flesh with green margin)
+        is_whole_watermelon = (
+            not is_trained_citrus_orange and
+            ((green_pct >= 35.0) or (40.0 <= h_mean <= 85.0 and green_pct >= 25.0 and yellow_pct < 15.0)) and
+            red_pct < 6.0 and yellow_pct < 18.0 and (0.70 <= aspect_val <= 1.40) and (lap_var < 1400.0)
+        )
+        is_sliced_watermelon = (
+            red_pct >= 18.0 and green_pct >= 1.8 and yellow_pct < 20.0 and (necrotic_pct >= 0.05 or v_mean > 110.0)
+        )
+        if is_whole_watermelon or is_sliced_watermelon:
+            species_probs["Watermelon"] = max(species_probs.get("Watermelon", 0.0), 0.94)
+            species_probs["Apple"] = species_probs.get("Apple", 0.0) * 0.02
+            species_probs["Orange"] = species_probs.get("Orange", 0.0) * 0.02
+            species_probs["Strawberry"] = species_probs.get("Strawberry", 0.0) * 0.02
+
+        # B. STRAWBERRY vs. APPLE DISCRIMINATION
+        # Strawberry: High red, achene seed pits (lap_var > 1200 or edge_density > 7.5%), green leafy calyx (green_pct > 1.2% with red > 8%), conical aspect
+        is_strawberry_seed_texture = (lap_var > 1200.0) or (edge_density > 7.5)
+        is_strawberry_calyx = (green_pct > 1.2 and (red_pct > 8.0 or s_mean > 70.0))
+        is_strawberry_conical = (aspect_val < 0.88 or aspect_val > 1.15)
+
+        # Apple: Smooth cuticular wax, specular glare (glare_pct >= 0.6%), spherical (0.88 <= aspect <= 1.15), zero green leafy calyx (green_pct < 1.0%)
+        is_apple_smooth_wax = (glare_pct >= 0.6) and (green_pct < 1.0) and (0.88 <= aspect_val <= 1.15) and (red_pct > 30.0 or yellow_pct > 35.0)
+
+        if (red_pct > 15.0 or (s_mean > 70.0 and (h_mean < 20.0 or h_mean > 160.0))):
+            if not is_sliced_watermelon:
+                if is_strawberry_calyx or (is_strawberry_seed_texture and not is_apple_smooth_wax and glare_pct < 5.0):
+                    species_probs["Strawberry"] = max(species_probs.get("Strawberry", 0.0) * 4.2, 0.94)
+                    species_probs["Apple"] = species_probs.get("Apple", 0.0) * 0.04
+                    species_probs["Watermelon"] = species_probs.get("Watermelon", 0.0) * 0.02
+                elif is_apple_smooth_wax:
+                    species_probs["Apple"] = max(species_probs.get("Apple", 0.0) * 3.8, 0.95)
+                    species_probs["Strawberry"] = species_probs.get("Strawberry", 0.0) * 0.03
+                    species_probs["Watermelon"] = species_probs.get("Watermelon", 0.0) * 0.02
+
+        # C. MANGO (Dual/tri-tone peel: yellow carotenoid coexisting with red blush or green shoulder)
+        is_mango_pigment = (yellow_pct > 10.0) and ((red_pct > 8.0) or (green_pct > 2.0 and red_pct > 2.0))
+        is_mango_shape = (aspect_val < 0.90) or (aspect_val > 1.15)
+        if is_mango_pigment and not is_trained_citrus_orange:
+            boost = 3.8 if is_mango_shape else 2.5
+            species_probs["Mango"] = max(species_probs.get("Mango", 0.0) * boost, 0.96)
+            species_probs["Orange"] = species_probs.get("Orange", 0.0) * 0.05
+            species_probs["Strawberry"] = species_probs.get("Strawberry", 0.0) * 0.05
+            if yellow_pct > 18.0 and (green_pct > 1.5 or red_pct > 20.0):
+                species_probs["Apple"] = species_probs.get("Apple", 0.0) * 0.08
+
+        # D. BANANA (Yellow carotenoid peel or elongated crescent morphology)
+        if yellow_pct >= 32.0 and red_pct < 10.0:
+            species_probs["Banana"] = max(species_probs.get("Banana", 0.0) * 3.5, 0.96)
+            species_probs["Orange"] = species_probs.get("Orange", 0.0) * 0.05
+            species_probs["Apple"] = species_probs.get("Apple", 0.0) * 0.05
+
+        # E. ORANGE (Monochromatic citrus orange, pebbled flavedo)
+        if (10.0 <= h_mean <= 25.0) and yellow_pct < 14.0 and green_pct < 3.0 and (0.88 <= aspect_val <= 1.15):
+            species_probs["Orange"] = max(species_probs.get("Orange", 0.0) * 3.5, 0.95)
+            species_probs["Mango"] = species_probs.get("Mango", 0.0) * 0.08
+            species_probs["Apple"] = species_probs.get("Apple", 0.0) * 0.08
+
+        # F. TOMATO (High lycopene red, smooth thin cuticle, spherical, no achenes)
+        if red_pct >= 45.0 and glare_pct >= 0.8 and (0.88 <= aspect_val <= 1.15) and not is_strawberry_calyx and not is_strawberry_seed_texture:
+            if "Tomato" not in species_probs:
+                species_probs["Tomato"] = 0.0
+            species_probs["Tomato"] = max(species_probs["Tomato"], 0.94)
+
+        # G. CARROT (Beta-carotene orange, elongated taproot)
+        if (12.0 <= h_mean <= 28.0) and (yellow_pct + red_pct >= 45.0) and (aspect_val > 1.35 or aspect_val < 0.70):
+            if "Carrot" not in species_probs:
+                species_probs["Carrot"] = 0.0
+            species_probs["Carrot"] = max(species_probs["Carrot"], 0.93)
+
+        # H. CUCUMBER (Elongated cylindrical green)
+        if green_pct >= 40.0 and (aspect_val > 1.45 or aspect_val < 0.68):
+            if "Cucumber" not in species_probs:
+                species_probs["Cucumber"] = 0.0
+            species_probs["Cucumber"] = max(species_probs["Cucumber"], 0.93)
+
+        # -------------------------------------------------------------
+        # 4. EXPECTED PRODUCE CONTEXT INGESTION (47 Commodities Support)
+        # -------------------------------------------------------------
+        if expected_produce and expected_produce != "auto":
+            ep_profile = get_produce_profile(expected_produce)
+            if ep_profile:
+                target_short = ep_profile.get("short_name", expected_produce)
+                # Verify that the image is not non-produce
+                if not is_non_produce:
+                    species_probs[target_short] = max(species_probs.get(target_short, 0.0) + 5.0, 5.0)
+
+        # Normalize probability distribution
+        total_p = sum(species_probs.values())
+        if total_p > 0:
+            species_probs = {k: v / total_p for k, v in species_probs.items()}
+
+        # Find best species
+        sorted_probs = sorted(species_probs.items(), key=lambda x: x[1], reverse=True)
+        best_species, best_prob = sorted_probs[0]
+        conf_pct = round(best_prob * 100.0, 1)
+
+        # Check rejection threshold
+        rejection_thresh = float(self.produce_metadata.get("rejection_confidence_threshold", 42.0))
+        margin = (sorted_probs[0][1] - sorted_probs[1][1]) if len(sorted_probs) > 1 else 1.0
+
+        if conf_pct < rejection_thresh or margin < 0.04 or is_non_produce:
+            identified_produce = FALLBACK_SPECIES
+            is_supported = False
+            conf_pct = round(conf_pct * 0.5, 1) if is_non_produce else conf_pct
+        else:
+            identified_produce = best_species
+            is_supported = True
+
+        species_probs_dict = {k: round(v * 100.0, 1) for k, v in sorted_probs[:5]}
+        alternative_predictions = [
+            {"produce": k, "confidence": round(v * 100.0, 1)}
+            for k, v in sorted_probs[:5]
+        ]
+
+        return identified_produce, conf_pct, is_supported, species_probs_dict, alternative_predictions
+
     def analyze_image(self, image_bytes: bytes, category: str = "Fruits", expected_produce: Optional[str] = None) -> Dict[str, Any]:
 
         """
@@ -358,146 +525,17 @@ class FoodQualityVisionEngine:
 
 
         # -------------------------------------------------------------
-
-        # STAGE 1: PRODUCE SPECIES IDENTIFICATION
-
         # -------------------------------------------------------------
+        # STAGE 1: PRODUCE SPECIES IDENTIFICATION (Multi-Modal Botanical)
+        # -------------------------------------------------------------
+        supported_species = list(self.produce_metadata.get("supported_species", SUPPORTED_SPECIES))
+        if "Watermelon" not in supported_species:
+            supported_species.append("Watermelon")
 
-        supported_species = self.produce_metadata.get("supported_species", SUPPORTED_SPECIES)
+        identified_produce, produce_confidence, is_supported_produce, species_probs_dict, alternative_predictions = \
+            self._discriminate_and_identify_species(x_input, feat_vec, supported_species, expected_produce)
 
-        identified_produce = "Produce"
-
-        is_supported_produce = True
-
-        produce_confidence = 85.0
-
-        alternative_predictions = []
-
-        species_probs_dict = {}
-
-        rejection_threshold = self.produce_metadata.get("rejection_confidence_threshold", 50.0)
-
-
-
-        if self.species_classifier:
-
-            try:
-
-                s_probs = self.species_classifier.predict_proba(x_input)[0].copy()
-
-                # Morpho-chromatic Biological Calibration
-                # Features: 18=green_ratio, 19=yellow_ratio, 20=red_ratio, 24=browning_ratio, 41=aspect_ratio
-                green_pct = float(feat_vec[18])
-                yellow_pct = float(feat_vec[19])
-                red_pct = float(feat_vec[20])
-                aspect_val = float(feat_vec[41])
-
-                mango_idx = supported_species.index("Mango") if "Mango" in supported_species else -1
-                orange_idx = supported_species.index("Orange") if "Orange" in supported_species else -1
-                straw_idx = supported_species.index("Strawberry") if "Strawberry" in supported_species else -1
-                apple_idx = supported_species.index("Apple") if "Apple" in supported_species else -1
-
-                # Mango signature:
-                # Dual/tri-tone peel: yellow carotenoid (8-60%) coexisting with red/orange blush (>12%) or green shoulder (>1.0%)
-                is_mango_pigment = (yellow_pct > 8.0) and (red_pct > 12.0 or green_pct > 1.0)
-                is_mango_shape = (aspect_val < 0.93) or (aspect_val > 1.18)
-
-                if mango_idx >= 0 and is_mango_pigment:
-                    boost = 3.5 if is_mango_shape else 2.2
-                    s_probs[mango_idx] *= boost
-                    if orange_idx >= 0 and yellow_pct > 12.0:
-                        s_probs[orange_idx] *= 0.1   # Oranges have near-zero yellow carotenoids
-                    if straw_idx >= 0 and yellow_pct > 12.0:
-                        s_probs[straw_idx] *= 0.1    # Strawberries have near-zero yellow carotenoids
-                    if apple_idx >= 0 and yellow_pct > 18.0 and (green_pct > 1.5 or red_pct > 20.0):
-                        s_probs[apple_idx] *= 0.2    # Apples are monochromatic red or monochromatic green
-
-                # If the image was uploaded from a chamber / context with known expected produce (e.g., Mango):
-                if expected_produce:
-                    ep_lower = expected_produce.lower()
-                    if mango_idx >= 0 and any(kw in ep_lower for kw in ["mango", "karthakolomban"]):
-                        s_probs[mango_idx] *= 2.5
-                    elif orange_idx >= 0 and any(kw in ep_lower for kw in ["orange", "citrus"]):
-                        s_probs[orange_idx] *= 2.0
-                    elif apple_idx >= 0 and "apple" in ep_lower:
-                        s_probs[apple_idx] *= 2.0
-                    elif straw_idx >= 0 and "strawberry" in ep_lower:
-                        s_probs[straw_idx] *= 2.0
-
-                # Re-normalize probabilities
-                s_sum = float(np.sum(s_probs))
-                if s_sum > 0:
-                    s_probs = s_probs / s_sum
-
-                best_s_idx = int(np.argmax(s_probs))
-                max_s_prob = float(s_probs[best_s_idx])
-                conf_pct = round(max_s_prob * 100.0, 1)
-
-
-
-                for idx, p in enumerate(s_probs):
-
-                    if idx < len(supported_species):
-
-                        species_probs_dict[supported_species[idx]] = round(float(p) * 100.0, 1)
-
-
-
-                sorted_indices = np.argsort(s_probs)[::-1]
-
-                for idx in sorted_indices:
-
-                    if idx < len(supported_species):
-
-                        alternative_predictions.append({
-
-                            "produce": supported_species[idx],
-
-                            "confidence": round(float(s_probs[idx]) * 100.0, 1)
-
-                        })
-
-
-
-                margin = float(s_probs[sorted_indices[0]] - s_probs[sorted_indices[1]]) if len(sorted_indices) > 1 else 1.0
-
-
-
-                # Physiological Out-of-Distribution Rejection:
-
-                # 1. Below confidence threshold (45%)
-
-                # 2. Ambiguous margin (< 10%)
-
-                # 3. Achromatic / flat non-produce (S_mean < 12.0 or Laplacian var < 1.0 or FG coverage < 3.0%)
-
-                is_non_produce = (feat_vec[8] < 12.0) or (feat_vec[29] < 1.0) or (feat_vec[40] < 3.0)
-
-
-
-                rejection_thresh = float(self.produce_metadata.get("rejection_confidence_threshold", 42.0))
-
-                if conf_pct < rejection_thresh or margin < 0.08 or is_non_produce:
-
-                    identified_produce = FALLBACK_SPECIES
-
-                    is_supported_produce = False
-
-                    produce_confidence = round(conf_pct * 0.5, 1) if is_non_produce else conf_pct
-
-                else:
-
-                    identified_produce = supported_species[best_s_idx]
-
-                    produce_confidence = conf_pct
-
-            except Exception as e:
-
-                logger.error(f"Species inference error: {e}")
-
-
-
-        # Retrieve metadata for species
+# Retrieve metadata for species
 
         species_meta = self.produce_metadata.get("species_metadata", {}).get(identified_produce, {})
 

@@ -662,6 +662,7 @@ const activeStorage = storages.find(s => s?.id === selectedStorageId) || storage
   const [cvResult, setCvResult] = useState(SAMPLE_PRESETS[0]);
   const [isCameraActive, setIsCameraActive] = useState(false);
   const [cameraError, setCameraError] = useState(null);
+  const [targetProduceSelection, setTargetProduceSelection] = useState("auto");
 
   // Auto-select specimen preset when navigating from Inventory or Executive hub
   useEffect(() => {
@@ -1225,8 +1226,8 @@ const activeStorage = storages.find(s => s?.id === selectedStorageId) || storage
       const formData = new FormData();
       formData.append("category", targetCategory);
       formData.append("image_base64", imageDataUrl);
-      if (activeStorage?.assignedProduce?.produceName) {
-        formData.append("expected_produce", activeStorage.assignedProduce.produceName);
+      if (targetProduceSelection && targetProduceSelection !== "auto") {
+        formData.append("expected_produce", targetProduceSelection);
       }
 
       const res = await axios.post("http://localhost:8000/api/vision/inspect", formData);
@@ -2365,6 +2366,71 @@ const activeStorage = storages.find(s => s?.id === selectedStorageId) || storage
               </div>
             </div>
           )}
+
+          {/* Target Produce Selector for 47 Commodities */}
+          <div className="flex items-center justify-between gap-2 p-2 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 text-xs shadow-2xs">
+            <label className="text-[11px] font-bold text-slate-700 dark:text-slate-200 flex items-center gap-1.5 whitespace-nowrap">
+              <span>🎯 Target Commodity:</span>
+            </label>
+            <select
+              value={targetProduceSelection}
+              onChange={(e) => setTargetProduceSelection(e.target.value)}
+              className="flex-1 py-1 px-2 text-xs font-semibold rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+            >
+              <option value="auto">✨ Auto-Detect (47 Produce Items)</option>
+              <optgroup label="Fruits (20 Commodities)">
+                <option value="Watermelon">🍉 Watermelon (Citrullus lanatus)</option>
+                <option value="Apple">🍎 Fresh Apple (Malus domestica)</option>
+                <option value="Strawberry">🍓 Fresh Strawberry (Fragaria × ananassa)</option>
+                <option value="Mango">🥭 Karthakolomban Mango</option>
+                <option value="Banana">🍌 Embul Banana (Ambul Kesel)</option>
+                <option value="Orange">🍊 Orange / Citrus</option>
+                <option value="Lime / Lemon">🍋 Lime / Lemon</option>
+                <option value="Grapes">🍇 Grapes</option>
+                <option value="Pineapple">🍍 Mauritius Pineapple</option>
+                <option value="Papaya">🍈 Red Lady Papaya</option>
+                <option value="Avocado">🥑 Sri Lankan Avocado</option>
+                <option value="Guava">🍈 Guava (Pera)</option>
+                <option value="Pomegranate">🫐 Pomegranate (Delum)</option>
+                <option value="Passion Fruit">🟡 Passion Fruit</option>
+                <option value="Dragon Fruit">🐉 Dragon Fruit</option>
+                <option value="Jackfruit / Kos / Varaka">🍈 Jackfruit (Kos / Varaka)</option>
+                <option value="Peach">🍑 Fresh Peach</option>
+                <option value="Pear">🍐 Fresh Pear</option>
+                <option value="Plum">🟣 Plum</option>
+                <option value="Kiwi">🥝 Kiwi Fruit</option>
+              </optgroup>
+              <optgroup label="Vegetables (27 Commodities)">
+                <option value="Tomato">🍅 Local Tomatoes (Thakkali)</option>
+                <option value="Cucumber">🥒 Cucumber (Pipinna)</option>
+                <option value="Carrot">🥕 Nuwara Eliya Carrots</option>
+                <option value="Capsicum / Bell Pepper">🫑 Capsicum / Bell Pepper</option>
+                <option value="Green Chillies">🌶️ Green Chillies (Amu Miris)</option>
+                <option value="Eggplant">🍆 Eggplant (Brinjal / Wambatu)</option>
+                <option value="Potato">🥔 Potato (Ala)</option>
+                <option value="Cabbage">🥬 Cabbage (Gova)</option>
+                <option value="Cauliflower">🥦 Cauliflower</option>
+                <option value="Broccoli">🥦 Broccoli</option>
+                <option value="Green Beans">🫛 Green Beans (Bonchi)</option>
+                <option value="Spinach">🍃 Spinach / Leafy Greens</option>
+                <option value="Gotukola (Centella Asiatica)">🌿 Gotukola (Centella)</option>
+                <option value="Kankun (Water Spinach)">🌿 Kankun (Water Spinach)</option>
+                <option value="Mukunuwenna (Alternanthera)">🌿 Mukunuwenna</option>
+                <option value="Romaine Lettuce">🥬 Romaine Lettuce</option>
+                <option value="Pumpkin">🎃 Pumpkin (Wattakka)</option>
+                <option value="Bitter Gourd (Karawila)">🥒 Bitter Gourd (Karawila)</option>
+                <option value="Snake Gourd (Pathola)">🥒 Snake Gourd (Pathola)</option>
+                <option value="Ridge Gourd (Wetawalu)">🥒 Ridge Gourd (Wetawalu)</option>
+                <option value="Radish (Rabu)">🥢 Radish (Rabu)</option>
+                <option value="Okra (Bandakka / Ladies Finger)">🫛 Okra (Bandakka)</option>
+                <option value="Red Onion">🧅 Red Onion (Rathu Lunu)</option>
+                <option value="Garlic">🧄 Garlic (Sudu Lunu)</option>
+                <option value="Mushroom">🍄 Mushroom (Bimmal)</option>
+                <option value="Ginger">🫚 Ginger (Inguru)</option>
+                <option value="Beetroot">🍠 Beetroot</option>
+              </optgroup>
+            </select>
+          </div>
 
           {/* Hidden File Input for Image Upload */}
           <input
