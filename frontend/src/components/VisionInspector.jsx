@@ -816,7 +816,7 @@ const activeStorage = storages.find(s => s?.id === selectedStorageId) || storage
               voc: payload.voc,
               co2: payload.co2,
               nh3: payload.nh3,
-              status: (Math.abs(payload.temperature - (s.target_temp || 11)) > 3.5 || payload.voc > 0.6 || payload.nh3 > 0.04) ? 'warning' : 'optimal'
+              status: (Math.abs(payload.temperature - (s.target_temp || 11.0)) > 3.5 || payload.voc > 0.6 || payload.nh3 > 0.05 || payload.co2 > 1100.0 || payload.humidity > 96.0 || payload.humidity < 70.0) ? 'warning' : 'optimal'
             };
           }
           return s;
@@ -2081,9 +2081,9 @@ const activeStorage = storages.find(s => s?.id === selectedStorageId) || storage
                 </div>
                 <input
                   type="range"
-                  min="0.05"
+                  min="0.01"
                   max="3.00"
-                  step="0.05"
+                  step="0.01"
                   value={sensorUpdateForm.voc}
                   onChange={(e) => setSensorUpdateForm({ ...sensorUpdateForm, voc: parseFloat(e.target.value) })}
                   className="w-full accent-amber-600 h-2 bg-slate-200 dark:bg-slate-700 rounded-lg cursor-pointer"
