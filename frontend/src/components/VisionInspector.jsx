@@ -2508,74 +2508,91 @@ const activeStorage = storages.find(s => s?.id === selectedStorageId) || storage
         </div>
 
         {/* UNIT 2: IoT Environmental Telemetry Array (Right Side) */}
-        <div className="lg:col-span-6 flex flex-col justify-between p-4 sm:p-5 bg-[#f8faf9] dark:bg-slate-800/80 rounded-2xl border border-[#d1ded5] dark:border-slate-700 shadow-2xs space-y-3">
+        <div className="lg:col-span-6 flex flex-col p-4 sm:p-5 bg-[#f8faf9] dark:bg-slate-800/80 rounded-2xl border border-[#d1ded5] dark:border-slate-700 shadow-2xs space-y-3.5">
           
-          <div className="flex flex-wrap items-center justify-between pb-2 border-b border-[#e1eae4] dark:border-slate-800 text-xs gap-2">
-            <span className="font-extrabold flex items-center gap-1.5 text-slate-900 dark:text-white truncate">
-              <Activity className="h-4 w-4 text-sky-600 dark:text-sky-400 flex-shrink-0" />
-              <span>Unit 2: IoT Chamber Environmental Sensors</span>
-            </span>
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700">
+          {/* Header Bar: Node Identification, Live Stream Status & Telemetry Controls */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-[#e1eae4] dark:border-slate-700/80 text-xs gap-2.5">
+            <div className="flex items-center gap-2.5">
+              <div className="p-2 rounded-xl bg-sky-100 dark:bg-sky-950/80 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800 flex-shrink-0 shadow-2xs">
+                <Activity className="h-4 w-4" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-extrabold text-slate-900 dark:text-white text-xs sm:text-sm">
+                    Unit 2: IoT Chamber Sensors
+                  </span>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-sky-100 dark:bg-sky-950 text-sky-800 dark:text-sky-300 border border-sky-200 dark:border-sky-800 font-mono">
+                    {activeStorage?.node_id || "ESP32-NODE-01"}
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
+                  Continuous micro-climate monitoring synchronized with vision analysis
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-1.5 flex-wrap self-end sm:self-auto">
+              <span className="inline-flex items-center gap-1.5 text-[10px] font-bold px-2 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700 shadow-2xs">
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                <span className="hidden sm:inline">Live Stream</span>
+                <span>Live Stream</span>
               </span>
-              <span className="text-[10px] text-slate-400 font-mono hidden md:inline">
+              <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono font-medium px-2 py-1 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700">
                 {lastSensorSyncTime ? `${lastSensorSyncTime}` : 'Syncing...'}
               </span>
               <button
                 type="button"
                 onClick={fetchLiveSensors}
                 title="Refresh live sensor telemetry from chamber node"
-                className="p-1 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors cursor-pointer"
+                className="p-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:text-emerald-600 dark:hover:text-emerald-400 hover:border-emerald-300 dark:hover:border-emerald-700 transition-all cursor-pointer shadow-2xs active:scale-95"
               >
                 <RefreshCw className={`h-3 w-3 ${isSyncingSensors ? 'animate-spin text-emerald-500' : ''}`} />
               </button>
               <button
                 type="button"
                 onClick={() => setIsSensorModalOpen(true)}
-                className="px-2 py-0.5 rounded-lg bg-sky-50 dark:bg-sky-950/70 hover:bg-sky-100 dark:hover:bg-sky-900 text-sky-700 dark:text-sky-300 border border-sky-300 dark:border-sky-700 text-[10px] font-bold flex items-center gap-1 transition-all active:scale-95 cursor-pointer shadow-2xs"
+                className="px-2.5 py-1 rounded-lg bg-sky-600 hover:bg-sky-700 text-white text-[10px] font-bold flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer shadow-xs"
                 title="Update or simulate chamber sensor readings"
               >
-                <Sliders className="h-2.5 w-2.5" />
+                <Sliders className="h-3 w-3" />
                 <span>Update Telemetry</span>
               </button>
-              <span className="text-[10px] px-2 py-0.5 rounded bg-sky-100 dark:bg-sky-950/60 text-sky-900 dark:text-sky-300 font-bold border border-sky-300 dark:border-sky-700 font-mono">
-                {activeStorage?.node_id || "ESP32-NODE-01"}
-              </span>
             </div>
           </div>
 
           {/* Environmental Micro-Climate Banner */}
-          <div className={`p-3 rounded-xl border shadow-2xs flex items-center justify-between transition-colors ${
+          <div className={`p-3 rounded-xl border shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 transition-all ${
             activeStorage?.status === 'warning' || (Math.abs((activeStorage?.current_temp || 11) - (activeStorage?.target_temp || 11)) > 3.5) || ((activeStorage?.voc || 0) > 0.6)
               ? 'bg-amber-50 dark:bg-amber-950/40 border-amber-300 dark:border-amber-800'
               : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800'
           }`}>
-            <div>
-              <span className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400 block">Chamber Micro-Climate Status</span>
+            <div className="space-y-0.5">
+              <span className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400 block tracking-wider">
+                Chamber Micro-Climate Status
+              </span>
               {activeStorage?.status === 'warning' || (Math.abs((activeStorage?.current_temp || 11) - (activeStorage?.target_temp || 11)) > 3.5) || ((activeStorage?.voc || 0) > 0.6) ? (
-                <span className="text-xs font-black text-amber-700 dark:text-amber-400 flex items-center gap-1.5 mt-0.5">
+                <span className="text-xs font-black text-amber-700 dark:text-amber-400 flex items-center gap-1.5">
                   <AlertTriangle className="h-3.5 w-3.5 text-amber-500 animate-pulse flex-shrink-0" />
                   <span>Thermal or Gas Stress Detected • Accelerated Decay Phase</span>
                 </span>
               ) : (
-                <span className="text-xs font-black text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5 mt-0.5">
-                  <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-                  <span>Optimal Cold Chain Storage • Safe Range</span>
+                <span className="text-xs font-black text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5">
+                  <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse flex-shrink-0" />
+                  <span>Optimal Cold Chain Storage • Safe Atmospheric Envelope</span>
                 </span>
               )}
             </div>
-            <span className="text-[10px] text-slate-500 font-semibold text-right">
-              Target: {activeStorage?.target_temp || 11.0}°C • {activeStorage?.target_humidity || 89}% RH
-            </span>
+            <div className="flex items-center gap-2 self-start sm:self-auto">
+              <span className="text-[11px] font-bold text-slate-600 dark:text-slate-300 font-mono px-2 py-0.5 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+                Target: {activeStorage?.target_temp || 11.0}°C • {activeStorage?.target_humidity || 89}% RH
+              </span>
+            </div>
           </div>
 
-          {/* Redesigned 4-Parameter IoT Telemetry Matrix */}
+          {/* 4-Parameter IoT Telemetry Matrix (2x2 Grid) */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
             
             {/* 1. Chamber Temperature */}
-            <div className="p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xs space-y-2 relative overflow-hidden transition-all hover:border-rose-300 dark:hover:border-rose-900">
+            <div className="p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xs space-y-2 relative overflow-hidden transition-all hover:border-rose-300 dark:hover:border-rose-900 flex flex-col justify-between">
               <div className="flex items-center justify-between text-xs">
                 <div className="flex items-center gap-1.5 font-bold text-slate-700 dark:text-slate-200">
                   <div className="p-1 rounded-lg bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900">
@@ -2616,10 +2633,15 @@ const activeStorage = storages.find(s => s?.id === selectedStorageId) || storage
                   <span>35°C Max</span>
                 </div>
               </div>
+
+              <div className="pt-1 border-t border-slate-100 dark:border-slate-800/80 text-[10px] text-slate-500 dark:text-slate-400 flex items-center justify-between">
+                <span>Sensor: DHT22 Digital</span>
+                <span className="text-emerald-600 dark:text-emerald-400 font-semibold">Cold Chain Stable</span>
+              </div>
             </div>
 
             {/* 2. Relative Humidity */}
-            <div className="p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xs space-y-2 relative overflow-hidden transition-all hover:border-sky-300 dark:hover:border-sky-900">
+            <div className="p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xs space-y-2 relative overflow-hidden transition-all hover:border-sky-300 dark:hover:border-sky-900 flex flex-col justify-between">
               <div className="flex items-center justify-between text-xs">
                 <div className="flex items-center gap-1.5 font-bold text-slate-700 dark:text-slate-200">
                   <div className="p-1 rounded-lg bg-sky-50 dark:bg-sky-950/60 text-sky-600 dark:text-sky-400 border border-sky-200 dark:border-sky-900">
@@ -2658,10 +2680,15 @@ const activeStorage = storages.find(s => s?.id === selectedStorageId) || storage
                   <span>100% Sat</span>
                 </div>
               </div>
+
+              <div className="pt-1 border-t border-slate-100 dark:border-slate-800/80 text-[10px] text-slate-500 dark:text-slate-400 flex items-center justify-between">
+                <span>Sensor: Capacitive Array</span>
+                <span className="text-sky-600 dark:text-sky-400 font-semibold">Turgor Preserved</span>
+              </div>
             </div>
 
             {/* 3. VOC & Ethylene */}
-            <div className="p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xs space-y-2 relative overflow-hidden transition-all hover:border-amber-300 dark:hover:border-amber-900">
+            <div className="p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xs space-y-2 relative overflow-hidden transition-all hover:border-amber-300 dark:hover:border-amber-900 flex flex-col justify-between">
               <div className="flex items-center justify-between text-xs">
                 <div className="flex items-center gap-1.5 font-bold text-slate-700 dark:text-slate-200">
                   <div className="p-1 rounded-lg bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-900">
@@ -2702,10 +2729,15 @@ const activeStorage = storages.find(s => s?.id === selectedStorageId) || storage
                   <span>2.00 Decay</span>
                 </div>
               </div>
+
+              <div className="pt-1 border-t border-slate-100 dark:border-slate-800/80 text-[10px] text-slate-500 dark:text-slate-400 flex items-center justify-between">
+                <span>Sensor: MQ-135 Gas Cell</span>
+                <span className="text-amber-600 dark:text-amber-400 font-semibold">Sub-Senescence</span>
+              </div>
             </div>
 
             {/* 4. CO2 Respiration */}
-            <div className="p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xs space-y-2 relative overflow-hidden transition-all hover:border-emerald-300 dark:hover:border-emerald-900">
+            <div className="p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xs space-y-2 relative overflow-hidden transition-all hover:border-emerald-300 dark:hover:border-emerald-900 flex flex-col justify-between">
               <div className="flex items-center justify-between text-xs">
                 <div className="flex items-center gap-1.5 font-bold text-slate-700 dark:text-slate-200">
                   <div className="p-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900">
@@ -2746,13 +2778,18 @@ const activeStorage = storages.find(s => s?.id === selectedStorageId) || storage
                   <span>1500 Peak</span>
                 </div>
               </div>
+
+              <div className="pt-1 border-t border-slate-100 dark:border-slate-800/80 text-[10px] text-slate-500 dark:text-slate-400 flex items-center justify-between">
+                <span>Sensor: NDIR Optical</span>
+                <span className="text-emerald-600 dark:text-emerald-400 font-semibold">Aerobic Dormancy</span>
+              </div>
             </div>
 
           </div>
 
-          {/* Redesigned Chamber Atmosphere & Aeration Status Card */}
-          <div className="p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xs space-y-1.5 text-xs">
-            <div className="flex items-center justify-between pb-1 border-b border-slate-100 dark:border-slate-800">
+          {/* Chamber Atmosphere & Aeration Status Card */}
+          <div className="p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xs space-y-2 text-xs">
+            <div className="flex items-center justify-between pb-1.5 border-b border-slate-100 dark:border-slate-800">
               <span className="font-extrabold text-slate-900 dark:text-white flex items-center gap-1.5">
                 <Zap className="h-3.5 w-3.5 text-amber-500" /> Chamber Atmosphere & Aeration Status
               </span>
@@ -2769,7 +2806,6 @@ const activeStorage = storages.find(s => s?.id === selectedStorageId) || storage
         </div>
 
       </div>
-
       {/* ─────────────────────────────────────────────────────────────
           MASTER FUSED QUALITY ASSESSMENT (CROSS-CHECKING BOTH UNITS)
           "Output as Spoiled or Fresh and with Remaining Shelf Life"
