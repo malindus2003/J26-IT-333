@@ -513,6 +513,8 @@ export default function App() {
         onClose={() => setShowAlertsCenter(false)}
         recommendations={recommendations}
         onRefresh={fetchAllData}
+        onNavigateToSpoilage={handleNavigateToSpoilage}
+        onNavigateModule={setActiveModule}
       />
 
       {/* Clean Footer (hidden on mobile to make room for bottom dock) */}

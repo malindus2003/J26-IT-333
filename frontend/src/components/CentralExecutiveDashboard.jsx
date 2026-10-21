@@ -97,6 +97,8 @@ export default function CentralExecutiveDashboard({
         recommendations={recommendations}
         onOpenAlertsCenter={onOpenAlertsCenter}
         onRefresh={onRefresh}
+        onNavigateToSpoilage={onNavigateToSpoilage}
+        onNavigateModule={onNavigateModule}
       />
 
       {/* DEDICATED CROSS-COMPONENT SECTION: Cold Storage & Food Spoilage Closed Feedback Bridge */}
