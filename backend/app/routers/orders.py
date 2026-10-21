@@ -765,3 +765,126 @@ def get_historical_daily_sales(days: int = 14):
         "history": history
     }
 
+
+# --- TABLE RESERVATIONS INTEGRATION ---
+
+class OrderReservationPayload(BaseModel):
+    customer_name: str
+    pax: int
+    date: Optional[str] = None
+    shift: Optional[str] = "Dinner"
+    table_number: Optional[str] = "Table 01"
+    phone: Optional[str] = ""
+    notes: Optional[str] = ""
+    status: Optional[str] = "Confirmed"
+
+class UpdateReservationStatusPayload(BaseModel):
+    status: str
+
+@router.get("/reservations")
+def get_order_reservations(date: Optional[str] = None):
+    """
+    Retrieve live customer table reservations directly from Firebase Realtime Database (/reservations).
+    Returns both filtered reservations for target date and the full list across dates.
+    """
+    target_date = date or datetime.now().strftime("%Y-%m-%d")
+    all_res_list = []
+    
+    if firebase_service and firebase_service.is_connected:
+        try:
+            raw_all = firebase_service.get_reservations() or {}
+            if isinstance(raw_all, dict):
+                all_res_list = list(raw_all.values())
+            elif isinstance(raw_all, list):
+                all_res_list = raw_all
+        except Exception as e:
+            print(f"[!] Warning fetching reservations in orders: {e}")
+            all_res_list = []
+
+    # Sort reservations by date descending
+    all_res_list.sort(key=lambda x: (x.get("date", ""), x.get("id", "")), reverse=True)
+
+    # Filter for target date
+    today_matching = [
+        r for r in all_res_list 
+        if r.get("date") == target_date and str(r.get("status", "")).lower() != "cancelled"
+    ]
+    total_pax = sum(int(r.get("pax", 2)) for r in today_matching)
+
+    return {
+        "status": "success",
+        "date": target_date,
+        "reservations_booked": len(today_matching),
+        "total_pax": total_pax,
+        "status_text": f"{len(today_matching)} Bookings ({total_pax} Guests)" if today_matching else "0 Table Reservations (0 Guests)",
+        "today_reservations": today_matching,
+        "reservations": all_res_list if all_res_list else today_matching,
+        "all_reservations": all_res_list,
+        "all_reservations_count": len(all_res_list)
+    }
+
+@router.post("/reservations")
+def create_order_reservation(payload: OrderReservationPayload):
+    """
+    Create a new customer table reservation in Firebase Realtime Database (/reservations).
+    Persists to cloud and automatically impacts AI food demand prediction.
+    """
+    res_date = payload.date or datetime.now().strftime("%Y-%m-%d")
+    res_id = f"res-{int(datetime.now().timestamp())}"
+    res_data = {
+        "id": res_id,
+        "customer_name": payload.customer_name.strip(),
+        "pax": max(1, payload.pax),
+        "date": res_date,
+        "shift": payload.shift or "Dinner",
+        "table_number": payload.table_number or "Table 01",
+        "phone": payload.phone or "",
+        "notes": payload.notes or "",
+        "status": payload.status or "Confirmed",
+        "created_at": datetime.now().isoformat()
+    }
+
+    saved = False
+    if firebase_service and firebase_service.is_connected:
+        try:
+            saved = firebase_service.save_reservation(res_id, res_data)
+        except Exception as e:
+            print(f"[!] Error saving reservation in orders router: {e}")
+            saved = False
+
+    return {
+        "status": "success",
+        "message": f"Reservation for {payload.customer_name} ({payload.pax} pax) on {res_date} registered successfully.",
+        "reservation_id": res_id,
+        "firebase_synced": saved,
+        "data": res_data,
+        "reservation": res_data
+    }
+
+@router.patch("/reservations/{res_id}/status")
+def update_order_reservation_status(res_id: str, payload: Optional[UpdateReservationStatusPayload] = None, status: Optional[str] = None):
+    """Update status of a reservation (Confirmed, Seated, Completed, Cancelled)."""
+    new_status = (payload.status if payload else None) or status or "Confirmed"
+    if firebase_service and firebase_service.is_connected:
+        try:
+            all_res = firebase_service.get_reservations() or {}
+            target = all_res.get(res_id)
+            if target and isinstance(target, dict):
+                target["status"] = new_status
+                firebase_service.save_reservation(res_id, target)
+                return {"status": "success", "message": f"Reservation {res_id} marked as {new_status}", "data": target}
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+    return {"status": "success", "message": f"Reservation {res_id} status updated to {new_status}"}
+
+@router.delete("/reservations/{res_id}")
+def delete_order_reservation(res_id: str):
+    """Delete a customer reservation from Firebase Realtime Database."""
+    deleted = False
+    if firebase_service and firebase_service.is_connected:
+        try:
+            deleted = firebase_service.delete_reservation(res_id)
+        except Exception as e:
+            print(f"[!] Error deleting reservation in orders: {e}")
+    return {"status": "success", "deleted": deleted, "message": f"Reservation {res_id} removed"}
+

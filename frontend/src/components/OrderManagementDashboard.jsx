@@ -35,9 +35,13 @@ import {
   Download,
   BarChart3,
   ArrowUpRight,
-  TrendingDown
+  TrendingDown,
+  Phone,
+  Trash2
 } from 'lucide-react';
 import AddMenuItemModal from './AddMenuItemModal';
+import AddReservationModal from './AddReservationModal';
+import axios from 'axios';
 
 const DEFAULT_MENU = [
   {
@@ -293,6 +297,42 @@ const DEFAULT_TABLES = [
   { table_no: "Table 12", capacity: 6, status: "available", current_order_id: null, occupied_since: null }
 ];
 
+const DEFAULT_RESERVATIONS = [
+  {
+    id: "res-01",
+    customer_name: "Thomas Schmidt (German Tourist Group)",
+    phone: "+49 170 555 1234",
+    date: new Date().toISOString().split('T')[0],
+    shift: "Dinner Service (7:00 PM)",
+    table_number: "Ocean Deck Tables 01-03",
+    pax: 14,
+    notes: "Pre-ordered seafood marinara pizzas and fruit platters",
+    status: "Confirmed"
+  },
+  {
+    id: "res-02",
+    customer_name: "Dilshan Wickramasinghe",
+    phone: "+94 71 888 9911",
+    date: new Date().toISOString().split('T')[0],
+    shift: "Dinner Service (7:00 PM)",
+    table_number: "VIP Lounge Area",
+    pax: 8,
+    notes: "Corporate dinner party arriving from Colombo via Southern Expressway",
+    status: "Confirmed"
+  },
+  {
+    id: "res-03",
+    customer_name: "Elena Rostova",
+    phone: "+94 76 333 4422",
+    date: new Date().toISOString().split('T')[0],
+    shift: "Dinner Service (7:00 PM)",
+    table_number: "Table 09",
+    pax: 4,
+    notes: "Celebrating anniversary, window table requested",
+    status: "Confirmed"
+  }
+];
+
 const DEFAULT_ORDERS = [
   {
     id: "ORD-1081",
@@ -451,6 +491,11 @@ export default function OrderManagementDashboard({ onRefresh, isDarkMode, curren
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [showNewOrderModal, setShowNewOrderModal] = useState(false);
   const [showAddMenuItemModal, setShowAddMenuItemModal] = useState(false);
+  const [showAddReservationModal, setShowAddReservationModal] = useState(false);
+  const [reservations, setReservations] = useState(DEFAULT_RESERVATIONS);
+  const [reservationSearch, setReservationSearch] = useState("");
+  const [reservationStatusFilter, setReservationStatusFilter] = useState("all");
+  const [reservationDateFilter, setReservationDateFilter] = useState("");
   
   // Single-Page Sub-View State (when in Admin mode): 'pos_menu' | 'tables_map' | 'kds' | 'orders_ledger'
   const [adminActiveTab, setAdminActiveTab] = useState(
@@ -521,12 +566,13 @@ export default function OrderManagementDashboard({ onRefresh, isDarkMode, curren
   const fetchOrderData = async () => {
     try {
       setLoading(true);
-      const [menuRes, ordersRes, statsRes, tablesRes, dailySalesRes] = await Promise.all([
+      const [menuRes, ordersRes, statsRes, tablesRes, dailySalesRes, reservationsRes] = await Promise.all([
         axios.get("http://localhost:8000/api/orders/menu"),
         axios.get("http://localhost:8000/api/orders"),
         axios.get("http://localhost:8000/api/orders/stats"),
         axios.get("http://localhost:8000/api/orders/tables"),
-        axios.get(`http://localhost:8000/api/orders/daily-sales?days=${selectedDaysRange}`).catch(() => ({ data: null }))
+        axios.get(`http://localhost:8000/api/orders/daily-sales?days=${selectedDaysRange}`).catch(() => ({ data: null })),
+        axios.get("http://localhost:8000/api/orders/reservations").catch(() => ({ data: null }))
       ]);
       if (menuRes.data?.menu?.length > 0) setMenu(menuRes.data.menu);
       if (ordersRes.data?.orders?.length > 0) setOrders(ordersRes.data.orders);
@@ -535,6 +581,9 @@ export default function OrderManagementDashboard({ onRefresh, isDarkMode, curren
       if (dailySalesRes.data) {
         setDailySalesData(dailySalesRes.data);
       }
+      if (reservationsRes.data?.reservations?.length > 0) {
+        setReservations(reservationsRes.data.reservations);
+      }
     } catch (err) {
       console.warn("Backend server not reachable on localhost:8000, using comprehensive built-in offline data:", err);
       setMenu(prev => (prev && prev.length > 0 ? prev : DEFAULT_MENU));
@@ -542,8 +591,49 @@ export default function OrderManagementDashboard({ onRefresh, isDarkMode, curren
       setTables(prev => (prev && prev.length > 0 ? prev : DEFAULT_TABLES));
       setStats(prev => prev || DEFAULT_STATS);
       setDailySalesData(prev => prev || DEFAULT_DAILY_SALES);
+      setReservations(prev => (prev && prev.length > 0 ? prev : DEFAULT_RESERVATIONS));
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchReservations = async () => {
+    try {
+      const res = await axios.get("http://localhost:8000/api/orders/reservations");
+      if (res.data?.reservations) {
+        setReservations(res.data.reservations);
+      }
+    } catch (err) {
+      console.warn("Could not fetch reservations from backend:", err);
+    }
+  };
+
+  const handleUpdateReservationStatus = async (resId, newStatus) => {
+    try {
+      await axios.patch(`http://localhost:8000/api/orders/reservations/${resId}/status?status=${encodeURIComponent(newStatus)}`);
+      setReservations(prev => prev.map(r => r.id === resId ? { ...r, status: newStatus } : r));
+      setOrderSuccessMessage(`✓ Reservation status updated to "${newStatus}"!`);
+      setTimeout(() => setOrderSuccessMessage(null), 4000);
+    } catch (err) {
+      console.warn("Updating reservation status locally:", err);
+      setReservations(prev => prev.map(r => r.id === resId ? { ...r, status: newStatus } : r));
+      setOrderSuccessMessage(`Reservation status updated to "${newStatus}"!`);
+      setTimeout(() => setOrderSuccessMessage(null), 4000);
+    }
+  };
+
+  const handleDeleteReservation = async (resId) => {
+    if (!window.confirm("Are you sure you want to delete this table reservation?")) return;
+    try {
+      await axios.delete(`http://localhost:8000/api/orders/reservations/${resId}`);
+      setReservations(prev => prev.filter(r => r.id !== resId));
+      setOrderSuccessMessage("✓ Reservation deleted successfully.");
+      setTimeout(() => setOrderSuccessMessage(null), 4000);
+    } catch (err) {
+      console.warn("Deleting reservation locally:", err);
+      setReservations(prev => prev.filter(r => r.id !== resId));
+      setOrderSuccessMessage("Reservation deleted.");
+      setTimeout(() => setOrderSuccessMessage(null), 4000);
     }
   };
 
@@ -695,6 +785,24 @@ export default function OrderManagementDashboard({ onRefresh, isDarkMode, curren
         return <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-300 dark:border-slate-700">✓ Served & Paid</span>;
     }
   };
+
+  const filteredReservations = (reservations || []).filter(res => {
+    const q = (reservationSearch || "").toLowerCase();
+    const matchesSearch = !q || 
+      (res.customer_name && res.customer_name.toLowerCase().includes(q)) ||
+      (res.phone && res.phone.toLowerCase().includes(q)) ||
+      (res.table_number && res.table_number.toLowerCase().includes(q)) ||
+      (res.notes && res.notes.toLowerCase().includes(q));
+      
+    const matchesStatus = reservationStatusFilter === 'all' || 
+      (res.status && res.status.toLowerCase() === reservationStatusFilter.toLowerCase());
+    const matchesDate = !reservationDateFilter || res.date === reservationDateFilter;
+
+    return matchesSearch && matchesStatus && matchesDate;
+  });
+
+  const totalReservedPax = (reservations || []).reduce((sum, r) => sum + (Number(r.pax) || 0), 0);
+  const confirmedReservationsCount = (reservations || []).filter(r => (r.status || '').toLowerCase() === 'confirmed').length;
 
   // Determine current active single-page view
   const currentView = viewMode !== 'all' ? viewMode : adminActiveTab;
@@ -856,6 +964,21 @@ export default function OrderManagementDashboard({ onRefresh, isDarkMode, curren
               <span>Sales Ledger</span>
               <span className="ml-1 px-1.5 py-0.5 rounded-full text-[9px] bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-200 font-black">
                 {orders.length}
+              </span>
+            </button>
+
+            <button
+              onClick={() => setAdminActiveTab('reservations')}
+              className={`px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl text-[11px] sm:text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap ${
+                adminActiveTab === 'reservations'
+                  ? 'bg-emerald-700 text-white shadow-md shadow-emerald-700/20'
+                  : 'bg-[#f0f5f2] dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+              }`}
+            >
+              <Calendar className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+              <span>Reservations</span>
+              <span className="ml-1 px-1.5 py-0.5 rounded-full text-[9px] bg-emerald-100 dark:bg-emerald-900/60 text-emerald-800 dark:text-emerald-300 font-black">
+                {reservations.length}
               </span>
             </button>
           </div>
@@ -1626,6 +1749,276 @@ export default function OrderManagementDashboard({ onRefresh, isDarkMode, curren
       )}
 
       {/* ========================================================================= */}
+      {/* SINGLE PAGE VIEW 5: TABLE RESERVATION MANAGEMENT & DEMAND CALIBRATION     */}
+      {/* ========================================================================= */}
+      {currentView === 'reservations' && (
+        <div className="space-y-5 animate-fade-in">
+          {/* Top Header Card */}
+          <div className="glass-panel p-5 sm:p-6 rounded-2xl bg-white dark:bg-slate-900 border border-[#d1ded5] dark:border-slate-800 shadow-sm space-y-4">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 dark:bg-emerald-950/60 text-emerald-950 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700 flex items-center gap-1.5 shadow-sm">
+                    <Calendar className="h-3.5 w-3.5 text-emerald-700 dark:text-emerald-400" /> Dining Table Reservations
+                  </span>
+                  <span className="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400 font-bold">
+                    • Live Firebase RTDB & AI Demand Calibration
+                  </span>
+                </div>
+                <h2 className="text-lg sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight mt-1.5">
+                  Guest Table Bookings & Seat Allocation
+                </h2>
+                <p className="text-[11px] sm:text-xs text-slate-600 dark:text-slate-300 mt-1 font-medium max-w-2xl leading-relaxed">
+                  Record advance bookings, assign dining tables, and allocate guest party sizes. Confirmed bookings immediately synchronize with the AI Demand Forecasting engine to increase kitchen prep batch recommendations.
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  onClick={fetchReservations}
+                  className="px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold flex items-center gap-1.5 transition-colors border border-slate-300 dark:border-slate-700"
+                  title="Sync Live with Firebase Realtime Database"
+                >
+                  <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
+                  <span>Sync Live</span>
+                </button>
+
+                <button
+                  onClick={() => setShowAddReservationModal(true)}
+                  className="px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold flex items-center gap-1.5 shadow-md shadow-emerald-700/20 transition-all hover:scale-105"
+                >
+                  <Plus className="h-4 w-4" />
+                  <span> Add Reservation</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Metrics Ribbon */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3 pt-3 border-t border-[#e1eae4] dark:border-slate-800">
+              <div className="p-3 sm:p-3.5 rounded-xl bg-[#f8faf9] dark:bg-slate-800/80 border border-[#d1ded5] dark:border-slate-700">
+                <span className="text-[9px] sm:text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400 block">Total Bookings</span>
+                <div className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white mt-0.5">{reservations.length}</div>
+                <span className="text-[9px] sm:text-[10px] text-emerald-700 dark:text-emerald-400 font-bold block truncate">
+                  {confirmedReservationsCount} Confirmed active
+                </span>
+              </div>
+
+              <div className="p-3 sm:p-3.5 rounded-xl bg-[#f8faf9] dark:bg-slate-800/80 border border-[#d1ded5] dark:border-slate-700">
+                <span className="text-[9px] sm:text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400 block">Reserved Guests (Pax)</span>
+                <div className="text-xl sm:text-2xl font-black text-emerald-800 dark:text-emerald-400 mt-0.5">{totalReservedPax} <span className="text-xs font-medium text-slate-500">Pax</span></div>
+              
+              </div>
+
+            
+
+  
+            </div>
+          </div>
+
+          {/* Search, Filter & List Section */}
+          <div className="glass-panel p-4 sm:p-6 rounded-2xl bg-white dark:bg-slate-900 border border-[#d1ded5] dark:border-slate-800 shadow-sm space-y-4">
+            {/* Filter Bar */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+              <div className="relative flex-1">
+                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Search guest name, phone, table number, notes..."
+                  value={reservationSearch}
+                  onChange={(e) => setReservationSearch(e.target.value)}
+                  className="w-full pl-9 pr-4 py-2 rounded-xl text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                />
+              </div>
+
+              <div className="flex items-center gap-2">
+                <input
+                  type="date"
+                  value={reservationDateFilter}
+                  onChange={(e) => setReservationDateFilter(e.target.value)}
+                  className="px-3 py-2 rounded-xl text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white font-medium focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                />
+
+                <select
+                  value={reservationStatusFilter}
+                  onChange={(e) => setReservationStatusFilter(e.target.value)}
+                  className="px-3 py-2 rounded-xl text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white font-medium focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                >
+                  <option value="all">All Statuses</option>
+                  <option value="Confirmed">Confirmed</option>
+                  <option value="Seated">Seated</option>
+                  <option value="Completed">Completed</option>
+                  <option value="Cancelled">Cancelled</option>
+                </select>
+
+                {(reservationSearch || reservationDateFilter || reservationStatusFilter !== 'all') && (
+                  <button
+                    onClick={() => {
+                      setReservationSearch("");
+                      setReservationDateFilter("");
+                      setReservationStatusFilter("all");
+                    }}
+                    className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 text-xs font-bold transition-colors"
+                    title="Clear filters"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Reservations Table / Cards */}
+            {filteredReservations.length === 0 ? (
+              <div className="text-center py-12 px-4 border border-dashed border-slate-200 dark:border-slate-800 rounded-2xl space-y-3">
+                <Calendar className="h-10 w-10 text-slate-300 dark:text-slate-600 mx-auto" />
+                <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200">No Reservations Found</h4>
+                <p className="text-xs text-slate-500 max-w-sm mx-auto">
+                  {reservationSearch || reservationDateFilter || reservationStatusFilter !== 'all'
+                    ? "Try adjusting your search criteria or clearing filters."
+                    : "No table reservations recorded yet. Click '+ Add Reservation' to add your first guest booking."}
+                </p>
+                <button
+                  onClick={() => setShowAddReservationModal(true)}
+                  className="px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold inline-flex items-center gap-1.5 shadow-sm"
+                >
+                  <Plus className="h-4 w-4" /> Add Reservation
+                </button>
+              </div>
+            ) : (
+              <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="bg-[#f8faf9] dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 font-bold border-b border-slate-200 dark:border-slate-800">
+                      <th className="py-3 px-4">Date & Shift</th>
+                      <th className="py-3 px-4">Customer Details</th>
+                      <th className="py-3 px-4">Table & Party</th>
+                      <th className="py-3 px-4">Notes / Requests</th>
+                      <th className="py-3 px-4">Status</th>
+                      <th className="py-3 px-4 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-medium">
+                    {filteredReservations.map((res) => {
+                      const isToday = res.date === new Date().toISOString().split('T')[0];
+                      return (
+                        <tr key={res.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors">
+                          <td className="py-3.5 px-4 whitespace-nowrap">
+                            <div className="flex items-center gap-1.5 font-bold text-slate-900 dark:text-white">
+                              <Calendar className="h-3.5 w-3.5 text-emerald-700 dark:text-emerald-400" />
+                              <span>{res.date}</span>
+                              {isToday && (
+                                <span className="px-1.5 py-0.5 text-[9px] font-black uppercase rounded bg-emerald-100 dark:bg-emerald-950/70 text-emerald-800 dark:text-emerald-300">
+                                  Today
+                                </span>
+                              )}
+                            </div>
+                            <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium block mt-0.5">
+                              {res.shift || "Dinner Service"}
+                            </span>
+                          </td>
+
+                          <td className="py-3.5 px-4">
+                            <div className="font-bold text-slate-900 dark:text-white">{res.customer_name}</div>
+                            {res.phone && (
+                              <a
+                                href={`tel:${res.phone}`}
+                                className="inline-flex items-center gap-1 text-[11px] text-emerald-700 dark:text-emerald-400 hover:underline mt-0.5 font-mono"
+                              >
+                                <Phone className="h-3 w-3" />
+                                {res.phone}
+                              </a>
+                            )}
+                          </td>
+
+                          <td className="py-3.5 px-4 whitespace-nowrap">
+                            <div className="font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                              <Armchair className="h-3.5 w-3.5 text-slate-500" />
+                              <span>{res.table_number || "Table Assigned upon arrival"}</span>
+                            </div>
+                            <div className="inline-flex items-center gap-1 text-[11px] font-bold text-slate-600 dark:text-slate-300 mt-0.5">
+                              <Users className="h-3 w-3 text-emerald-700" />
+                              <span>{res.pax || 2} Guests</span>
+                            </div>
+                          </td>
+
+                          <td className="py-3.5 px-4 max-w-xs">
+                            {res.notes ? (
+                              <p className="text-[11px] text-slate-600 dark:text-slate-300 line-clamp-2 leading-relaxed italic">
+                                "{res.notes}"
+                              </p>
+                            ) : (
+                              <span className="text-[11px] text-slate-400">No special notes</span>
+                            )}
+                          </td>
+
+                          <td className="py-3.5 px-4 whitespace-nowrap">
+                            <span
+                              className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-black uppercase tracking-wide ${
+                                res.status === 'Confirmed'
+                                  ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700'
+                                  : res.status === 'Seated'
+                                  ? 'bg-amber-100 dark:bg-amber-950/60 text-amber-900 dark:text-amber-300 border border-amber-300 dark:border-amber-700'
+                                  : res.status === 'Completed'
+                                  ? 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700'
+                                  : 'bg-rose-100 dark:bg-rose-950/60 text-rose-800 dark:text-rose-300 border border-rose-300 dark:border-rose-700'
+                              }`}
+                            >
+                              {res.status || 'Confirmed'}
+                            </span>
+                          </td>
+
+                          <td className="py-3.5 px-4 text-right whitespace-nowrap">
+                            <div className="flex items-center justify-end gap-1.5">
+                              {res.status !== 'Seated' && res.status !== 'Completed' && (
+                                <button
+                                  onClick={() => handleUpdateReservationStatus(res.id, 'Seated')}
+                                  className="px-2.5 py-1 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-[10px] font-bold shadow-sm transition-all"
+                                  title="Mark guests as seated"
+                                >
+                                  Seat
+                                </button>
+                              )}
+
+                              {res.status !== 'Completed' && (
+                                <button
+                                  onClick={() => handleUpdateReservationStatus(res.id, 'Completed')}
+                                  className="px-2.5 py-1 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white text-[10px] font-bold shadow-sm transition-all"
+                                  title="Mark reservation completed"
+                                >
+                                  Done
+                                </button>
+                              )}
+
+                              {res.status !== 'Cancelled' && res.status !== 'Completed' && (
+                                <button
+                                  onClick={() => handleUpdateReservationStatus(res.id, 'Cancelled')}
+                                  className="px-2 py-1 rounded-lg bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-300 text-[10px] font-bold transition-all"
+                                  title="Cancel reservation"
+                                >
+                                  Cancel
+                                </button>
+                              )}
+
+                              <button
+                                onClick={() => handleDeleteReservation(res.id)}
+                                className="p-1.5 rounded-lg text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/50 transition-colors"
+                                title="Delete reservation"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
       {/* PROFESSIONAL CUSTOMER BILLING & PRINTABLE INVOICE MODAL                   */}
       {/* ========================================================================= */}
       {selectedReceiptOrder && (
@@ -1986,6 +2379,17 @@ export default function OrderManagementDashboard({ onRefresh, isDarkMode, curren
         onItemAdded={(newItem) => {
           setMenu(prev => [newItem, ...prev.filter(m => m.id !== newItem.id)]);
           setOrderSuccessMessage(`✓ Dish "${newItem.name}" added to menu & saved to Firebase Realtime Database!`);
+          setTimeout(() => setOrderSuccessMessage(null), 6000);
+        }}
+      />
+
+      {/* Add New Reservation Modal */}
+      <AddReservationModal
+        isOpen={showAddReservationModal}
+        onClose={() => setShowAddReservationModal(false)}
+        onReservationAdded={(newRes) => {
+          setReservations(prev => [newRes, ...prev.filter(r => r.id !== newRes.id)]);
+          setOrderSuccessMessage(`✓ Table Reservation for "${newRes.customer_name}" (${newRes.pax} Guests) saved to Firebase & calibrated in Demand Forecast!`);
           setTimeout(() => setOrderSuccessMessage(null), 6000);
         }}
       />

@@ -287,7 +287,18 @@ class FirebaseRealtimeDBService:
             logger.error(f"[FirebaseService] Error saving reservation {res_id} to Firebase: {e}")
             return False
 
+    def delete_reservation(self, res_id: str) -> bool:
+        """Removes a table reservation from Firebase Realtime Database at /reservations/{res_id}."""
+        if not self.is_connected:
+            return False
+        try:
+            ref = db.reference(f"reservations/{res_id}")
+            ref.delete()
+            return True
+        except Exception as e:
+            logger.error(f"[FirebaseService] Error deleting reservation {res_id} from Firebase: {e}")
+            return False
+
 
 # Global singleton instance
 firebase_service = FirebaseRealtimeDBService()
-

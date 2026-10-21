@@ -310,7 +310,8 @@ export default function DemandForecastingDashboard({ isDarkMode, currentRole = '
     } : {},
     calendar: {
       local_events: data.contextual_factors?.local_events,
-      event_impact: data.contextual_factors?.event_impact
+      event_impact: data.contextual_factors?.event_impact,
+      is_live_calendar: data.contextual_factors?.calendar_live
     },
     reservations: {
       reservations_booked: data.contextual_factors?.reservations_booked || 0,
@@ -318,6 +319,11 @@ export default function DemandForecastingDashboard({ isDarkMode, currentRole = '
       status_text: data.contextual_factors?.reservations_text,
       impact_text: data.contextual_factors?.reservations_impact,
       is_live_db: data.contextual_factors?.reservations_live
+    },
+    promotions: {
+      active_promotions: data.contextual_factors?.active_promotions,
+      promo_impact: data.contextual_factors?.promo_impact,
+      has_active_promo: data.contextual_factors?.has_active_promo
     },
     kpi_summary: data.kpi_summary,
     items: data.items
@@ -328,6 +334,11 @@ export default function DemandForecastingDashboard({ isDarkMode, currentRole = '
   const activeWeather = currentHorizonData.weather || data.contextual_factors || {};
   const activeCalendar = currentHorizonData.calendar || data.contextual_factors || {};
   const activeReservations = currentHorizonData.reservations || data.contextual_factors || {};
+  const activePromotions = currentHorizonData.promotions || {
+    active_promotions: data.contextual_factors?.active_promotions,
+    promo_impact: data.contextual_factors?.promo_impact,
+    has_active_promo: data.contextual_factors?.has_active_promo
+  };
   const activeCategoryBreakdown = currentHorizonData.category_breakdown || data.category_breakdown || [];
 
   const categories = ['All', ...new Set(activeItems.map(i => i.category))];
@@ -415,9 +426,7 @@ export default function DemandForecastingDashboard({ isDarkMode, currentRole = '
                 </>
               ) : (
                 <>
-                  <span className="px-2.5 sm:px-3 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-black bg-emerald-700 text-white shadow-sm flex items-center gap-1.5">
-                    <TrendingUp className="h-3 w-3 sm:h-3.5 sm:w-3.5" /> AI Food Demand Forecast
-                  </span>
+                  
                   <span className="px-2.5 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-bold bg-emerald-50 dark:bg-emerald-950/70 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 flex items-center gap-1">
                     <MapPin className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
                     <span>{data?.active_branch?.name || "Hikkaduwa Beachfront (Main Branch)"}</span>
@@ -560,12 +569,18 @@ export default function DemandForecastingDashboard({ isDarkMode, currentRole = '
             <CloudRain className="h-5 w-5" />
           </div>
           <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-1.5 mb-1">
+            <div className="flex items-center justify-between gap-1.5 mb-1">
               <span className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400 tracking-wider">Weather Intelligence</span>
-              {data.contextual_factors?.weather_live }
+              <span className="text-[9px] font-black uppercase text-sky-700 dark:text-sky-300 bg-sky-100 dark:bg-sky-950/60 px-1.5 py-0.5 rounded">
+                {currentHorizonData.day_name || (selectedHorizon === 'tomorrow' ? 'Tomorrow' : selectedHorizon === 'day_after' ? 'Day After' : 'Today')}
+              </span>
             </div>
-            <div className="text-xs font-extrabold text-slate-900 dark:text-white leading-snug break-words">{data.contextual_factors.weather_condition}</div>
-            <div className="text-[11px] text-sky-700 dark:text-sky-400 font-bold leading-snug mt-1 break-words">{data.contextual_factors.weather_impact}</div>
+            <div className="text-xs font-extrabold text-slate-900 dark:text-white leading-snug break-words">
+              {activeWeather.weather_condition || data.contextual_factors?.weather_condition}
+            </div>
+            <div className="text-[11px] text-sky-700 dark:text-sky-400 font-bold leading-snug mt-1 break-words">
+              {activeWeather.weather_impact || data.contextual_factors?.weather_impact}
+            </div>
           </div>
         </div>
 
@@ -575,17 +590,17 @@ export default function DemandForecastingDashboard({ isDarkMode, currentRole = '
             <Calendar className="h-5 w-5" />
           </div>
           <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-1.5 mb-1">
+            <div className="flex items-center justify-between gap-1.5 mb-1">
               <span className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400 tracking-wider">Customer Bookings</span>
-              {data.contextual_factors?.reservations_live 
-                
-              }
+              <span className="text-[9px] font-black uppercase text-amber-800 dark:text-amber-300 bg-amber-100 dark:bg-amber-950/60 px-1.5 py-0.5 rounded">
+                {currentHorizonData.day_name || (selectedHorizon === 'tomorrow' ? 'Tomorrow' : selectedHorizon === 'day_after' ? 'Day After' : 'Today')}
+              </span>
             </div>
             <div className="text-xs font-extrabold text-slate-900 dark:text-white leading-snug break-words">
-              {data.contextual_factors.reservations_text || `${data.contextual_factors.reservations_booked ?? 0} Table Reservations`}
+              {activeReservations.status_text || activeReservations.reservations_text || `${activeReservations.reservations_booked ?? 0} Table Reservations`}
             </div>
             <div className="text-[11px] text-amber-700 dark:text-amber-400 font-bold leading-snug mt-1 break-words">
-              {data.contextual_factors.reservations_impact || "Standard walk-in customer flow"}
+              {activeReservations.impact_text || activeReservations.reservations_impact || "Standard walk-in customer flow"}
             </div>
           </div>
         </div>
@@ -596,16 +611,18 @@ export default function DemandForecastingDashboard({ isDarkMode, currentRole = '
             <Award className="h-5 w-5" />
           </div>
           <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-1.5 mb-1">
+            <div className="flex items-center justify-between gap-1.5 mb-1">
               <span className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400 tracking-wider">Local Event Radar</span>
-              {data.contextual_factors?.calendar_live && (
-                <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300">
-                  Live Calendar
-                </span>
-              )}
+              <span className="text-[9px] font-black uppercase text-purple-800 dark:text-purple-300 bg-purple-100 dark:bg-purple-950/60 px-1.5 py-0.5 rounded">
+                {currentHorizonData.day_name || (selectedHorizon === 'tomorrow' ? 'Tomorrow' : selectedHorizon === 'day_after' ? 'Day After' : 'Today')}
+              </span>
             </div>
-            <div className="text-xs font-extrabold text-slate-900 dark:text-white leading-snug break-words">{data.contextual_factors.local_events}</div>
-            <div className="text-[11px] text-purple-700 dark:text-purple-400 font-bold leading-snug mt-1 break-words">{data.contextual_factors.event_impact || "Standard regular dining (0% surge)"}</div>
+            <div className="text-xs font-extrabold text-slate-900 dark:text-white leading-snug break-words">
+              {activeCalendar.local_events || data.contextual_factors?.local_events}
+            </div>
+            <div className="text-[11px] text-purple-700 dark:text-purple-400 font-bold leading-snug mt-1 break-words">
+              {activeCalendar.event_impact || data.contextual_factors?.event_impact || "Standard regular dining (0% surge)"}
+            </div>
           </div>
         </div>
 
@@ -615,12 +632,17 @@ export default function DemandForecastingDashboard({ isDarkMode, currentRole = '
             <ShoppingBag className="h-5 w-5" />
           </div>
           <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-1.5 mb-1">
+            <div className="flex items-center justify-between gap-1.5 mb-1">
               <span className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400 tracking-wider">Active Campaign</span>
+              <span className="text-[9px] font-black uppercase text-emerald-800 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-950/60 px-1.5 py-0.5 rounded">
+                {currentHorizonData.day_name || (selectedHorizon === 'tomorrow' ? 'Tomorrow' : selectedHorizon === 'day_after' ? 'Day After' : 'Today')}
+              </span>
             </div>
-            <div className="text-xs font-extrabold text-slate-900 dark:text-white leading-snug break-words">{data.contextual_factors.active_promotions}</div>
+            <div className="text-xs font-extrabold text-slate-900 dark:text-white leading-snug break-words">
+              {activePromotions.active_promotions || data.contextual_factors?.active_promotions}
+            </div>
             <div className="text-[11px] text-emerald-700 dark:text-emerald-400 font-bold leading-snug mt-1 break-words">
-              {data.contextual_factors.promo_impact || (data.contextual_factors.has_active_promo ? "+10% dining surge" : "Standard regular pricing (0% surge)")}
+              {activePromotions.promo_impact || data.contextual_factors?.promo_impact || (activePromotions.has_active_promo ? "+10% dining surge" : "Standard regular pricing (0% surge)")}
             </div>
           </div>
         </div>
@@ -1107,61 +1129,6 @@ export default function DemandForecastingDashboard({ isDarkMode, currentRole = '
               </div>
             </div>
 
-            {/* 4 Feature Category Attribution Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="p-4 rounded-xl bg-emerald-50/70 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-emerald-900 dark:text-emerald-300">Historical Sales Baseline</span>
-                  <span className="text-sm font-black text-emerald-800 dark:text-emerald-400">53.8%</span>
-                </div>
-                <div className="w-full bg-emerald-200 dark:bg-emerald-900/60 rounded-full h-2 overflow-hidden">
-                  <div className="bg-emerald-600 h-2 rounded-full" style={{ width: '53.8%' }}></div>
-                </div>
-                <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-tight">
-                  7-Day (26.8%) & 14-Day (20.4%) moving trends + yesterday's demand (2.3%).
-                </p>
-              </div>
-
-              <div className="p-4 rounded-xl bg-sky-50/70 dark:bg-sky-950/30 border border-sky-200 dark:border-sky-800 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-sky-900 dark:text-sky-300">Operational & Calendar</span>
-                  <span className="text-sm font-black text-sky-800 dark:text-sky-400">22.8%</span>
-                </div>
-                <div className="w-full bg-sky-200 dark:bg-sky-900/60 rounded-full h-2 overflow-hidden">
-                  <div className="bg-sky-600 h-2 rounded-full" style={{ width: '22.8%' }}></div>
-                </div>
-                <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-tight">
-                  Operating vs closed days (13.9%), month seasonality (3.2%), and weekend peaks (1.5%).
-                </p>
-              </div>
-
-              <div className="p-4 rounded-xl bg-purple-50/70 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-purple-900 dark:text-purple-300">Category & Pricing</span>
-                  <span className="text-sm font-black text-purple-800 dark:text-purple-400">11.2%</span>
-                </div>
-                <div className="w-full bg-purple-200 dark:bg-purple-900/60 rounded-full h-2 overflow-hidden">
-                  <div className="bg-purple-600 h-2 rounded-full" style={{ width: '11.2%' }}></div>
-                </div>
-                <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-tight">
-                  Cross-category demand surges (3.2%) and menu pricing elasticity (0.9%).
-                </p>
-              </div>
-
-              <div className="p-4 rounded-xl bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-amber-900 dark:text-amber-300">Weather & Environment</span>
-                  <span className="text-sm font-black text-amber-800 dark:text-amber-400">4.5%</span>
-                </div>
-                <div className="w-full bg-amber-200 dark:bg-amber-900/60 rounded-full h-2 overflow-hidden">
-                  <div className="bg-amber-600 h-2 rounded-full" style={{ width: '4.5%' }}></div>
-                </div>
-                <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-tight">
-                  Rainfall volume (1.7%), temperature shifts (1.1%), and rain threshold flags (0.9%).
-                </p>
-              </div>
-            </div>
-
             {/* Key Factor Attribution Breakdown Bars */}
             <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-[#cbdad0] dark:border-slate-700 space-y-3">
               <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wide">
@@ -1195,77 +1162,109 @@ export default function DemandForecastingDashboard({ isDarkMode, currentRole = '
             
           </div>
 
-          {/* ITEM-LEVEL SHAP FACTOR DECOMPOSITION */}
+          {/* ITEM-LEVEL DEMAND FACTOR BREAKDOWN */}
           <div className="glass-panel p-6 rounded-2xl bg-white dark:bg-slate-900 border border-[#cbdad0] dark:border-slate-800 shadow-sm space-y-4">
             <div className="border-b border-[#e2ece5] dark:border-slate-800 pb-3">
               <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
                 <Layers className="h-5 w-5 text-emerald-700 dark:text-emerald-400" />
-                Explainable AI: Dish-Level Factor Breakdown
+                Dish-by-Dish Demand Breakdown
               </h3>
               <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
-                Explaining WHY demand is forecasted to rise or fall for each specific dish using localized factor attribution
+                Detailed breakdown explaining why each dish recommendation rises or falls based on weather, calendar, bookings, and waste reduction
               </p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pt-2">
-              {activeItems.map((item) => (
-                <div key={item.id} className="p-5 rounded-2xl bg-slate-50 dark:bg-slate-800/70 border border-[#cbdad0] dark:border-slate-700 space-y-3 shadow-sm">
-                  
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <h4 className="text-sm font-bold text-slate-900 dark:text-white">{item.name}</h4>
-                      <span className="text-xs text-slate-500 font-medium">{item.category}</span>
-                    </div>
-                    <span className="text-xs font-black text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded-lg border border-emerald-200 dark:border-emerald-700">
-                      Total: {item.predicted_demand_today}
-                    </span>
-                  </div>
+              {activeItems.map((item) => {
+                const weatherEff = item.shap_breakdown?.weather_effect ?? 0;
+                const calEff = item.shap_breakdown?.holiday_event_effect ?? 0;
+                const resEff = item.shap_breakdown?.reservation_effect ?? 0;
+                const promoEff = item.shap_breakdown?.promo_effect ?? 0;
+                const wasteEff = item.shap_breakdown?.waste_feedback_dampener ?? 0;
 
-                  {/* Factor Breakdown Bars */}
-                  <div className="space-y-2 text-xs pt-1">
+                const hasAdjustments = weatherEff !== 0 || calEff !== 0 || resEff !== 0 || promoEff !== 0 || wasteEff !== 0;
+
+                return (
+                  <div key={item.id} className="p-5 rounded-2xl bg-slate-50 dark:bg-slate-800/70 border border-[#cbdad0] dark:border-slate-700 space-y-3 shadow-sm flex flex-col justify-between">
                     
-                    <div className="flex items-center justify-between">
-                      <span className="text-slate-600 dark:text-slate-400">90-Day Baseline Sales:</span>
-                      <span className="font-mono font-bold text-slate-800 dark:text-slate-200">{item.shap_breakdown.base_value} portions</span>
+                    <div>
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <h4 className="text-sm font-bold text-slate-900 dark:text-white">{item.name}</h4>
+                          <span className="text-xs text-slate-500 font-medium">{item.category}</span>
+                        </div>
+                        <span className="text-xs font-black text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded-lg border border-emerald-200 dark:border-emerald-700">
+                          Target: {item.predicted_demand_today} portions
+                        </span>
+                      </div>
+
+                      {/* Factor Breakdown */}
+                      <div className="space-y-2 text-xs pt-2">
+                        
+                        <div className="flex items-center justify-between">
+                          <span className="text-slate-600 dark:text-slate-400">Average Daily Sales:</span>
+                          <span className="font-mono font-bold text-slate-800 dark:text-slate-200">
+                            {item.shap_breakdown?.base_value ?? item.historical_avg ?? item.predicted_demand_today} portions
+                          </span>
+                        </div>
+
+                        {weatherEff !== 0 && (
+                          <div className={`flex items-center justify-between ${weatherEff > 0 ? 'text-sky-700 dark:text-sky-400' : 'text-rose-600 dark:text-rose-400'}`}>
+                            <span className="flex items-center gap-1.5"><CloudRain className="h-3.5 w-3.5 flex-shrink-0" /> Weather Impact:</span>
+                            <span className="font-mono font-bold">{weatherEff > 0 ? `+${weatherEff}` : weatherEff} portions</span>
+                          </div>
+                        )}
+
+                        {calEff !== 0 && (
+                          <div className={`flex items-center justify-between ${calEff > 0 ? 'text-purple-700 dark:text-purple-400' : 'text-rose-600 dark:text-rose-400'}`}>
+                            <span className="flex items-center gap-1.5"><Award className="h-3.5 w-3.5 flex-shrink-0" /> Day & Event Impact:</span>
+                            <span className="font-mono font-bold">{calEff > 0 ? `+${calEff}` : calEff} portions</span>
+                          </div>
+                        )}
+
+                        {resEff !== 0 && (
+                          <div className={`flex items-center justify-between ${resEff > 0 ? 'text-amber-700 dark:text-amber-400' : 'text-rose-600 dark:text-rose-400'}`}>
+                            <span className="flex items-center gap-1.5"><Calendar className="h-3.5 w-3.5 flex-shrink-0" /> Table Reservations:</span>
+                            <span className="font-mono font-bold">{resEff > 0 ? `+${resEff}` : resEff} portions</span>
+                          </div>
+                        )}
+
+                        {promoEff > 0 && (
+                          <div className="flex items-center justify-between text-emerald-700 dark:text-emerald-400">
+                            <span className="flex items-center gap-1.5"><ShoppingBag className="h-3.5 w-3.5 flex-shrink-0" /> Active Promotion:</span>
+                            <span className="font-mono font-bold">+{promoEff} portions</span>
+                          </div>
+                        )}
+
+                        {wasteEff !== 0 && (
+                          <div className="flex items-center justify-between text-rose-600 dark:text-rose-400 border-t border-slate-200 dark:border-slate-700 pt-1.5">
+                            <span className="flex items-center gap-1.5" title="Portion reduction based on past waste to prevent spoilage">
+                              <Scale className="h-3.5 w-3.5 flex-shrink-0" /> Waste Reduction:
+                            </span>
+                            <span className="font-mono font-bold">{wasteEff > 0 ? `+${wasteEff}` : wasteEff} portions</span>
+                          </div>
+                        )}
+
+                        {!hasAdjustments && (
+                          <div className="text-[11px] text-slate-500 dark:text-slate-400 italic pt-1">
+                            Standard baseline prep (no external adjustments today)
+                          </div>
+                        )}
+
+                      </div>
                     </div>
 
-                    <div className="flex items-center justify-between text-sky-700 dark:text-sky-400">
-                      <span className="flex items-center gap-1"><CloudRain className="h-3.5 w-3.5" /> Weather Impact:</span>
-                      <span className="font-mono font-bold">+{item.shap_breakdown.weather_effect} portions</span>
-                    </div>
-
-                    <div className="flex items-center justify-between text-purple-700 dark:text-purple-400">
-                      <span className="flex items-center gap-1"><Award className="h-3.5 w-3.5" /> Holiday / Event Lift:</span>
-                      <span className="font-mono font-bold">+{item.shap_breakdown.holiday_event_effect} portions</span>
-                    </div>
-
-                    <div className="flex items-center justify-between text-amber-700 dark:text-amber-400">
-                      <span className="flex items-center gap-1"><Calendar className="h-3.5 w-3.5" /> Table Reservations:</span>
-                      <span className="font-mono font-bold">+{item.shap_breakdown.reservation_effect} portions</span>
-                    </div>
-
-                    {item.shap_breakdown.promo_effect > 0 && (
-                      <div className="flex items-center justify-between text-emerald-700 dark:text-emerald-400">
-                        <span className="flex items-center gap-1"><ShoppingBag className="h-3.5 w-3.5" /> Active Promotion:</span>
-                        <span className="font-mono font-bold">+{item.shap_breakdown.promo_effect} portions</span>
+                    {/* Summary Narrative */}
+                    {item.key_drivers && item.key_drivers.length > 0 && (
+                      <div className="p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-[11px] text-slate-600 dark:text-slate-300 leading-snug mt-2">
+                        <span className="font-bold text-slate-800 dark:text-slate-200 block mb-0.5">Why this recommendation:</span>
+                        {item.key_drivers.join(" • ")}
                       </div>
                     )}
 
-                    <div className="flex items-center justify-between text-rose-700 dark:text-rose-400 border-t border-slate-200 dark:border-slate-700 pt-1.5">
-                      <span className="flex items-center gap-1"><Scale className="h-3.5 w-3.5" /> Closed-Loop Waste Dampener:</span>
-                      <span className="font-mono font-bold">{item.shap_breakdown.waste_feedback_dampener} portions</span>
-                    </div>
-
                   </div>
-
-                  {/* Summary Narrative */}
-                  <div className="p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-[11px] text-slate-600 dark:text-slate-300 leading-snug">
-                    <span className="font-bold text-slate-800 dark:text-slate-200 block mb-0.5">Primary Model Rationale:</span>
-                    {item.key_drivers.join(" • ")}
-                  </div>
-
-                </div>
-              ))}
+                );
+              })}
             </div>
 
           </div>
