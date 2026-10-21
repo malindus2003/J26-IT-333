@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from .routers import sensors, vision, predictions, inventory, recommendations, demand, kitchen, waste, orders, auth
+from .routers import sensors, vision, produce, predictions, inventory, recommendations, demand, kitchen, waste, orders, auth
 from .data.mock_data import STORAGE_ZONES
 from .routers.inventory import inventory_db
 from .routers.orders import orders_db
@@ -27,6 +27,7 @@ app.include_router(demand.router)           # Component 1 (Nanayakkara K.A.J.Y)
 app.include_router(kitchen.router)          # Component 2 (Pahesara H.H.D.S)
 app.include_router(sensors.router)          # Component 3 (Maddumage M. S - IoT)
 app.include_router(vision.router)           # Component 3 (Maddumage M. S - CV)
+app.include_router(produce.router)          # Component 3 (Produce Assessment & Models Status)
 app.include_router(predictions.router)      # Component 3 (Maddumage M. S - AI Fusion)
 app.include_router(recommendations.router)  # Component 3 (Maddumage M. S - Decisions)
 app.include_router(waste.router)            # Component 4 (Pathirana P.R.T)

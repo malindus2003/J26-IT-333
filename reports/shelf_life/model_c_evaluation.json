@@ -1,0 +1,6 @@
+{
+  "model_type": "RandomForestRegressor(n_estimators=150, max_depth=10)",
+  "test_r2_score": 0.916,
+  "test_rmse_percent": 9.01,
+  "test_mae_percent": 4.29
+}

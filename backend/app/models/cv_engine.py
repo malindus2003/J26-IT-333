@@ -340,16 +340,19 @@ class FoodQualityVisionEngine:
         # 3. BIOLOGICAL MORPHO-CHROMATIC SIGNATURES
         # -------------------------------------------------------------
 
-        # Trained model citrus orange confidence guard
-        is_trained_citrus_orange = (species_probs.get("Orange", 0.0) >= 0.50) and (red_pct < 3.0)
+        # Trained model confident species guards
+        is_trained_citrus_orange = (species_probs.get("Orange", 0.0) >= 0.50)
+        is_trained_apple = (species_probs.get("Apple", 0.0) >= 0.65)
+        is_trained_strawberry = (species_probs.get("Strawberry", 0.0) >= 0.65)
 
         # A. WATERMELON (Whole green rind or sliced red/pink flesh with green margin)
         is_whole_watermelon = (
-            not is_trained_citrus_orange and
+            not is_trained_citrus_orange and not is_trained_apple and
             ((green_pct >= 35.0) or (40.0 <= h_mean <= 85.0 and green_pct >= 25.0 and yellow_pct < 15.0)) and
             red_pct < 6.0 and yellow_pct < 18.0 and (0.70 <= aspect_val <= 1.40) and (lap_var < 1400.0)
         )
         is_sliced_watermelon = (
+            not is_trained_citrus_orange and not is_trained_apple and not is_trained_strawberry and
             red_pct >= 18.0 and green_pct >= 1.8 and yellow_pct < 20.0 and (necrotic_pct >= 0.05 or v_mean > 110.0)
         )
         if is_whole_watermelon or is_sliced_watermelon:
