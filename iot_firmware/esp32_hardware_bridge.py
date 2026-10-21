@@ -100,7 +100,7 @@ def run_serial_bridge(port: str, baud: int, backend_url: str):
     extracts the telemetry JSON payload, and dispatches it to the FastAPI backend.
     """
     try:
-        import serial
+        import serial  # type: ignore
     except ImportError:
         print("[ERROR] pyserial is not installed. Please run: pip install pyserial")
         sys.exit(1)

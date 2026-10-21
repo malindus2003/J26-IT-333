@@ -8,7 +8,7 @@ import urllib.parse
 # Ensure Windows terminal supports UTF-8 emojis
 if sys.platform.startswith('win'):
     try:
-        sys.stdout.reconfigure(encoding='utf-8')
+        sys.stdout.reconfigure(encoding='utf-8')  # type: ignore
     except Exception:
         pass
 

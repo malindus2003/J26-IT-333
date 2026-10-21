@@ -118,6 +118,22 @@ def load_csv_data(filename: str) -> pd.DataFrame:
         return pd.read_csv(p2)
     return pd.DataFrame()
 
+def safe_float(val: Any, default: float = 0.0) -> float:
+    try:
+        if val is None or pd.isna(val):
+            return default
+        return float(val)
+    except (ValueError, TypeError):
+        return default
+
+def safe_int(val: Any, default: int = 0) -> int:
+    try:
+        if val is None or pd.isna(val):
+            return default
+        return int(float(val))
+    except (ValueError, TypeError):
+        return default
+
 def get_stations_data() -> List[Dict[str, Any]]:
     df = load_csv_data("kitchen_bottlenecks_detected.csv")
     if not df.empty:
@@ -184,29 +200,33 @@ def get_stations_data() -> List[Dict[str, Any]]:
 
         mapped_stations = []
         for st in stations_config:
-            live_active_queue = sum(1 for o in active_orders if station_matches_order(st["name"], o))
-            live_completed_count = sum(1 for o in completed_orders if station_matches_order(st["name"], o))
-            base_load = base_shift_loads.get(st["name"], 0.0)
+            st_name: str = str(st["name"])
+            st_default_cooks: int = int(st["default_cooks"])
+            st_target_prep: float = float(st["target_prep"])
+
+            live_active_queue = sum(1 for o in active_orders if station_matches_order(st_name, o))
+            live_completed_count = sum(1 for o in completed_orders if station_matches_order(st_name, o))
+            base_load = float(base_shift_loads.get(st_name, 0.0))
             
             # Actual load incorporates base shift orders + active and completed orders for the station
             current_load = round(base_load + live_active_queue + live_completed_count, 1)
-            thresh = thresholds[st["name"]]
+            thresh = float(thresholds[st_name])
             load_percentage = min(100, int(round((current_load / thresh) * 80))) if current_load > 0 else 0
             is_bottleneck = current_load >= thresh
             
             # Live cooks incorporating dynamic staff reallocation adjustments
-            active_cooks_count = max(1, st["default_cooks"] + station_cook_adjustments.get(st["name"], 0))
+            active_cooks_count = max(1, st_default_cooks + int(station_cook_adjustments.get(st_name, 0)))
             status = "High Delay Risk" if is_bottleneck else ("Moderate Load" if load_percentage > 65 else "Smooth Flow")
             recommended_cooks = active_cooks_count + (1 if is_bottleneck else 0)
-            avg_prep = round(st["target_prep"] + (live_active_queue * 0.45), 1)
+            avg_prep = round(st_target_prep + (live_active_queue * 0.45), 1)
 
-            action = f"Add +1 Cook to {st['name']} due to peak backlog" if is_bottleneck else "Maintain current station staffing"
+            action = f"Add +1 Cook to {st_name} due to peak backlog" if is_bottleneck else "Maintain current station staffing"
 
             pred_load = round(current_load * 0.94 + 0.1, 1) if current_load > 0 else 0.0
 
             mapped_stations.append({
-                "id": st["id"],
-                "name": st["name"],
+                "id": str(st["id"]),
+                "name": st_name,
                 "actual_load": round(current_load, 1),
                 "predicted_load": pred_load,
                 "load_level": load_percentage,
@@ -214,11 +234,11 @@ def get_stations_data() -> List[Dict[str, Any]]:
                 "active_cooks": active_cooks_count,
                 "recommended_cooks": recommended_cooks,
                 "avg_prep_time_mins": avg_prep,
-                "target_prep_time_mins": st["target_prep"],
+                "target_prep_time_mins": st_target_prep,
                 "queue_length": live_active_queue,
                 "bottleneck_status": status,
                 "action": action,
-                "overload_days_count": overload_counts[st["name"]]
+                "overload_days_count": int(overload_counts[st_name])
             })
 
         return mapped_stations
@@ -346,12 +366,12 @@ def get_staff_data() -> List[Dict[str, Any]]:
                     reallocated_to = realloc['to']
                     break
 
-            scores = {col: int(row.get(col, 3)) for col in station_cols}
+            scores = {col: int(float(row.get(col, 3) or 3)) for col in station_cols}
             avg_score = sum(scores.values()) / float(len(scores))
             eff_rating = min(98, max(55, int(round(avg_score * 17.5 + 11.0))))
             speed_score = f"{min(5.0, round(avg_score * 0.85 + 0.65, 1))} / 5.0"
 
-            min_col = min(scores, key=scores.get)
+            min_col = min(scores.keys(), key=lambda k: scores[k])
             skill_gap, training_rec, prog_prefix = gap_training_map.get(min_col, ("Advanced Pastry & Bakery", "Executive Kitchen Leadership & Precision Control", "Line Master Track"))
 
             if "Head Chef" in name or avg_score >= 4.4:
@@ -517,8 +537,8 @@ def get_workload_forecast() -> List[Dict[str, Any]]:
         records = []
         sample_df = df.tail(15)
         for _, row in sample_df.iterrows():
-            pred = int(round(float(row.get('Predicted_Total_Load', 20))))
-            actual = int(round(float(row.get('Actual_Total_Load', pred))))
+            pred = int(round(safe_float(row.get('Predicted_Total_Load'), 20.0)))
+            actual = int(round(safe_float(row.get('Actual_Total_Load'), float(pred))))
             req_staff = max(2, int(round(pred / 12)))
             act_staff = max(2, req_staff - (1 if pred > 70 else 0))
             
@@ -528,11 +548,11 @@ def get_workload_forecast() -> List[Dict[str, Any]]:
                 "actual_orders": actual,
                 "staff_required": req_staff,
                 "actual_staff": act_staff,
-                "hot_kitchen_est_load": round(float(row.get('Hot_Kitchen_Est_Load', 0)), 1),
-                "grill_est_load": round(float(row.get('Grill_Est_Load', 0)), 1),
-                "cold_salad_est_load": round(float(row.get('Cold_Salad_Est_Load', 0)), 1),
-                "pizza_est_load": round(float(row.get('Pizza_Est_Load', 0)), 1),
-                "fryer_est_load": round(float(row.get('Fryer_Est_Load', 0)), 1),
+                "hot_kitchen_est_load": round(safe_float(row.get('Hot_Kitchen_Est_Load'), 0.0), 1),
+                "grill_est_load": round(safe_float(row.get('Grill_Est_Load'), 0.0), 1),
+                "cold_salad_est_load": round(safe_float(row.get('Cold_Salad_Est_Load'), 0.0), 1),
+                "pizza_est_load": round(safe_float(row.get('Pizza_Est_Load'), 0.0), 1),
+                "fryer_est_load": round(safe_float(row.get('Fryer_Est_Load'), 0.0), 1),
             })
         return records
 
@@ -636,8 +656,8 @@ def analyze_incoming_dish_types_and_recommend_staff() -> Dict[str, Any]:
             
             candidates = []
             for s in all_staff:
-                s_id = s.get("id") or s.get("emp_id")
-                staff_name = s.get("name", "")
+                s_id = str(s.get("id") or s.get("emp_id") or "")
+                staff_name = str(s.get("name", ""))
                 curr_assigned = s.get("assigned_station", "")
                 
                 # 1. Never reallocate staff already assigned to this station
@@ -1007,13 +1027,13 @@ def generate_personalized_ai_upskilling_recommendations() -> List[Dict[str, Any]
     now_str = datetime.now().strftime("%Y-%m-%d %I:%M:%S %p")
     records = []
 
-    for idx, r in df.iterrows():
+    for row_idx, (_, r) in enumerate(df.iterrows()):
         emp_id = str(r["emp_id"])
         name = str(r["name"])
         base_st = str(r.get("base_station", "Hot Kitchen"))
         
         custom = CUSTOM_STAFF_METADATA.get(emp_id, {})
-        scores = {c: int(r[c]) for c in station_cols}
+        scores = {c: safe_int(r[c], 3) for c in station_cols}
         avg_score = sum(scores.values()) / float(len(scores))
         eff_rating = custom.get("efficiency_rating", min(98, max(55, int(round(avg_score * 17.5 + 11.0)))))
 
@@ -1064,7 +1084,7 @@ def generate_personalized_ai_upskilling_recommendations() -> List[Dict[str, Any]
                     # Moderate gap (score 2 = 40% < 50%) -> Alternate between Targeted Course and Cross-Station Training
                     risk = "HIGH"
                     priority = "HIGH"
-                    if idx % 2 == 0:
+                    if row_idx % 2 == 0:
                         prog_type = "Targeted Culinary Course"
                         prog_title, duration, mentor, desc = st_cfg["course"]
                         rec_action = f"{prog_title} (Mentor: {mentor})"
@@ -1401,7 +1421,7 @@ def add_new_staff_member(payload: NewStaffRequest):
     eff_rating = payload.efficiency_rating if payload.efficiency_rating is not None else calc_eff
     speed_score = f"{min(5.0, round(avg_score * 0.85 + 0.65, 1))} / 5.0"
 
-    min_col = min(scores, key=scores.get)
+    min_col = min(scores.keys(), key=lambda k: scores[k])
     def_gap, def_training, def_prog_prefix = gap_training_map.get(min_col, ("Advanced Pastry & Bakery", "Executive Kitchen Leadership & Precision Control", "Line Master Track"))
 
     skill_gap = payload.skill_gap if payload.skill_gap and payload.skill_gap.strip() else def_gap
@@ -1704,7 +1724,12 @@ def simulate_dish_surge(payload: Optional[DishSurgeRequest] = None):
     to dynamically demonstrate real-time dish volume monitoring, station surge alert, and skill-based staff reallocation.
     """
     station = payload.station if (payload and payload.station) else "Pizza"
-    count = (payload.order_count or payload.count) if (payload and (payload.order_count or payload.count)) else 10
+    count = 10
+    if payload:
+        if payload.order_count is not None:
+            count = int(payload.order_count)
+        elif payload.count is not None:
+            count = int(payload.count)
 
     station_configs = {
         "Pizza": {
@@ -1854,21 +1879,22 @@ def get_workload_analytics_trends():
 
     if not df_raw.empty and "Date" in df_raw.columns:
         df_food = df_raw[df_raw["Station"] != "Bar & Beverage"].copy() if "Station" in df_raw.columns else df_raw.copy()
-        df_food["dt"] = pd.to_datetime(df_food["Date"], errors="coerce")
-        df_food["dt"] = df_food["dt"].apply(lambda d: d.replace(year=2026) if d and d.year > 2030 else d)
-        df_food = df_food.dropna(subset=["dt"]).sort_values("dt")
+        parsed_dates = pd.to_datetime(df_food["Date"], errors="coerce")
+        clean_dates = [d.replace(year=2026) if hasattr(d, 'year') and d.year > 2030 else d for d in parsed_dates]
+        df_food["dt"] = clean_dates
+        df_food = df_food[pd.notna(clean_dates)].sort_values(by="dt")  # type: ignore
 
         if not df_food.empty:
             total_days = int(df_food["dt"].dt.date.nunique())
-            total_dishes = int(df_food["Quantity"].sum()) if "Quantity" in df_food.columns else len(df_food)
+            total_dishes = safe_int(df_food["Quantity"].sum() if "Quantity" in df_food.columns else len(df_food))
             total_items_all = len(df_raw)
-            total_rev = float(df_food["Total_Price"].sum()) if "Total_Price" in df_food.columns else 24960600.0
+            total_rev = safe_float(df_food["Total_Price"].sum() if "Total_Price" in df_food.columns else 24960600.0)
             avg_daily_dishes = round(total_dishes / max(1, total_days), 1)
 
             if "Station" in df_food.columns:
                 for st_key in station_distribution.keys():
                     sub = df_food[df_food["Station"].str.contains(st_key.split(" ")[0], case=False, na=False)]
-                    cnt = int(sub["Quantity"].sum()) if "Quantity" in sub.columns else len(sub)
+                    cnt = safe_int(sub["Quantity"].sum() if "Quantity" in sub.columns else len(sub))
                     if cnt > 0:
                         station_distribution[st_key]["dishes"] = cnt
                         station_distribution[st_key]["pct"] = round((cnt / max(1, total_dishes)) * 100, 1)
@@ -1884,14 +1910,14 @@ def get_workload_analytics_trends():
             for w_num, w_df in daily_grouped.groupby("week"):
                 start_d = w_df["dt"].min()
                 end_d = w_df["dt"].max()
-                w_dishes = int(w_df["dishes"].sum())
+                w_dishes = safe_int(w_df["dishes"].sum())
                 w_days = len(w_df)
                 w_avg = round(w_dishes / max(1, w_days), 1)
-                w_rev = float(w_df["revenue"].sum())
+                w_rev = safe_float(w_df["revenue"].sum())
                 est_orders = int(round(w_dishes * 5.4))
 
                 weekly_trends.append({
-                    "week_number": int(w_num),
+                    "week_number": safe_int(w_num),
                     "week_label": f"Wk {w_num}",
                     "period": f"{start_d.strftime('%d %b')} – {end_d.strftime('%d %b')}",
                     "days_active": w_days,

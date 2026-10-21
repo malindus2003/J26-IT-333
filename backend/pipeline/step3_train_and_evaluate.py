@@ -50,8 +50,8 @@ train_df = df[df['date'] < test_cutoff_date].copy()
 test_df = df[df['date'] >= test_cutoff_date].copy()
 
 print(f"    Total Operational Days: {len(dates)}")
-print(f"    Training Period: {train_df['date'].min().strftime('%Y-%m-%d')} to {train_df['date'].max().strftime('%Y-%m-%d')} ({train_df['date'].nunique()} days, {len(train_df)} rows)")
-print(f"    Testing Period:  {test_df['date'].min().strftime('%Y-%m-%d')} to {test_df['date'].max().strftime('%Y-%m-%d')} ({test_df['date'].nunique()} days, {len(test_df)} rows)")
+print(f"    Training Period: {train_df['date'].min().strftime('%Y-%m-%d')} to {train_df['date'].max().strftime('%Y-%m-%d')} ({train_df['date'].nunique()} days, {len(train_df)} rows)")  # type: ignore
+print(f"    Testing Period:  {test_df['date'].min().strftime('%Y-%m-%d')} to {test_df['date'].max().strftime('%Y-%m-%d')} ({test_df['date'].nunique()} days, {len(test_df)} rows)")  # type: ignore
 
 # 2. Select Features for Training
 feature_cols = [
@@ -104,11 +104,11 @@ results = []
 
 # --- 3. Baselines ---
 print("\n[+] Evaluating Baseline 1: Naïve Forecast (lag_7 - same day last week)...")
-y_pred_naive = test_df['lag_7'].values
+y_pred_naive = test_df['lag_7'].values  # type: ignore
 results.append(calc_metrics(y_test, y_pred_naive, "Baseline 1: Naïve (lag_7)"))
 
 print("[+] Evaluating Baseline 2: Moving Average (rolling_mean_7)...")
-y_pred_ma = test_df['rolling_mean_7'].values
+y_pred_ma = test_df['rolling_mean_7'].values  # type: ignore
 results.append(calc_metrics(y_test, y_pred_ma, "Baseline 2: 7-Day Moving Average"))
 
 # --- 4. Machine Learning Models ---
@@ -184,8 +184,8 @@ test_results['predicted_demand'] = np.round(np.clip(y_pred_xgb, 0, None), 2)
 test_results['recommended_prep_qty'] = np.ceil(test_results['predicted_demand'] * 1.15).astype(int)
 
 # Zero out prep if restaurant was closed
-test_results.loc[test_df['is_closed'] == 1, ['predicted_demand', 'recommended_prep_qty']] = 0
+test_results.loc[test_df['is_closed'] == 1, ['predicted_demand', 'recommended_prep_qty']] = 0  # type: ignore
 
 output_preds_path = os.path.join(DATA_DIR, 'test_predictions_comparison.csv')
-test_results.to_csv(output_preds_path, index=False)
+test_results.to_csv(output_preds_path, index=False)  # type: ignore
 print(f"[OK] Saved sample predictions and preparation recommendations to: {output_preds_path}")

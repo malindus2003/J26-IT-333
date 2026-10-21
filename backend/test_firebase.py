@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 
 # Reconfigure stdout to utf-8 for terminal emojis
 if hasattr(sys.stdout, "reconfigure"):
-    sys.stdout.reconfigure(encoding="utf-8")
+    sys.stdout.reconfigure(encoding="utf-8")  # type: ignore
 
 import firebase_admin
 from firebase_admin import credentials, db as rtdb, firestore
@@ -90,7 +90,7 @@ try:
                 elif "pizza" in base_st.lower(): clean_station = "Pizza"
                 elif "fryer" in base_st.lower(): clean_station = "Fryer"
 
-                scores = {c: int(row.get(c, 3)) for c in ["hot_kitchen", "grill_station", "cold_salad", "pizza_station", "fryer_station"]}
+                scores = {c: int(float(row.get(c, 3) or 3)) for c in ["hot_kitchen", "grill_station", "cold_salad", "pizza_station", "fryer_station"]}
                 avg_score = sum(scores.values()) / float(len(scores))
                 eff = min(98, max(55, int(round(avg_score * 17.5 + 11.0))))
                 speed = f"{min(5.0, round(avg_score * 0.85 + 0.65, 1))} / 5.0"

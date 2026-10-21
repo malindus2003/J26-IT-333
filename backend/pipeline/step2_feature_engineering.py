@@ -40,7 +40,7 @@ df['rolling_mean_14'] = shifted_qty.groupby(df['item']).transform(lambda x: x.ro
 
 # 3. Category-Level Total Demand Dynamics
 print("[+] Generating category-level demand aggregations & lags...")
-cat_daily = df.groupby(['item_category', 'date'])['quantity_demanded'].sum().reset_index()
+cat_daily = df.groupby(['item_category', 'date'])['quantity_demanded'].sum().reset_index()  # type: ignore
 cat_daily = cat_daily.sort_values(by=['item_category', 'date']).reset_index(drop=True)
 cat_daily['cat_demand_lag_1'] = cat_daily.groupby('item_category')['quantity_demanded'].shift(1)
 cat_daily['cat_demand_lag_7'] = cat_daily.groupby('item_category')['quantity_demanded'].shift(7)
@@ -51,7 +51,7 @@ df = pd.merge(df, cat_daily, on=['item_category', 'date'], how='left')
 
 # 4. Total Restaurant Daily Demand Lags (Proxy for general restaurant busyness / footfall)
 print("[+] Generating restaurant total footfall/demand lags...")
-rest_daily = df.groupby('date')['quantity_demanded'].sum().reset_index()
+rest_daily = df.groupby('date')['quantity_demanded'].sum().reset_index()  # type: ignore
 rest_daily = rest_daily.sort_values(by='date').reset_index(drop=True)
 rest_daily['rest_total_lag_1'] = rest_daily['quantity_demanded'].shift(1)
 rest_daily['rest_total_lag_7'] = rest_daily['quantity_demanded'].shift(7)

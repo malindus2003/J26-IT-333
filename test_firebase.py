@@ -12,12 +12,11 @@ if backend_dir not in sys.path:
     sys.path.insert(0, backend_dir)
 
 try:
-    from app.services.firebase_service import firebase_service
-    from app.data.mock_data import STORAGE_ZONES
-except ImportError:
-    # If run from inside backend/
     from backend.app.services.firebase_service import firebase_service
     from backend.app.data.mock_data import STORAGE_ZONES
+except ImportError:
+    from app.services.firebase_service import firebase_service
+    from app.data.mock_data import STORAGE_ZONES
 
 def main():
     print("=" * 70)
@@ -58,11 +57,11 @@ def main():
         })
     print("[*] 3. Syncing 30 Kitchen Staff Members from staff_database.csv to Firebase...")
     try:
-        from app.routers.kitchen import get_staff_data
+        from backend.app.routers.kitchen import get_staff_data
         staff_list = get_staff_data()
     except Exception:
         try:
-            from backend.app.routers.kitchen import get_staff_data
+            from app.routers.kitchen import get_staff_data
             staff_list = get_staff_data()
         except Exception:
             staff_list = []

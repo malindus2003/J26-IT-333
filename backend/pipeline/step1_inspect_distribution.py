@@ -18,7 +18,7 @@ item_stats = df.groupby('item').agg(
     total_qty=('total_quantity', 'sum'),
     days_present=('date', 'nunique'),
     avg_qty_when_ordered=('total_quantity', 'mean')
-).sort_values(by='total_qty', ascending=False)
+).sort_values(by='total_qty', ascending=False)  # type: ignore
 
 print(f"\nTotal unique items: {len(item_stats)}")
 print("\n--- Top 20 Most Ordered Items ---")

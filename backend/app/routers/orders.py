@@ -453,7 +453,12 @@ def load_csv_menu():
                     if not clean or clean.lower() == 'nan':
                         continue
                         
-                    price = float(row[price_col]) if price_col and pd.notnull(row[price_col]) else 1500.0
+                    price = 1500.0
+                    if price_col:
+                        try:
+                            price = float(row[price_col])  # type: ignore
+                        except Exception:
+                            price = 1500.0
                     cat, st_id, st_name, img, bom = classify_item(clean)
                     
                     items.append({
