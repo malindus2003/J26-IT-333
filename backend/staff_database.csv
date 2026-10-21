@@ -1,0 +1,31 @@
+emp_id,name,base_station,hot_kitchen,grill_station,cold_salad,pizza_station,fryer_station
+EMP01,Chef Kamal (Head Chef),Hot Kitchen / Saute,5,5,4,4,4
+EMP02,Chef Nimal (Senior Sous Chef),Grill Station,5,5,3,4,4
+EMP03,Chef Ruwan (Float Specialist),Hot Kitchen / Saute,4,4,4,4,4
+EMP04,Chef Samantha (Lead Grill Master),Grill Station,4,5,2,3,4
+EMP05,Chef Amara (Italian Lead),Pizza Station,3,2,4,5,3
+EMP06,Chef Priyantha (Pantry In-Charge),Cold & Salad Station,2,2,5,3,2
+EMP07,Chef Sunil (Fast Food Lead),Fryer Station,3,3,2,4,5
+EMP08,Chef Kasun (CDP - Hot Line),Hot Kitchen / Saute,5,4,2,3,3
+EMP09,Chef Dilshan (CDP - Grill),Grill Station,3,5,2,2,4
+EMP10,Chef Dinesh (Float - Senior),Pizza Station,4,4,3,4,4
+EMP11,Chef Chaminda (Demi CDP),Hot Kitchen / Saute,4,3,2,2,3
+EMP12,Chef Roshan (Demi CDP),Grill Station,3,4,2,2,4
+EMP13,Chef Anura (Salad Specialist),Cold & Salad Station,1,2,5,2,2
+EMP14,Chef Nuwan (Pizza Baker),Pizza Station,2,2,3,5,3
+EMP15,Chef Kelum (Fryer Tech),Fryer Station,2,3,2,3,5
+EMP16,Chef Mahesh (Commis I),Hot Kitchen / Saute,3,3,2,2,3
+EMP17,Chef Lahiru (Commis I),Grill Station,2,3,2,3,4
+EMP18,Chef Danushka (Commis I),Cold & Salad Station,2,2,4,3,2
+EMP19,Chef Isuru (Commis I),Pizza Station,2,2,2,4,3
+EMP20,Chef Tharindu (Commis II),Fryer Station,2,2,2,3,4
+EMP21,Chef Kavinda (Commis II),Hot Kitchen / Saute,3,2,2,1,3
+EMP22,Chef Sandun (Commis II),Cold & Salad Station,1,2,4,2,2
+EMP23,Chef Chathura (Commis II),Pizza Station,2,1,2,4,3
+EMP24,Chef Ravindu (Float - Junior),Hot Kitchen / Saute,3,3,3,3,3
+EMP25,Chef Malith (Commis III),Grill Station,2,3,1,2,3
+EMP26,Trainee Oshada,Hot Kitchen / Saute,2,1,2,1,2
+EMP27,Trainee Bimsara,Grill Station,1,2,1,1,2
+EMP28,Trainee Janith,Cold & Salad Station,1,1,3,2,1
+EMP29,Trainee Sachith,Pizza Station,1,1,2,3,2
+EMP30,Trainee Kaveen,Fryer Station,1,1,1,2,3

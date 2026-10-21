@@ -1,4 +1,4 @@
-"""
+﻿"""
 
 GreenPulse Computer Vision Inference Engine (v2.3-calibrated)
 
@@ -53,7 +53,6 @@ import joblib
 import numpy as np
 
 import cv2
-
 from PIL import Image
 
 from typing import Dict, Any, Tuple, List, Optional
@@ -1287,8 +1286,6 @@ class FoodQualityVisionEngine:
 
             "texture_degradation": texture_degradation,
 
-
-
             "remaining_shelf_life_hours": remaining_shelf_life,
 
             "baseline_shelf_life_hours": baseline_shelf_life,
@@ -1650,4 +1647,3 @@ class FoodQualityVisionEngine:
 food_vision_engine = FoodQualityVisionEngine()
 
 vision_engine = food_vision_engine
-

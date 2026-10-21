@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { 
   ShoppingBag, 
   Plus, 
@@ -41,8 +41,6 @@ import {
 } from 'lucide-react';
 import AddMenuItemModal from './AddMenuItemModal';
 import AddReservationModal from './AddReservationModal';
-import axios from 'axios';
-
 import axios from 'axios';
 const DEFAULT_MENU = [
   {

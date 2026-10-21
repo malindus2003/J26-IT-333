@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+﻿import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { StatusBar, Style } from '@capacitor/status-bar';
 import Header, { getModulesForRole } from './components/Header';
@@ -7,6 +7,7 @@ import StorageZoneTelemetry from './components/StorageZoneTelemetry';
 import VisionInspector from './components/VisionInspector';
 import MultiModalAssessor from './components/MultiModalAssessor';
 import InventoryHealthTable from './components/InventoryHealthTable';
+import StatsCards from './components/StatsCards';
 import ActionRecommendations from './components/ActionRecommendations';
 import AlertNotificationCenter from './components/AlertNotificationCenter';
 import ESP32Simulator from './components/ESP32Simulator';
@@ -447,6 +448,8 @@ export default function App() {
               </div>
 
             </div>
+
+            <StatsCards stats={stats} isDarkMode={isDarkMode} />
 
             {/* Sub-View 1: Optical Camera Scanner & CV Bounding Box Inspector */}
             {spoilageSubTab === 'vision' && (

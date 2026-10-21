@@ -1,4 +1,4 @@
-"""
+﻿"""
 =========================================================================================
 SLIIT IT4010 Research Project - SST (J26-IT-333)
 Component 3: AI-Based Multi-Modal Food Spoilage Prediction & Quality Assessment
@@ -298,7 +298,40 @@ class FirebaseRealtimeDBService:
         except Exception as e:
             logger.error(f"[FirebaseService] Error deleting reservation {res_id} from Firebase: {e}")
             return False
+    def sync_kitchen_staff(self, staff_list: List[Dict[str, Any]]) -> bool:
+        """
+        Syncs all 30 kitchen staff members from staff_database.csv to Firebase Realtime Database:
+        Path: /kitchen_staff/{emp_id}
+        """
+        if not self.is_connected:
+            return False
+
+        try:
+            ref = db.reference("kitchen_staff")
+            staff_map = {}
+            for s in staff_list:
+                emp_id = str(s.get("emp_id") or s.get("id"))
+                clean_s = {k: v for k, v in s.items() if not str(k).startswith("_")}
+                staff_map[emp_id] = clean_s
+            ref.set(staff_map)
+            return True
+        except Exception as e:
+            logger.error(f"[FirebaseService] Error syncing kitchen staff to Firebase: {e}")
+            return False
+
+    def get_kitchen_staff(self) -> Optional[Dict[str, Any]]:
+        """Reads all kitchen staff members directly from Firebase Realtime Database."""
+        if not self.is_connected:
+            return None
+
+        try:
+            ref = db.reference("kitchen_staff")
+            return ref.get()
+        except Exception as e:
+            logger.error(f"[FirebaseService] Error reading kitchen staff from Firebase: {e}")
+            return None
 
 
 # Global singleton instance
 firebase_service = FirebaseRealtimeDBService()
+

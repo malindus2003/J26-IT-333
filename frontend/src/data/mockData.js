@@ -447,3 +447,6 @@ export const DEFAULT_DASHBOARD_STATS = {
   "active_chambers_monitored": 4,
   "total_sensors_online": 24
 };
+
+export { DEFAULT_STAFF_30 } from './staffData';
+
