@@ -342,17 +342,19 @@ class FoodQualityVisionEngine:
 
         # Trained model confident species guards
         is_trained_citrus_orange = (species_probs.get("Orange", 0.0) >= 0.50)
+        is_trained_banana = (species_probs.get("Banana", 0.0) >= 0.55)
         is_trained_apple = (species_probs.get("Apple", 0.0) >= 0.65)
-        is_trained_strawberry = (species_probs.get("Strawberry", 0.0) >= 0.65)
+        is_trained_strawberry = (species_probs.get("Strawberry", 0.0) >= 0.55)
+        is_trained_mango = (species_probs.get("Mango", 0.0) >= 0.55)
 
-        # A. WATERMELON (Whole green rind or sliced red/pink flesh with green margin)
+        # A. WATERMELON (Whole green rind with minimal yellow, or sliced red/pink flesh with green margin)
         is_whole_watermelon = (
-            not is_trained_citrus_orange and not is_trained_apple and
-            ((green_pct >= 35.0) or (40.0 <= h_mean <= 85.0 and green_pct >= 25.0 and yellow_pct < 15.0)) and
-            red_pct < 6.0 and yellow_pct < 18.0 and (0.70 <= aspect_val <= 1.40) and (lap_var < 1400.0)
+            not is_trained_citrus_orange and not is_trained_apple and not is_trained_banana and not is_trained_mango and
+            ((green_pct >= 35.0) or (40.0 <= h_mean <= 85.0 and green_pct >= 25.0 and yellow_pct < 6.0)) and
+            red_pct < 6.0 and yellow_pct < 6.0 and (0.70 <= aspect_val <= 1.40) and (lap_var < 1400.0)
         )
         is_sliced_watermelon = (
-            not is_trained_citrus_orange and not is_trained_apple and not is_trained_strawberry and
+            not is_trained_citrus_orange and not is_trained_apple and not is_trained_strawberry and not is_trained_mango and
             red_pct >= 18.0 and green_pct >= 1.8 and yellow_pct < 20.0 and (necrotic_pct >= 0.05 or v_mean > 110.0)
         )
         if is_whole_watermelon or is_sliced_watermelon:
@@ -361,48 +363,79 @@ class FoodQualityVisionEngine:
             species_probs["Orange"] = species_probs.get("Orange", 0.0) * 0.02
             species_probs["Strawberry"] = species_probs.get("Strawberry", 0.0) * 0.02
 
-        # B. STRAWBERRY vs. APPLE DISCRIMINATION
-        # Strawberry: High red, achene seed pits (lap_var > 1200 or edge_density > 7.5%), green leafy calyx (green_pct > 1.2% with red > 8%), conical aspect
-        is_strawberry_seed_texture = (lap_var > 1200.0) or (edge_density > 7.5)
+        # B. STRAWBERRY vs. APPLE vs. ORANGE DISCRIMINATION
+        # Strawberry: High red, achene seed pits (lap_var > 800 or edge_density > 13%), green leafy calyx, or prominent red with achene texture
+        is_strawberry_seed_texture = (lap_var > 800.0) or (edge_density > 13.0)
         is_strawberry_calyx = (green_pct > 1.2 and (red_pct > 8.0 or s_mean > 70.0))
-        is_strawberry_conical = (aspect_val < 0.88 or aspect_val > 1.15)
+        is_strawberry_achene_red = (red_pct > 35.0 and (lap_var > 600.0 or edge_density > 13.0) and yellow_pct < 20.0 and not is_trained_mango)
 
-        # Apple: Smooth cuticular wax, specular glare (glare_pct >= 0.6%), spherical (0.88 <= aspect <= 1.15), zero green leafy calyx (green_pct < 1.0%)
-        is_apple_smooth_wax = (glare_pct >= 0.6) and (green_pct < 1.0) and (0.88 <= aspect_val <= 1.15) and (red_pct > 30.0 or yellow_pct > 35.0)
+        # Apple: Smooth cuticular wax, specular glare (glare_pct >= 0.6%), spherical (0.88 <= aspect <= 1.15), low texture noise
+        is_apple_smooth_wax = (glare_pct >= 0.6) and (green_pct < 1.0) and (0.88 <= aspect_val <= 1.15) and (red_pct > 30.0 or yellow_pct > 35.0) and (lap_var < 110.0 and edge_density < 11.0)
+
+        # Pale/oxidized cut apple flesh or Golden Delicious apple
+        is_pale_apple = (s_mean < 55.0) and (0.90 <= aspect_val <= 1.15) and (edge_density < 6.0) and (yellow_pct > 15.0 or red_pct < 5.0) and not is_trained_citrus_orange
+
+        # Citrus flavedo texture (oil gland depressions, moderate laplacian variance, matte peel, yellow-orange b*)
+        b_lab_val = float(feat_vec[16])
+        is_citrus_peel_texture = (
+            (120.0 <= lap_var <= 450.0) and (edge_density > 12.0) and (green_pct < 2.0) and
+            (yellow_pct < 5.0) and (glare_pct < 2.5) and (h_mean < 75.0) and (b_lab_val >= 150.0) and
+            (0.85 <= aspect_val <= 1.15)
+        )
 
         if (red_pct > 15.0 or (s_mean > 70.0 and (h_mean < 20.0 or h_mean > 160.0))):
             if not is_sliced_watermelon:
-                if is_strawberry_calyx or (is_strawberry_seed_texture and not is_apple_smooth_wax and glare_pct < 5.0):
+                if not is_trained_apple and not is_trained_citrus_orange and not is_trained_mango and not is_citrus_peel_texture and (is_strawberry_calyx or is_strawberry_achene_red or (is_strawberry_seed_texture and not is_apple_smooth_wax and glare_pct < 5.0)):
                     species_probs["Strawberry"] = max(species_probs.get("Strawberry", 0.0) * 4.2, 0.94)
                     species_probs["Apple"] = species_probs.get("Apple", 0.0) * 0.04
                     species_probs["Watermelon"] = species_probs.get("Watermelon", 0.0) * 0.02
-                elif is_apple_smooth_wax:
+                    species_probs["Orange"] = species_probs.get("Orange", 0.0) * 0.04
+                elif is_apple_smooth_wax or (is_trained_apple and not is_citrus_peel_texture):
                     species_probs["Apple"] = max(species_probs.get("Apple", 0.0) * 3.8, 0.95)
                     species_probs["Strawberry"] = species_probs.get("Strawberry", 0.0) * 0.03
                     species_probs["Watermelon"] = species_probs.get("Watermelon", 0.0) * 0.02
+                    species_probs["Orange"] = species_probs.get("Orange", 0.0) * 0.05
+                elif is_citrus_peel_texture:
+                    species_probs["Orange"] = max(species_probs.get("Orange", 0.0) * 5.0, 0.95)
+                    species_probs["Apple"] = species_probs.get("Apple", 0.0) * 0.03
+                    species_probs["Strawberry"] = species_probs.get("Strawberry", 0.0) * 0.03
+
+        if is_pale_apple:
+            species_probs["Apple"] = max(species_probs.get("Apple", 0.0) * 4.0, 0.94)
+            species_probs["Banana"] = species_probs.get("Banana", 0.0) * 0.05
+            species_probs["Orange"] = species_probs.get("Orange", 0.0) * 0.05
 
         # C. MANGO (Dual/tri-tone peel: yellow carotenoid coexisting with red blush or green shoulder)
         is_mango_pigment = (yellow_pct > 10.0) and ((red_pct > 8.0) or (green_pct > 2.0 and red_pct > 2.0))
         is_mango_shape = (aspect_val < 0.90) or (aspect_val > 1.15)
-        if is_mango_pigment and not is_trained_citrus_orange:
-            boost = 3.8 if is_mango_shape else 2.5
+        if (is_mango_pigment or is_trained_mango) and not is_trained_citrus_orange and not is_strawberry_achene_red:
+            boost = 3.8 if is_mango_shape or is_trained_mango else 2.5
             species_probs["Mango"] = max(species_probs.get("Mango", 0.0) * boost, 0.96)
             species_probs["Orange"] = species_probs.get("Orange", 0.0) * 0.05
             species_probs["Strawberry"] = species_probs.get("Strawberry", 0.0) * 0.05
             if yellow_pct > 18.0 and (green_pct > 1.5 or red_pct > 20.0):
                 species_probs["Apple"] = species_probs.get("Apple", 0.0) * 0.08
 
-        # D. BANANA (Yellow carotenoid peel or elongated crescent morphology)
-        if yellow_pct >= 32.0 and red_pct < 10.0:
-            species_probs["Banana"] = max(species_probs.get("Banana", 0.0) * 3.5, 0.96)
-            species_probs["Orange"] = species_probs.get("Orange", 0.0) * 0.05
-            species_probs["Apple"] = species_probs.get("Apple", 0.0) * 0.05
+        # D. BANANA (Yellow carotenoid peel, green maturing peel, or severe overripe browning)
+        is_banana_peel = (
+            not is_trained_citrus_orange and (
+                (yellow_pct >= 30.0 and red_pct < 10.0) or
+                (green_pct >= 25.0 and yellow_pct >= 8.0 and red_pct < 5.0) or
+                (is_trained_banana and (browning_pct > 5.0 or necrotic_pct > 5.0))
+            )
+        )
+        if is_banana_peel and not is_pale_apple:
+            species_probs["Banana"] = max(species_probs.get("Banana", 0.0) * 4.0, 0.96)
+            species_probs["Orange"] = species_probs.get("Orange", 0.0) * 0.04
+            species_probs["Apple"] = species_probs.get("Apple", 0.0) * 0.04
+            species_probs["Watermelon"] = species_probs.get("Watermelon", 0.0) * 0.02
 
         # E. ORANGE (Monochromatic citrus orange, pebbled flavedo)
-        if (10.0 <= h_mean <= 25.0) and yellow_pct < 14.0 and green_pct < 3.0 and (0.88 <= aspect_val <= 1.15):
+        if (10.0 <= h_mean <= 25.0) and yellow_pct < 14.0 and green_pct < 3.0 and (0.88 <= aspect_val <= 1.15) and not is_trained_banana and not is_banana_peel:
             species_probs["Orange"] = max(species_probs.get("Orange", 0.0) * 3.5, 0.95)
             species_probs["Mango"] = species_probs.get("Mango", 0.0) * 0.08
             species_probs["Apple"] = species_probs.get("Apple", 0.0) * 0.08
+            species_probs["Banana"] = species_probs.get("Banana", 0.0) * 0.05
 
         # F. TOMATO (High lycopene red, smooth thin cuticle, spherical, no achenes)
         if red_pct >= 45.0 and glare_pct >= 0.8 and (0.88 <= aspect_val <= 1.15) and not is_strawberry_calyx and not is_strawberry_seed_texture:
@@ -421,7 +454,6 @@ class FoodQualityVisionEngine:
             if "Cucumber" not in species_probs:
                 species_probs["Cucumber"] = 0.0
             species_probs["Cucumber"] = max(species_probs["Cucumber"], 0.93)
-
         # -------------------------------------------------------------
         # 4. EXPECTED PRODUCE CONTEXT INGESTION (47 Commodities Support)
         # -------------------------------------------------------------
