@@ -2094,7 +2094,7 @@ const activeStorage = storages.find(s => s?.id === selectedStorageId) || storage
                   Dual-Unit Synchronized Chamber
                 </span>
                 {simulationSpoilageOverride !== null && (
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300">
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950/80 text-amber-900 dark:text-amber-200 border border-amber-300 dark:border-amber-700">
                     Simulation Override: ~{simulationSpoilageOverride}%
                   </span>
                 )}
@@ -2224,17 +2224,17 @@ const activeStorage = storages.find(s => s?.id === selectedStorageId) || storage
           {/* Optical Metrics Bar */}
           <div className="grid grid-cols-3 gap-2 text-center text-xs">
             <div className="p-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
-              <span className="text-[10px] text-slate-500 font-bold block">Browning</span>
+              <span className="text-[10px] text-slate-500 dark:text-slate-400 font-bold block">Browning</span>
               <span className="font-black text-slate-900 dark:text-white">{cvResult?.discoloration_score || 3.2}%</span>
             </div>
             <div className="p-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
-              <span className="text-[10px] text-slate-500 font-bold block">Mould Colony</span>
+              <span className="text-[10px] text-slate-500 dark:text-slate-400 font-bold block">Mould Colony</span>
               <span className={`font-black ${cvResult?.mould_detected ? 'text-rose-600' : 'text-emerald-600'}`}>
                 {cvResult?.mould_detected ? 'Detected!' : '0% Clear'}
               </span>
             </div>
             <div className="p-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
-              <span className="text-[10px] text-slate-500 font-bold block">Tissue Degradation</span>
+              <span className="text-[10px] text-slate-500 dark:text-slate-400 font-bold block">Tissue Degradation</span>
               <span className="font-black text-slate-900 dark:text-white">{cvResult?.texture_degradation || 6}%</span>
             </div>
           </div>
@@ -2360,7 +2360,7 @@ const activeStorage = storages.find(s => s?.id === selectedStorageId) || storage
               : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800'
           }`}>
             <div>
-              <span className="text-[10px] uppercase font-bold text-slate-500 block">Chamber Micro-Climate Status</span>
+              <span className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400 block">Chamber Micro-Climate Status</span>
               {activeStorage?.status === 'warning' || (Math.abs((activeStorage?.current_temp || 11) - (activeStorage?.target_temp || 11)) > 3.5) || ((activeStorage?.voc || 0) > 0.6) ? (
                 <span className="text-xs font-black text-amber-700 dark:text-amber-400 flex items-center gap-1.5 mt-0.5">
                   <AlertTriangle className="h-3.5 w-3.5 text-amber-500 animate-pulse flex-shrink-0" />
@@ -2403,7 +2403,7 @@ const activeStorage = storages.find(s => s?.id === selectedStorageId) || storage
                 <div className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">
                   {activeStorage?.current_temp || 11.4}°C
                 </div>
-                <span className="text-[11px] font-bold text-slate-500 font-mono">
+                <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 font-mono">
                   Set: {activeStorage?.target_temp || 11.0}°C ({((activeStorage?.current_temp || 11.0) - (activeStorage?.target_temp || 11.0)) >= 0 ? `+${(((activeStorage?.current_temp || 11.0) - (activeStorage?.target_temp || 11.0))).toFixed(1)}` : (((activeStorage?.current_temp || 11.0) - (activeStorage?.target_temp || 11.0))).toFixed(1)}°C)
                 </span>
               </div>
@@ -2447,7 +2447,7 @@ const activeStorage = storages.find(s => s?.id === selectedStorageId) || storage
                 <div className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">
                   {activeStorage?.current_humidity || 90.2}%
                 </div>
-                <span className="text-[11px] font-bold text-slate-500 font-mono">
+                <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 font-mono">
                   Target: {activeStorage?.target_humidity || 89}% RH
                 </span>
               </div>
@@ -2489,7 +2489,7 @@ const activeStorage = storages.find(s => s?.id === selectedStorageId) || storage
                 <div className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">
                   {activeStorage?.voc || 0.32} <span className="text-xs font-semibold text-slate-500">ppm</span>
                 </div>
-                <span className="text-[11px] font-bold text-slate-500 font-mono">
+                <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 font-mono">
                   Safe: &lt;0.40 ppm
                 </span>
               </div>
@@ -2533,7 +2533,7 @@ const activeStorage = storages.find(s => s?.id === selectedStorageId) || storage
                 <div className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">
                   {activeStorage?.co2 || 415} <span className="text-xs font-semibold text-slate-500">ppm</span>
                 </div>
-                <span className="text-[11px] font-bold text-slate-500 font-mono">
+                <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 font-mono">
                   Ceiling: &lt;1000 ppm
                 </span>
               </div>
@@ -2623,7 +2623,7 @@ const activeStorage = storages.find(s => s?.id === selectedStorageId) || storage
                   <span className="text-[11px] font-extrabold uppercase px-2.5 py-0.5 rounded-full bg-slate-900 text-white dark:bg-white dark:text-slate-900">
                     Dual-Unit Fusion Output
                   </span>
-                  <span className="text-xs font-bold text-slate-500">
+                  <span className="text-xs font-bold text-slate-500 dark:text-slate-400">
                     Cross-Checked: Camera Optical Inspection + IoT Environmental Telemetry
                   </span>
                 </div>
@@ -2669,7 +2669,7 @@ const activeStorage = storages.find(s => s?.id === selectedStorageId) || storage
                   }`}>
                     {fusedScore}%
                   </span>
-                  <span className="text-xs font-bold text-slate-500">60% Camera + 40% Sensors</span>
+                  <span className="text-xs font-bold text-slate-500 dark:text-slate-400">60% Camera + 40% Sensors</span>
                 </div>
                 <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2 mt-2 overflow-hidden">
                   <div
@@ -2712,7 +2712,7 @@ const activeStorage = storages.find(s => s?.id === selectedStorageId) || storage
                 <div className="text-lg font-black text-slate-900 dark:text-white mt-1">
                   {isSpoiledState ? "Severe breakdown (> 5.2x baseline)" : (isNearSpoilState ? "Accelerated cellular breakdown (3.4x)" : "Normal metabolic aging (1.0x)")}
                 </div>
-                <p className="text-[11px] text-slate-500 font-medium">
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
                   Grounded on visual browning ({cvResult?.discoloration_score || 3.2}%) & chamber thermal baseline.
                 </p>
               </div>

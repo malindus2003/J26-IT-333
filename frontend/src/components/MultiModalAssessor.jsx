@@ -696,7 +696,7 @@ export default function MultiModalAssessor({ currentVisionFeatures, selectedZone
                   {activeProduce?.produceName || "Perishable Stock"}
                 </span>
                 {simulationOverrides[activeStorage.id] && (
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300">
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950/80 text-amber-900 dark:text-amber-200 border border-amber-300 dark:border-amber-700">
                     Simulation Override Active
                   </span>
                 )}
