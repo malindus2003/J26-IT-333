@@ -1,15 +1,45 @@
+import os
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from .routers import sensors, vision, produce, predictions, inventory, recommendations, demand, kitchen, waste, orders, auth
 from .data.mock_data import STORAGE_ZONES
 from .routers.inventory import inventory_db
 from .routers.orders import orders_db
+from .firebase import init_firebase, get_firebase_status, sync_all_staff_to_firebase
 
 app = FastAPI(
     title="AI & IoT Smart Restaurant Management & Waste Reduction System",
     description="Integrated 4-Component System for Food Demand Prediction, Smart Waste Sorting, Multi-Modal Spoilage Detection, Kitchen Efficiency, and Order & Inventory Management.",
     version="2.1.0"
 )
+
+@app.on_event("startup")
+def on_startup():
+    is_init = init_firebase()
+    if is_init:
+        try:
+            from .routers.kitchen import get_staff_data
+            staff = get_staff_data()
+            if staff:
+                sync_all_staff_to_firebase(staff)
+        except Exception as e:
+            print(f"Startup staff sync warning: {e}")
+
+@app.get("/api/firebase/status")
+def check_firebase_status():
+    """Live health-check endpoint for Firebase Realtime Database & Firestore connectivity."""
+    return get_firebase_status()
+
+
+
+# Mount static assets for dish images
+_static_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static")
+if os.path.exists(_static_dir):
+    app.mount("/static", StaticFiles(directory=_static_dir), name="static")
+_dishes_dir = os.path.join(_static_dir, "dishes")
+if os.path.exists(_dishes_dir):
+    app.mount("/dishes", StaticFiles(directory=_dishes_dir), name="dishes")
 
 app.add_middleware(
     CORSMiddleware,

@@ -1,0 +1,46 @@
+Timestamp,Event_Phase,Station,Queue_Length,Action_Taken,Chef_Involved,Previous_Station,New_Station,Skill_Rating,Status
+04:07:10 PM,Phase 1: Pre-Rush Normal Operations,All Stations,16,MONITOR_BALANCED,None,N/A,N/A,N/A,OPTIMAL
+04:07:12 PM,Phase 2: Sudden Rush Surge at Hot Kitchen,Hot Kitchen / Saute,65,REALLOCATE_CHEF_DISPATCHED,Chef Sunil (Fast Food Lead),Fryer Station,Hot Kitchen / Saute,3/5.0,DISPATCHED
+04:07:14 PM,Phase 3: Hot Kitchen Recovers (Chef Reassigned),Hot Kitchen / Saute,20,ALERT_RESOLVED_AUTO_CLEARED,Chef Sunil (Fast Food Lead),N/A,Hot Kitchen / Saute,N/A,CLEARED
+04:07:14 PM,Phase 3: Hot Kitchen Recovers (Chef Reassigned),All Stations,30,MONITOR_BALANCED,None,N/A,N/A,N/A,OPTIMAL
+04:07:16 PM,Phase 4: Rush Shifts to Grill Station,All Stations,59,MONITOR_BALANCED,None,N/A,N/A,N/A,OPTIMAL
+2026-10-13 09:27:17 PM,string,string,string,High order queue surge mitigation,SUCCESS
+2026-10-13 09:28:56 PM,string,string,string,High order queue surge mitigation,SUCCESS
+2026-10-14 08:04:49 PM,S. Fernando,Cold Salad,Hot Kitchen,Queue mitigation test,SUCCESS
+2026-10-14 08:07:05 PM,S. Fernando,Cold Salad,Hot Kitchen,🚨 REAL-TIME QUEUE SURGE (08:07 PM): Ticket queue at Hot Kitchen surged to 18 tickets!,SUCCESS
+2026-10-15 09:55:47 AM,Chef Kamal (Head Chef),Hot Kitchen,Pizza,10 Pizza Orders Surge Mitigation,SUCCESS
+2026-10-15 12:14:43 PM,Chef Kamal,Hot Kitchen,Grill,Direct surge reallocation to Grill,SUCCESS
+2026-10-15 12:15:05 PM,Chef Ruwan,Hot Kitchen,Cold Salad,Direct surge reallocation to Cold Salad,SUCCESS
+2026-10-15 12:15:21 PM,Chef Kamal,Grill,Cold Salad,Direct surge reallocation to Cold Salad,SUCCESS
+2026-10-15 12:15:26 PM,Chef Kamal,Cold Salad,Grill,Direct surge reallocation to Grill,SUCCESS
+2026-10-15 12:15:30 PM,Chef Kamal,Grill,Cold Salad,Direct surge reallocation to Cold Salad,SUCCESS
+2026-10-15 12:15:34 PM,Chef Sunil,Fryer,Pizza,Direct surge reallocation to Pizza,SUCCESS
+2026-10-15 12:15:38 PM,Chef Kamal,Cold Salad,Grill,Direct surge reallocation to Grill,SUCCESS
+2026-10-15 12:15:43 PM,Chef Kamal,Grill,Pizza,Multi-staff surge deployment to Pizza,SUCCESS
+2026-10-15 12:15:43 PM,Chef Nimal,Grill,Pizza,Multi-staff surge deployment to Pizza,SUCCESS
+2026-10-15 12:17:57 PM,Chef Ruwan,Cold Salad,Pizza,Direct surge reallocation to Pizza,SUCCESS
+2026-10-15 12:18:00 PM,Chef Samantha,Grill,Pizza,Direct surge reallocation to Pizza,SUCCESS
+2026-10-15 12:18:03 PM,Chef Kasun,Hot Kitchen,Pizza,Direct surge reallocation to Pizza,SUCCESS
+2026-10-15 12:18:08 PM,Chef Kelum,Fryer,Pizza,Direct surge reallocation to Pizza,SUCCESS
+2026-10-15 12:18:13 PM,Chef Ravindu,Hot Kitchen,Pizza,Multi-staff surge deployment to Pizza,SUCCESS
+2026-10-15 12:18:13 PM,Chef Lahiru,Grill,Pizza,Multi-staff surge deployment to Pizza,SUCCESS
+2026-10-15 12:18:37 PM,Chef Tharindu,Fryer,Pizza,Surge response reallocation to Pizza,SUCCESS
+2026-10-15 12:18:54 PM,Chef Priyantha,Cold Salad,Pizza,Direct surge reallocation to Pizza,SUCCESS
+2026-10-15 12:18:57 PM,Chef Danushka,Cold Salad,Pizza,Direct surge reallocation to Pizza,SUCCESS
+2026-10-15 03:02:12 PM,S. Fernando,Pantry Line,Cold Salad,⚡ ACTIVE TICKET FLOW: Station (Cold Salad) has 2 active orders queued (2 orders shift load).,SUCCESS
+2026-10-15 03:02:14 PM,S. Fernando,Cold Salad,Hot Kitchen,⚡ ACTIVE TICKET FLOW: Station (Hot Kitchen) has 1 active orders queued (5 orders shift load).,SUCCESS
+2026-10-15 03:02:16 PM,S. Fernando,Cold Salad,Cold Salad,⚖️ DYNAMIC LINE BALANCING: Pizza is clear (0% load) while Cold Salad has active queue.,SUCCESS
+2026-10-15 03:02:18 PM,T. Silva,Prep Station,Grill,⚡ ACTIVE TICKET FLOW: Station (Grill) has 1 active orders queued (1 orders shift load).,SUCCESS
+2026-10-15 03:02:19 PM,S. Fernando,Cold Salad,Hot Kitchen,⚠️ DINNER RUSH ALERT: Station 1 (Hot Kitchen) requires +1 Cook at 7:00 PM due to 115 projected orders.,SUCCESS
+2026-10-15 03:02:41 PM,S. Fernando,Cold Salad,Hot Kitchen,🚨 REAL-TIME QUEUE SURGE (03:02 PM): Ticket queue at Hot Kitchen surged to 18 tickets!,SUCCESS
+2026-10-15 03:02:43 PM,S. Fernando,Cold Salad,Hot Kitchen,🚨 REAL-TIME QUEUE SURGE (03:02 PM): Ticket queue at Hot Kitchen surged to 18 tickets!,SUCCESS
+2026-10-15 03:02:44 PM,S. Fernando,Cold Salad,Hot Kitchen,🚨 REAL-TIME QUEUE SURGE (03:02 PM): Ticket queue at Hot Kitchen surged to 18 tickets!,SUCCESS
+2026-10-15 03:02:46 PM,T. Silva,Prep Station,Grill,🥩 GRILL & PROTEIN LINE SYNC: Station 2 (Grill) requires +1 Prep Cook for forecasted dinner protein orders (18.2 load).,SUCCESS
+2026-10-15 03:02:49 PM,S. Fernando,Cold Salad,Hot Kitchen,🚨 REAL-TIME QUEUE SURGE (03:02 PM): Ticket queue at Hot Kitchen surged to 18 tickets!,SUCCESS
+2026-10-15 04:52:00 PM,Chef Nimal,Grill,Fryer,Direct surge response to Fryer,SUCCESS
+2026-10-15 04:52:53 PM,S. Fernando,Cold Salad,Hot Kitchen,⚡ ACTIVE TICKET FLOW: Station (Hot Kitchen) has 1 active orders queued (5 orders shift load).,SUCCESS
+2026-10-15 04:52:54 PM,A. Jayasinghe,Line Assembly,Pizza,⚡ ACTIVE TICKET FLOW: Station (Pizza) has 1 active orders queued (1 orders shift load).,SUCCESS
+2026-10-15 04:53:03 PM,T. Silva,Prep Station,Grill,🥩 GRILL & PROTEIN LINE SYNC: Station 2 (Grill) requires +1 Prep Cook for forecasted dinner protein orders (18.2 load).,SUCCESS
+2026-10-15 08:21:22 PM,Chef Samantha,Off-Duty (Morning Shift),Grill,Night workload surge on-call relief for Grill (5★ skill),SUCCESS
+2026-10-15 08:24:42 PM,Chef Dinesh (Float - Senior),Off-Duty (Morning Shift),Hot Kitchen,Night workload surge on-call relief for Hot Kitchen (4★ skill),SUCCESS
+2026-10-15 09:54:27 PM,Chef Ruwan (Float Specialist),Prep Station,Pizza,Test surge reallocation,SUCCESS

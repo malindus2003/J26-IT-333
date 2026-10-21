@@ -1,12 +1,10 @@
 """
-=========================================================================================
-SLIIT IT4010 Research Project - SST (J26-IT-333)
+==================================================================================SLIIT IT4010 Research Project - SST (J26-IT-333)
 Component 3: AI-Based Multi-Modal Food Spoilage Prediction & Quality Assessment
 Author: Maddumage M. S. (IT23348820)
 
 Firebase Realtime Database Integration Service
-=========================================================================================
-Manages high-frequency streaming of:
+==================================================================================Manages high-frequency streaming of:
   - ESP32 Environmental Telemetry (Temp, Humidity, NH3, CO2, VOC)
   - Real-Time Storage Zone States
   - Early Spoilage & Risk Level Alerts
@@ -16,8 +14,7 @@ Features:
   - Auto-discovery of `firebase_service_account.json` credentials
   - Environment variable support (FIREBASE_DATABASE_URL, FIREBASE_CREDENTIALS_PATH)
   - Seamless offline fallback: Runs without crashing if Firebase is not yet configured
-=========================================================================================
-"""
+=================================================================================="""
 
 import os
 import json
@@ -286,6 +283,39 @@ class FirebaseRealtimeDBService:
         except Exception as e:
             logger.error(f"[FirebaseService] Error saving reservation {res_id} to Firebase: {e}")
             return False
+
+    def sync_kitchen_staff(self, staff_list: List[Dict[str, Any]]) -> bool:
+        """
+        Syncs all 30 kitchen staff members from staff_database.csv to Firebase Realtime Database:
+        Path: /kitchen_staff/{emp_id}
+        """
+        if not self.is_connected:
+            return False
+
+        try:
+            ref = db.reference("kitchen_staff")
+            staff_map = {}
+            for s in staff_list:
+                emp_id = str(s.get("emp_id") or s.get("id"))
+                clean_s = {k: v for k, v in s.items() if not str(k).startswith("_")}
+                staff_map[emp_id] = clean_s
+            ref.set(staff_map)
+            return True
+        except Exception as e:
+            logger.error(f"[FirebaseService] Error syncing kitchen staff to Firebase: {e}")
+            return False
+
+    def get_kitchen_staff(self) -> Optional[Dict[str, Any]]:
+        """Reads all kitchen staff members directly from Firebase Realtime Database."""
+        if not self.is_connected:
+            return None
+
+        try:
+            ref = db.reference("kitchen_staff")
+            return ref.get()
+        except Exception as e:
+            logger.error(f"[FirebaseService] Error reading kitchen staff from Firebase: {e}")
+            return None
 
 
 # Global singleton instance

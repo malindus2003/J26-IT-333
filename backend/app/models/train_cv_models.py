@@ -14,11 +14,18 @@ import json
 import xml.etree.ElementTree as ET
 import joblib
 import numpy as np
-import cv2
+try:
+    import cv2
+except ImportError:
+    cv2 = None
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor, GradientBoostingClassifier
 from sklearn.preprocessing import StandardScaler
-from sklearn.metrics import accuracy_score, f1_score, r2_score
+from sklearn.metrics import accuracy_score, f1_score, r2_score, mean_squared_error, confusion_matrix
+try:
+    import xgboost as xgb
+except ImportError:
+    xgb = None
 
 PRODUCE_INFO = {
     # ==========================================
@@ -282,7 +289,7 @@ def extract_visual_features_from_image(img_bgr):
     """
     Extracts a 36-dimensional feature vector strictly normalized on foreground produce tissue.
     """
-    if img_bgr is None:
+    if cv2 is None or img_bgr is None:
         return np.zeros(36, dtype=np.float32)
 
     mask, primary_contour, fg_pixels, img_resized = segment_produce_foreground(img_bgr)
