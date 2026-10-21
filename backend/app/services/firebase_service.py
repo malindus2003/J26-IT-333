@@ -218,6 +218,76 @@ class FirebaseRealtimeDBService:
             logger.error(f"[FirebaseService] Error syncing storage zones to Firebase: {e}")
             return False
 
+    def get_restaurant_profile(self) -> Optional[Dict[str, Any]]:
+        """Reads the centralized restaurant profile & multi-branch configuration from Firebase."""
+        if not self.is_connected:
+            return None
+        try:
+            ref = db.reference("restaurant_profile")
+            return ref.get()
+        except Exception as e:
+            logger.error(f"[FirebaseService] Error reading restaurant profile from Firebase: {e}")
+            return None
+
+    def update_restaurant_profile(self, profile_data: Dict[str, Any]) -> bool:
+        """Persists restaurant identity, branch locations, and active coordinates to Firebase."""
+        if not self.is_connected:
+            return False
+        try:
+            ref = db.reference("restaurant_profile")
+            ref.set(profile_data)
+            return True
+        except Exception as e:
+            logger.error(f"[FirebaseService] Error updating restaurant profile in Firebase: {e}")
+            return False
+
+    def get_menu_items(self) -> Dict[str, Any]:
+        """Reads all menu items from Firebase Realtime Database at /menu_items."""
+        if not self.is_connected:
+            return {}
+        try:
+            ref = db.reference("menu_items")
+            return ref.get() or {}
+        except Exception as e:
+            logger.error(f"[FirebaseService] Error reading menu_items from Firebase: {e}")
+            return {}
+
+    def save_menu_item(self, item_id: str, item_data: Dict[str, Any]) -> bool:
+        """Persists a new or updated menu item to Firebase at /menu_items/{item_id}."""
+        if not self.is_connected:
+            return False
+        try:
+            ref = db.reference(f"menu_items/{item_id}")
+            ref.set(item_data)
+            return True
+        except Exception as e:
+            logger.error(f"[FirebaseService] Error saving menu item {item_id} to Firebase: {e}")
+            return False
+
+    def get_reservations(self) -> Dict[str, Any]:
+        """Reads all customer table reservations from Firebase Realtime Database at /reservations."""
+        if not self.is_connected:
+            return {}
+        try:
+            ref = db.reference("reservations")
+            return ref.get() or {}
+        except Exception as e:
+            logger.error(f"[FirebaseService] Error reading reservations from Firebase: {e}")
+            return {}
+
+    def save_reservation(self, res_id: str, res_data: Dict[str, Any]) -> bool:
+        """Persists a new or updated table reservation to Firebase at /reservations/{res_id}."""
+        if not self.is_connected:
+            return False
+        try:
+            ref = db.reference(f"reservations/{res_id}")
+            ref.set(res_data)
+            return True
+        except Exception as e:
+            logger.error(f"[FirebaseService] Error saving reservation {res_id} to Firebase: {e}")
+            return False
+
 
 # Global singleton instance
 firebase_service = FirebaseRealtimeDBService()
+

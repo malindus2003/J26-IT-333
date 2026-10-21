@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 from pydantic import BaseModel
 from .inventory import inventory_db
 from ..data.mock_data import STORAGE_ZONES
+from ..services.firebase_service import firebase_service
 
 router = APIRouter(prefix="/api/orders", tags=["Order Management & POS"])
 
@@ -322,6 +323,20 @@ class CreateOrderPayload(BaseModel):
 class UpdateOrderStatusPayload(BaseModel):
     status: str
 
+class CreateMenuItemPayload(BaseModel):
+    name: str
+    category: str = "Main Course"
+    price_lkr: float
+    cost_lkr: Optional[float] = None
+    prep_time_mins: int = 15
+    station_id: Optional[str] = "station-1"
+    station_name: Optional[str] = "Hot Wok & Kottu Station"
+    image_url: Optional[str] = ""
+    description: Optional[str] = ""
+    recipe_bom: Optional[List[Dict[str, Any]]] = []
+    current_stock: Optional[int] = 25
+    branch_id: Optional[str] = "branch-hikkaduwa"
+
 # --- ROUTER ENDPOINTS ---
 
 @router.get("/tables")
@@ -357,12 +372,51 @@ def free_table(table_no: str):
 @router.get("/menu")
 def get_menu_catalog():
     """Retrieve full restaurant menu with BOM recipes and real-time inventory availability."""
+    # Synchronize any extra dishes persisted in Firebase Realtime Database
+    if firebase_service.is_connected:
+        try:
+            fb_items = firebase_service.get_menu_items()
+            if fb_items and isinstance(fb_items, dict):
+                existing_ids = {m["id"] for m in MENU_ITEMS}
+                for item_id, item_val in fb_items.items():
+                    if item_id not in existing_ids and isinstance(item_val, dict):
+                        bom = item_val.get("recipe_bom")
+                        if not bom and "ingredients" in item_val:
+                            bom = [
+                                {
+                                    "ingredient_name": ing.get("name", "Ingredient"),
+                                    "category": "Vegetables",
+                                    "required_kg": float(ing.get("ratio", 0.1))
+                                }
+                                for ing in item_val["ingredients"]
+                            ]
+                        elif not bom:
+                            bom = []
+
+                        MENU_ITEMS.append({
+                            "id": item_id,
+                            "name": item_val.get("name", "Dish"),
+                            "category": item_val.get("category", "Main Course"),
+                            "price_lkr": float(item_val.get("price_lkr") or item_val.get("price") or 1500.0),
+                            "cost": float(item_val.get("cost") or 600.0),
+                            "prep_time_mins": int(item_val.get("prep_time_mins") or item_val.get("prep_lead_time_mins") or 15),
+                            "station_id": item_val.get("station_id") or "station-1",
+                            "station_name": item_val.get("station_name") or "Hot Wok & Kottu Station",
+                            "image_url": item_val.get("image_url") or "/images/dishes/dish_1.jpg",
+                            "description": item_val.get("description") or "",
+                            "recipe_bom": bom,
+                            "branch_id": item_val.get("branch_id") or "branch-hikkaduwa"
+                        })
+                        existing_ids.add(item_id)
+        except Exception:
+            pass
+
     enriched_menu = []
     for item in MENU_ITEMS:
         can_prepare = True
         stock_details = []
-        for bom in item["recipe_bom"]:
-            match = next((inv for inv in inventory_db if bom["ingredient_name"].lower() in inv["name"].lower() or bom["category"].lower() == inv["category"].lower()), None)
+        for bom in item.get("recipe_bom", []):
+            match = next((inv for inv in inventory_db if bom.get("ingredient_name", "").lower() in inv["name"].lower() or bom.get("category", "").lower() == inv["category"].lower()), None)
             if match:
                 qty_str = match.get("quantity", "0 kg").replace(" kg", "").replace(" L", "")
                 try:
@@ -370,12 +424,12 @@ def get_menu_catalog():
                 except ValueError:
                     current_qty = 10.0
                 
-                is_available = current_qty >= bom["required_kg"] and match.get("risk_level") != "Critical"
+                is_available = current_qty >= bom.get("required_kg", 0.1) and match.get("risk_level") != "Critical"
                 if not is_available:
                     can_prepare = False
                 stock_details.append({
-                    "ingredient": bom["ingredient_name"],
-                    "required_kg": bom["required_kg"],
+                    "ingredient": bom.get("ingredient_name", ""),
+                    "required_kg": bom.get("required_kg", 0.1),
                     "available_kg": current_qty,
                     "batch": match.get("batch_number"),
                     "rsl_hours": match.get("remaining_shelf_life_hours", 48.0),
@@ -383,8 +437,8 @@ def get_menu_catalog():
                 })
             else:
                 stock_details.append({
-                    "ingredient": bom["ingredient_name"],
-                    "required_kg": bom["required_kg"],
+                    "ingredient": bom.get("ingredient_name", ""),
+                    "required_kg": bom.get("required_kg", 0.1),
                     "available_kg": 15.0,
                     "batch": "DEFAULT-BATCH",
                     "rsl_hours": 72.0,
@@ -397,6 +451,93 @@ def get_menu_catalog():
             "stock_details": stock_details
         })
     return {"menu": enriched_menu, "total_dishes": len(enriched_menu)}
+
+
+@router.post("/menu")
+def add_menu_item(payload: CreateMenuItemPayload):
+    """
+    Creates a new dish in the POS Food Menu and persists it to Firebase Realtime Database (/menu_items).
+    Supports photo upload, category, price, prep time, station assignment, and BOM recipe ingredients.
+    """
+    if not payload.name or not payload.name.strip():
+        raise HTTPException(status_code=400, detail="Dish name is required")
+    if payload.price_lkr <= 0:
+        raise HTTPException(status_code=400, detail="Price must be greater than zero")
+
+    existing_ids = {m["id"] for m in MENU_ITEMS}
+    new_index = len(MENU_ITEMS) + 1
+    new_id = f"menu-{new_index:02d}"
+    while new_id in existing_ids:
+        new_index += 1
+        new_id = f"menu-{new_index:02d}"
+
+    station_names = {
+        "station-1": "Hot Wok & Kottu Station",
+        "station-2": "Curry & Rice Assembly Bay",
+        "station-3": "Grill & Seafood Station",
+        "station-4": "Salad & Cold Prep Station",
+        "station-5": "Dessert & Beverage Bar"
+    }
+    station_id = payload.station_id or "station-1"
+    station_name = payload.station_name or station_names.get(station_id, "Hot Wok & Kottu Station")
+
+    bom_list = []
+    for bom in (payload.recipe_bom or []):
+        if bom.get("ingredient_name"):
+            bom_list.append({
+                "ingredient_name": bom.get("ingredient_name", "").strip(),
+                "category": bom.get("category", "Vegetables"),
+                "required_kg": float(bom.get("required_kg", 0.1))
+            })
+
+    ingredients_compat = [
+        {
+            "name": b["ingredient_name"],
+            "qty_per_portion": f"{b['required_kg']}kg",
+            "unit": "kg",
+            "ratio": b["required_kg"]
+        }
+        for b in bom_list
+    ]
+
+    cost = float(payload.cost_lkr) if payload.cost_lkr else round(float(payload.price_lkr) * 0.45, 2)
+
+    new_dish = {
+        "id": new_id,
+        "name": payload.name.strip(),
+        "category": payload.category.strip(),
+        "price_lkr": float(payload.price_lkr),
+        "price": float(payload.price_lkr),
+        "cost": cost,
+        "prep_time_mins": int(payload.prep_time_mins),
+        "prep_lead_time_mins": int(payload.prep_time_mins),
+        "station_id": station_id,
+        "station_name": station_name,
+        "image_url": payload.image_url.strip() if payload.image_url else "/images/dishes/dish_1.jpg",
+        "description": payload.description.strip() if payload.description else "",
+        "recipe_bom": bom_list,
+        "ingredients": ingredients_compat,
+        "current_stock": payload.current_stock or 25,
+        "historical_avg": 50,
+        "status": "Available",
+        "branch_id": payload.branch_id or "branch-hikkaduwa",
+        "created_at": datetime.now().isoformat()
+    }
+
+    # Prepend to MENU_ITEMS so it immediately shows at the top of the POS menu
+    MENU_ITEMS.insert(0, new_dish)
+
+    # Persist directly to Firebase Realtime Database at /menu_items/{new_id}
+    firebase_saved = False
+    if firebase_service.is_connected:
+        firebase_saved = firebase_service.save_menu_item(new_id, new_dish)
+
+    return {
+        "status": "success",
+        "message": f"Menu item '{new_dish['name']}' successfully added and saved to Firebase!",
+        "firebase_synced": firebase_saved,
+        "item": new_dish
+    }
 
 
 @router.get("")

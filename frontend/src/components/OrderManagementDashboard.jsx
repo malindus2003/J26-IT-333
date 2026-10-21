@@ -38,6 +38,7 @@ import {
   TrendingDown
 } from 'lucide-react';
 import axios from 'axios';
+import AddMenuItemModal from './AddMenuItemModal';
 const DEFAULT_MENU = [
   {
     id: "menu-01",
@@ -449,6 +450,7 @@ export default function OrderManagementDashboard({ onRefresh, isDarkMode, curren
   const [loading, setLoading] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [showNewOrderModal, setShowNewOrderModal] = useState(false);
+  const [showAddMenuItemModal, setShowAddMenuItemModal] = useState(false);
   
   // Single-Page Sub-View State (when in Admin mode): 'pos_menu' | 'tables_map' | 'kds' | 'orders_ledger'
   const [adminActiveTab, setAdminActiveTab] = useState(
@@ -858,9 +860,7 @@ export default function OrderManagementDashboard({ onRefresh, isDarkMode, curren
             </button>
           </div>
 
-          <span className="text-xs text-slate-500 dark:text-slate-400 font-semibold pr-2 hidden lg:inline">
-            1 Single-Purpose Screen per View
-          </span>
+         
         </div>
       )}
 
@@ -880,21 +880,34 @@ export default function OrderManagementDashboard({ onRefresh, isDarkMode, curren
               </p>
             </div>
 
-            {/* Category Filter Pills */}
-            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
-              {["all", "main", "seafood", "salad", "dessert", "beverage"].map(cat => (
-                <button
-                  key={cat}
-                  onClick={() => setSelectedCategory(cat)}
-                  className={`px-3 py-1.5 sm:px-3.5 rounded-xl text-xs font-bold capitalize transition-all whitespace-nowrap ${
-                    selectedCategory === cat
-                      ? 'bg-emerald-700 text-white shadow-sm'
-                      : 'bg-[#f0f5f2] dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-emerald-50 dark:hover:bg-slate-700 border border-[#d1ded5] dark:border-slate-700'
-                  }`}
-                >
-                  {cat}
-                </button>
-              ))}
+            {/* Category Filter Pills & Add New Item Button */}
+            <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap justify-between sm:justify-end">
+              <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
+                {["all", "main", "seafood", "salad", "dessert", "beverage"].map(cat => (
+                  <button
+                    key={cat}
+                    onClick={() => setSelectedCategory(cat)}
+                    className={`px-3 py-1.5 sm:px-3.5 rounded-xl text-xs font-bold capitalize transition-all whitespace-nowrap ${
+                      selectedCategory === cat
+                        ? 'bg-emerald-700 text-white shadow-sm'
+                        : 'bg-[#f0f5f2] dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-emerald-50 dark:hover:bg-slate-700 border border-[#d1ded5] dark:border-slate-700'
+                    }`}
+                  >
+                    {cat}
+                  </button>
+                ))}
+              </div>
+
+              {/* Add New Item Button */}
+              <button
+                type="button"
+                onClick={() => setShowAddMenuItemModal(true)}
+                className="flex items-center gap-1.5 px-3.5 py-1.5 sm:py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white text-xs font-black rounded-xl shadow-sm hover:shadow-md transition-all active:scale-95 flex-shrink-0"
+                title="Add New Dish to POS Menu & Database"
+              >
+                <Plus className="h-4 w-4 stroke-[3]" />
+                <span>Add New Item</span>
+              </button>
             </div>
           </div>
 
@@ -1965,6 +1978,17 @@ export default function OrderManagementDashboard({ onRefresh, isDarkMode, curren
           </div>
         </div>
       )}
+
+      {/* Add New Menu Item Modal */}
+      <AddMenuItemModal
+        isOpen={showAddMenuItemModal}
+        onClose={() => setShowAddMenuItemModal(false)}
+        onItemAdded={(newItem) => {
+          setMenu(prev => [newItem, ...prev.filter(m => m.id !== newItem.id)]);
+          setOrderSuccessMessage(`✓ Dish "${newItem.name}" added to menu & saved to Firebase Realtime Database!`);
+          setTimeout(() => setOrderSuccessMessage(null), 6000);
+        }}
+      />
 
     </div>
   );
