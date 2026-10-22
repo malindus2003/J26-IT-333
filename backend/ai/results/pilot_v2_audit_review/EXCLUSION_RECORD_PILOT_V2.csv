@@ -1,0 +1,25 @@
+Filename,Roboflow_ID,Reason,Previous_Split,Current_Status
+mango_flesh_add_022.jpg,Y9zKWgkTBs5fE5ScUpR1,Rejected during Roboflow review (unapproved non-mango flesh image),train,EXCLUDED from food_waste_pilot_v2
+mango_flesh_add_021.jpg,pUdpgXMLCnBtvkiTRKS2,Rejected during Roboflow review (unapproved non-mango flesh image),test,EXCLUDED from food_waste_pilot_v2
+mango_flesh_add_006.jpg,lnEloSX4QCL6SwEB83EI,Rejected during Roboflow review (unapproved Mangifera foetida / non-standard flesh image),val,EXCLUDED from food_waste_pilot_v2
+mango_peel_add_001.jpg,tpvVwf4dZ4MQzNdth2LL,Deleted from Roboflow dataset following review; fly on skin in street setting,excluded,EXCLUDED from food_waste_pilot_v2
+bread_plate_001.jpg,UNANNOTATED,Paused research class; 0 annotations in Roboflow,unassigned,EXCLUDED from food_waste_pilot_v2
+bread_plate_002.jpg,UNANNOTATED,Paused research class; 0 annotations in Roboflow,unassigned,EXCLUDED from food_waste_pilot_v2
+bread_plate_003.jpg,UNANNOTATED,Paused research class; 0 annotations in Roboflow,unassigned,EXCLUDED from food_waste_pilot_v2
+bread_plate_004.jpg,UNANNOTATED,Paused research class; 0 annotations in Roboflow,unassigned,EXCLUDED from food_waste_pilot_v2
+bread_plate_005.jpg,UNANNOTATED,Paused research class; 0 annotations in Roboflow,unassigned,EXCLUDED from food_waste_pilot_v2
+bread_plate_006.jpg,UNANNOTATED,Paused research class; 0 annotations in Roboflow,unassigned,EXCLUDED from food_waste_pilot_v2
+bread_plate_007.jpg,UNANNOTATED,Paused research class; 0 annotations in Roboflow,unassigned,EXCLUDED from food_waste_pilot_v2
+bread_plate_008.jpg,UNANNOTATED,Paused research class; 0 annotations in Roboflow,unassigned,EXCLUDED from food_waste_pilot_v2
+bread_plate_009.jpg,UNANNOTATED,Paused research class; 0 annotations in Roboflow,unassigned,EXCLUDED from food_waste_pilot_v2
+bread_plate_010.jpg,UNANNOTATED,Paused research class; 0 annotations in Roboflow,unassigned,EXCLUDED from food_waste_pilot_v2
+bread_plate_011.jpg,UNANNOTATED,Paused research class; 0 annotations in Roboflow,unassigned,EXCLUDED from food_waste_pilot_v2
+bread_plate_012.jpg,UNANNOTATED,Paused research class; 0 annotations in Roboflow,unassigned,EXCLUDED from food_waste_pilot_v2
+bread_plate_013.jpg,UNANNOTATED,Paused research class; 0 annotations in Roboflow,unassigned,EXCLUDED from food_waste_pilot_v2
+bread_plate_014.jpg,UNANNOTATED,Paused research class; 0 annotations in Roboflow,unassigned,EXCLUDED from food_waste_pilot_v2
+bread_wm_015.jpg,UNANNOTATED,Paused research class; 0 annotations in Roboflow,unassigned,EXCLUDED from food_waste_pilot_v2
+bread_wm_016.jpg,UNANNOTATED,Paused research class; 0 annotations in Roboflow,unassigned,EXCLUDED from food_waste_pilot_v2
+bread_wm_017.jpg,UNANNOTATED,Paused research class; 0 annotations in Roboflow,unassigned,EXCLUDED from food_waste_pilot_v2
+bread_wm_018.jpg,UNANNOTATED,Paused research class; 0 annotations in Roboflow,unassigned,EXCLUDED from food_waste_pilot_v2
+bread_wm_019.jpg,UNANNOTATED,Paused research class; 0 annotations in Roboflow,unassigned,EXCLUDED from food_waste_pilot_v2
+bread_wm_020.jpg,UNANNOTATED,Paused research class; 0 annotations in Roboflow,unassigned,EXCLUDED from food_waste_pilot_v2

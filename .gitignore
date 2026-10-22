@@ -64,3 +64,24 @@ backend/app/data/public_benchmarks/fruit_freshness_images/
 backend/app/models/baseline_backup/
 backend/app/data/public_benchmarks/uci_gas_sensor_dataset/
 backend/app/data/public_benchmarks/strawberry_dataset/
+
+# Local secrets, environments, and generated waste-recognition artifacts
+.env.*
+!.env.example
+.venv/
+.pytest_cache/
+.ruff_cache/
+*.pt
+*.pth
+*.onnx
+runs/
+backend/ai/models/
+backend/ai/datasets/**/images/
+backend/ai/datasets/**/labels/
+backend/ai/datasets/staging*/
+backend/ai/datasets/candidate*/
+backend/ai/results/train_runs/
+backend/ai/results/**/predictions.json
+backend/ai/results/manual_corrections.json
+backend/ai/results/*.zip
+backend/ai/scripts/roboflow_images_detailed.json

@@ -1,0 +1,47 @@
+{
+  "experiments": [
+    {
+      "experiment_id": "food-waste-yolo-v1",
+      "timestamp": "2026-10-18T01:10:27.719645",
+      "status": "BLOCKED_PENDING_DATASET",
+      "reason": "0 images in dataset",
+      "dataset_path": "D:\\SLIIT\\Research\\Research-\\backend\\ai\\datasets\\food_waste"
+    },
+    {
+      "experiment_id": "food-waste-yolo-pilot-v1",
+      "timestamp": "2026-10-21T15:38:05.465687",
+      "status": "COMPLETED",
+      "date": "2026-10-21T15:38:05.465384",
+      "model_architecture": "yolov8n.pt",
+      "dataset_path": "D:\\SLIIT\\Research\\Research-\\backend\\ai\\datasets\\food_waste_pilot_v1",
+      "total_images": 130,
+      "num_classes": 7,
+      "epochs": 100,
+      "batch_size": 16,
+      "imgsz": 640,
+      "device": "cpu",
+      "seed": 42,
+      "versioned_weights": "D:\\SLIIT\\Research\\Research-\\backend\\ai\\models\\food-waste-yolo-pilot-v1_best.pt",
+      "weights_saved_at": "D:\\SLIIT\\Research\\Research-\\backend\\ai\\models\\best.pt",
+      "run_directory": "D:\\SLIIT\\Research\\Research-\\backend\\ai\\results\\train_runs\\food-waste-yolo-pilot-v1"
+    },
+    {
+      "experiment_id": "food-waste-yolo-pilot-v2",
+      "timestamp": "2026-10-21T17:09:36.436210",
+      "status": "COMPLETED",
+      "date": "2026-10-21T17:09:36.435524",
+      "model_architecture": "yolov8n.pt",
+      "dataset_path": "D:\\SLIIT\\Research\\Research-\\backend\\ai\\datasets\\food_waste_pilot_v2",
+      "total_images": 127,
+      "num_classes": 7,
+      "epochs": 100,
+      "batch_size": 16,
+      "imgsz": 640,
+      "device": "cpu",
+      "seed": 42,
+      "versioned_weights": "D:\\SLIIT\\Research\\Research-\\backend\\ai\\models\\food-waste-yolo-pilot-v2_best.pt",
+      "weights_saved_at": "D:\\SLIIT\\Research\\Research-\\backend\\ai\\models\\best.pt",
+      "run_directory": "D:\\SLIIT\\Research\\Research-\\backend\\ai\\results\\train_runs\\food-waste-yolo-pilot-v2"
+    }
+  ]
+}

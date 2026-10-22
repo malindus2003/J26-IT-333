@@ -1,0 +1,268 @@
+{
+  "total_images_to_delete": 37,
+  "affected_classes": [
+    "rice",
+    "noodles"
+  ],
+  "cleanup_candidates": [
+    {
+      "filename": "rice_plate_001.jpg",
+      "class_name": "rice",
+      "batch_name": "pilot-rice",
+      "roboflow_id": "5K8jOAMV5tGmWONOcSko",
+      "reason": "Zero rice visible. Image contains only green peas, diced carrot cubes, and white sauce residue on a canteen plate."
+    },
+    {
+      "filename": "rice_plate_002.jpg",
+      "class_name": "rice",
+      "batch_name": "pilot-rice",
+      "roboflow_id": "z2AOwMnzWjhFtRbJIWUA",
+      "reason": "Zero rice visible. Image contains only green peas, diced carrot cubes, and white sauce residue on a canteen plate."
+    },
+    {
+      "filename": "rice_plate_003.jpg",
+      "class_name": "rice",
+      "batch_name": "pilot-rice",
+      "roboflow_id": "qwnw0FfKBbEq1uHik1Qb",
+      "reason": "Zero rice visible. Image contains only green peas, diced carrot cubes, and white sauce residue on a canteen plate."
+    },
+    {
+      "filename": "rice_plate_004.jpg",
+      "class_name": "rice",
+      "batch_name": "pilot-rice",
+      "roboflow_id": "5bKRWM49xTtW0LzIC6xi",
+      "reason": "Zero rice visible. Image contains only green peas, diced carrot cubes, and white sauce residue on a canteen plate."
+    },
+    {
+      "filename": "rice_plate_005.jpg",
+      "class_name": "rice",
+      "batch_name": "pilot-rice",
+      "roboflow_id": "kItxbefdftd8EUZvlVg3",
+      "reason": "Zero rice visible. Image contains only green peas, diced carrot cubes, and white sauce residue on a canteen plate."
+    },
+    {
+      "filename": "rice_plate_006.jpg",
+      "class_name": "rice",
+      "batch_name": "pilot-rice",
+      "roboflow_id": "Qe0yI37LyWVkYpqMFObx",
+      "reason": "Zero rice visible. Image contains only green peas, diced carrot cubes, and white sauce residue on a canteen plate."
+    },
+    {
+      "filename": "rice_plate_007.jpg",
+      "class_name": "rice",
+      "batch_name": "pilot-rice",
+      "roboflow_id": "t29VKu9STkWGS8Z9GgBz",
+      "reason": "Zero rice visible. Image contains only green peas, diced carrot cubes, and white sauce residue on a canteen plate."
+    },
+    {
+      "filename": "rice_plate_008.jpg",
+      "class_name": "rice",
+      "batch_name": "pilot-rice",
+      "roboflow_id": "BRsbM8IqrsAcTZoypEPl",
+      "reason": "Zero rice visible. Image contains only green peas, diced carrot cubes, and white sauce residue on a canteen plate."
+    },
+    {
+      "filename": "rice_plate_009.jpg",
+      "class_name": "rice",
+      "batch_name": "pilot-rice",
+      "roboflow_id": "uNVVQNopDSs6EcYYqdVF",
+      "reason": "Zero rice visible. Image contains only green peas, diced carrot cubes, and white sauce residue on a canteen plate."
+    },
+    {
+      "filename": "rice_plate_010.jpg",
+      "class_name": "rice",
+      "batch_name": "pilot-rice",
+      "roboflow_id": "tUzjxwupIyCekVmalkLq",
+      "reason": "Zero rice visible. Image contains only green peas, diced carrot cubes, and white sauce residue on a canteen plate."
+    },
+    {
+      "filename": "rice_plate_011.jpg",
+      "class_name": "rice",
+      "batch_name": "pilot-rice",
+      "roboflow_id": "aX0sV4SryYvOKuZt5vvd",
+      "reason": "Zero rice visible. Image contains only green peas, diced carrot cubes, and white sauce residue on a canteen plate."
+    },
+    {
+      "filename": "rice_plate_012.jpg",
+      "class_name": "rice",
+      "batch_name": "pilot-rice",
+      "roboflow_id": "D7QwBxj0slOGJ35srCjQ",
+      "reason": "Zero rice visible. Image contains only green peas, diced carrot cubes, and white sauce residue on a canteen plate."
+    },
+    {
+      "filename": "rice_plate_013.jpg",
+      "class_name": "rice",
+      "batch_name": "pilot-rice",
+      "roboflow_id": "WZtirHrhbAnMmE5lDbxD",
+      "reason": "Zero rice visible. Image contains only a solitary piece of poultry meat on a canteen plate."
+    },
+    {
+      "filename": "rice_plate_014.jpg",
+      "class_name": "rice",
+      "batch_name": "pilot-rice",
+      "roboflow_id": "AtH5wKEc5YoIH4JfvPwa",
+      "reason": "Zero rice visible. Image contains only a solitary piece of poultry meat on a canteen plate."
+    },
+    {
+      "filename": "rice_plate_015.jpg",
+      "class_name": "rice",
+      "batch_name": "pilot-rice",
+      "roboflow_id": "4nsipMN4g52DCvnNvDCU",
+      "reason": "Zero rice visible. Image contains only a solitary piece of poultry meat on a canteen plate."
+    },
+    {
+      "filename": "rice_plate_016.jpg",
+      "class_name": "rice",
+      "batch_name": "pilot-rice",
+      "roboflow_id": "9HVssz0xJVtnfb2adLXl",
+      "reason": "Zero rice visible. Image contains only a solitary piece of poultry meat on a canteen plate."
+    },
+    {
+      "filename": "rice_plate_017.jpg",
+      "class_name": "rice",
+      "batch_name": "pilot-rice",
+      "roboflow_id": "0bZIydZytRIxBcN97R9t",
+      "reason": "Zero rice visible. Image contains only a solitary piece of poultry meat on a canteen plate."
+    },
+    {
+      "filename": "rice_plate_018.jpg",
+      "class_name": "rice",
+      "batch_name": "pilot-rice",
+      "roboflow_id": "kwdSywRGGzqJ8jjjN3IQ",
+      "reason": "Zero rice visible. Image contains only a solitary piece of poultry meat on a canteen plate."
+    },
+    {
+      "filename": "rice_plate_019.jpg",
+      "class_name": "rice",
+      "batch_name": "pilot-rice",
+      "roboflow_id": "nT1z80rsFeXtAdAHoM4A",
+      "reason": "Zero rice visible. Image contains only a solitary piece of poultry meat on a canteen plate."
+    },
+    {
+      "filename": "rice_plate_020.jpg",
+      "class_name": "rice",
+      "batch_name": "pilot-rice",
+      "roboflow_id": "t4iDtsUt34jEnOi1gv4f",
+      "reason": "Zero rice visible. Image contains only a solitary piece of poultry meat on a canteen plate."
+    },
+    {
+      "filename": "noodles_plate_001.jpg",
+      "class_name": "noodles",
+      "batch_name": "pilot-noodles",
+      "roboflow_id": "EUIPdpclvPzVAk5oVPfX",
+      "reason": "Zero noodles visible. Image contains sliced pickled cucumber salad (Gurkensalat) in white dressing on a canteen plate."
+    },
+    {
+      "filename": "noodles_plate_002.jpg",
+      "class_name": "noodles",
+      "batch_name": "pilot-noodles",
+      "roboflow_id": "HHeBhDzTPRDwAVE7zPbY",
+      "reason": "Zero noodles visible. Image contains sliced pickled cucumber salad (Gurkensalat) in white dressing on a canteen plate."
+    },
+    {
+      "filename": "noodles_plate_003.jpg",
+      "class_name": "noodles",
+      "batch_name": "pilot-noodles",
+      "roboflow_id": "67OkcmHdO0TaZXGLqflY",
+      "reason": "Zero noodles visible. Image contains sliced pickled cucumber salad (Gurkensalat) in white dressing on a canteen plate."
+    },
+    {
+      "filename": "noodles_plate_004.jpg",
+      "class_name": "noodles",
+      "batch_name": "pilot-noodles",
+      "roboflow_id": "3b4vlqjQK9XqvG4pKr9H",
+      "reason": "Zero noodles visible. Image contains sliced pickled cucumber salad (Gurkensalat) in white dressing on a canteen plate."
+    },
+    {
+      "filename": "noodles_plate_005.jpg",
+      "class_name": "noodles",
+      "batch_name": "pilot-noodles",
+      "roboflow_id": "njiI9bTf1G7pkJaZsI54",
+      "reason": "Zero noodles visible. Image contains sliced pickled cucumber salad (Gurkensalat) in white dressing on a canteen plate."
+    },
+    {
+      "filename": "noodles_plate_006.jpg",
+      "class_name": "noodles",
+      "batch_name": "pilot-noodles",
+      "roboflow_id": "J2hqQiEITSjsojVdGZ1L",
+      "reason": "Zero noodles visible. Image contains sliced pickled cucumber salad (Gurkensalat) in white dressing on a canteen plate."
+    },
+    {
+      "filename": "noodles_plate_007.jpg",
+      "class_name": "noodles",
+      "batch_name": "pilot-noodles",
+      "roboflow_id": "MDPzZgy8qRATPYd8cpOl",
+      "reason": "Zero noodles visible. Image contains sliced pickled cucumber salad (Gurkensalat) in white dressing on a canteen plate."
+    },
+    {
+      "filename": "noodles_plate_008.jpg",
+      "class_name": "noodles",
+      "batch_name": "pilot-noodles",
+      "roboflow_id": "qzp3JaPZBNBDdIFhOBHL",
+      "reason": "Zero noodles visible. Image contains sliced pickled cucumber salad (Gurkensalat) in white dressing on a canteen plate."
+    },
+    {
+      "filename": "noodles_plate_009.jpg",
+      "class_name": "noodles",
+      "batch_name": "pilot-noodles",
+      "roboflow_id": "swEy3ge05477SPH6g4GO",
+      "reason": "Zero noodles visible. Image contains sliced pickled cucumber salad (Gurkensalat) in white dressing on a canteen plate."
+    },
+    {
+      "filename": "noodles_plate_010.jpg",
+      "class_name": "noodles",
+      "batch_name": "pilot-noodles",
+      "roboflow_id": "sKSIhXrBuSd1h0aLlUsU",
+      "reason": "Zero noodles visible. Image contains sliced pickled cucumber salad (Gurkensalat) in white dressing on a canteen plate."
+    },
+    {
+      "filename": "noodles_plate_011.jpg",
+      "class_name": "noodles",
+      "batch_name": "pilot-noodles",
+      "roboflow_id": "BU9kGAQE2YTef0R3WZHm",
+      "reason": "Zero noodles visible. Image contains sliced pickled cucumber salad (Gurkensalat) in white dressing on a canteen plate."
+    },
+    {
+      "filename": "noodles_plate_012.jpg",
+      "class_name": "noodles",
+      "batch_name": "pilot-noodles",
+      "roboflow_id": "VXF7jzvIuWR4fbP7Ox7u",
+      "reason": "Zero noodles visible. Image contains sliced pickled cucumber salad (Gurkensalat) in white dressing on a canteen plate."
+    },
+    {
+      "filename": "noodles_plate_013.jpg",
+      "class_name": "noodles",
+      "batch_name": "pilot-noodles",
+      "roboflow_id": "OrZuIpu9jo415JkcsVtL",
+      "reason": "Zero noodles visible. Image contains sliced pickled cucumber salad (Gurkensalat) in white dressing on a canteen plate."
+    },
+    {
+      "filename": "noodles_plate_014.jpg",
+      "class_name": "noodles",
+      "batch_name": "pilot-noodles",
+      "roboflow_id": "W9DHBZRB2AZZ8IAhAOHB",
+      "reason": "Zero noodles visible. Image contains sliced pickled cucumber salad (Gurkensalat) in white dressing on a canteen plate."
+    },
+    {
+      "filename": "noodles_plate_015.jpg",
+      "class_name": "noodles",
+      "batch_name": "pilot-noodles",
+      "roboflow_id": "AN7t5IRqs1igM2a9bT11",
+      "reason": "Zero noodles visible. Image contains sliced pickled cucumber salad (Gurkensalat) in white dressing on a canteen plate."
+    },
+    {
+      "filename": "noodles_plate_016.jpg",
+      "class_name": "noodles",
+      "batch_name": "pilot-noodles",
+      "roboflow_id": "gl8TFgN3504MOVY1jkWu",
+      "reason": "Zero noodles visible. Image contains sliced pickled cucumber salad (Gurkensalat) in white dressing on a canteen plate."
+    },
+    {
+      "filename": "noodles_plate_017.jpg",
+      "class_name": "noodles",
+      "batch_name": "pilot-noodles",
+      "roboflow_id": "a73JYlx45CWS6bVZ5IVj",
+      "reason": "Zero noodles visible. Image contains sliced pickled cucumber salad (Gurkensalat) in white dressing on a canteen plate."
+    }
+  ]
+}

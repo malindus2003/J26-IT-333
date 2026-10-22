@@ -1,0 +1,144 @@
+{
+  "total_inspected": 131,
+  "total_approved": 114,
+  "total_flagged": 17,
+  "approved_by_class": {
+    "rice": 20,
+    "kottu": 13,
+    "noodles": 20,
+    "chicken": 20,
+    "bread": 20,
+    "whole_mango": 19,
+    "mango_peel": 2
+  },
+  "flagged_by_class": {
+    "rice": 0,
+    "kottu": 2,
+    "noodles": 0,
+    "chicken": 0,
+    "bread": 0,
+    "whole_mango": 1,
+    "mango_peel": 14
+  },
+  "flagged_details": [
+    {
+      "class_name": "kottu",
+      "filename": "kottu_wm_017.jpg",
+      "title": "File:Making Kottu 1.jpg",
+      "reason": "Wide environmental shot of cooks preparing dish on large street griddle; insufficient waste/plate crop clarity.",
+      "license": "CC BY-SA 3.0"
+    },
+    {
+      "class_name": "kottu",
+      "filename": "kottu_wm_018.jpg",
+      "title": "File:Making Kottu 2.jpg",
+      "reason": "Wide environmental shot of cooks preparing dish on large street griddle; insufficient waste/plate crop clarity.",
+      "license": "CC BY-SA 3.0"
+    },
+    {
+      "class_name": "whole_mango",
+      "filename": "whole_mango_wm_007.jpg",
+      "title": "whole_mango_wm_007.jpg",
+      "reason": "Depicts cut/sliced mango pieces on a plate (File:Cut mangoes on plate.jpg), conflicting with class definition 'whole_mango'.",
+      "license": "CC-BY-SA 4.0 / Open Access"
+    },
+    {
+      "class_name": "mango_peel",
+      "filename": "mango_peel_wm_003.jpg",
+      "title": "File:1361Peeled rambutans in the Philippines Mango seeds 01.jpg",
+      "reason": "Depicts rambutan fruit and mango seeds/pits rather than mango peel.",
+      "license": "CC0"
+    },
+    {
+      "class_name": "mango_peel",
+      "filename": "mango_peel_wm_004.jpg",
+      "title": "File:1361Peeled rambutans in the Philippines Mango seeds 02.jpg",
+      "reason": "Depicts rambutan fruit and mango seeds/pits rather than mango peel.",
+      "license": "CC0"
+    },
+    {
+      "class_name": "mango_peel",
+      "filename": "mango_peel_wm_005.jpg",
+      "title": "File:1361Peeled rambutans in the Philippines Mango seeds 03.jpg",
+      "reason": "Depicts rambutan fruit and mango seeds/pits rather than mango peel.",
+      "license": "CC0"
+    },
+    {
+      "class_name": "mango_peel",
+      "filename": "mango_peel_wm_006.jpg",
+      "title": "File:1361Peeled rambutans in the Philippines Mango seeds 04.jpg",
+      "reason": "Depicts rambutan fruit and mango seeds/pits rather than mango peel.",
+      "license": "CC0"
+    },
+    {
+      "class_name": "mango_peel",
+      "filename": "mango_peel_wm_007.jpg",
+      "title": "File:1361Peeled rambutans in the Philippines Mango seeds 05.jpg",
+      "reason": "Depicts rambutan fruit and mango seeds/pits rather than mango peel.",
+      "license": "CC0"
+    },
+    {
+      "class_name": "mango_peel",
+      "filename": "mango_peel_wm_008.jpg",
+      "title": "File:5185Sliced mangoes 15.jpg",
+      "reason": "Depicts sliced edible mango fruit pulp, not mango peel skin waste.",
+      "license": "CC0"
+    },
+    {
+      "class_name": "mango_peel",
+      "filename": "mango_peel_wm_009.jpg",
+      "title": "File:5185Sliced mangoes 16.jpg",
+      "reason": "Depicts sliced edible mango fruit pulp, not mango peel skin waste.",
+      "license": "CC0"
+    },
+    {
+      "class_name": "mango_peel",
+      "filename": "mango_peel_wm_010.jpg",
+      "title": "File:5185Sliced mangoes 17.jpg",
+      "reason": "Depicts sliced edible mango fruit pulp, not mango peel skin waste.",
+      "license": "CC0"
+    },
+    {
+      "class_name": "mango_peel",
+      "filename": "mango_peel_wm_011.jpg",
+      "title": "File:5185Sliced mangoes 18.jpg",
+      "reason": "Depicts sliced edible mango fruit pulp, not mango peel skin waste.",
+      "license": "CC0"
+    },
+    {
+      "class_name": "mango_peel",
+      "filename": "mango_peel_wm_012.jpg",
+      "title": "File:A Santal girl discarding the skin (peel) of green mango.jpg",
+      "reason": "Depicts a person portrait preparing mango rather than focused food waste on a tray/bin.",
+      "license": "CC BY-SA 4.0"
+    },
+    {
+      "class_name": "mango_peel",
+      "filename": "mango_peel_wm_013.jpg",
+      "title": "File:Mango and cross section edit.jpg",
+      "reason": "Depicts cut/halved whole mango fruit, not discarded peel waste.",
+      "license": "GFDL 1.2"
+    },
+    {
+      "class_name": "mango_peel",
+      "filename": "mango_peel_wm_014.jpg",
+      "title": "File:Mango and cross sections.jpg",
+      "reason": "Depicts cut/halved whole mango fruit, not discarded peel waste.",
+      "license": "GFDL 1.2"
+    },
+    {
+      "class_name": "mango_peel",
+      "filename": "mango_peel_wm_015.jpg",
+      "title": "File:Mango fruit Nam Dok Mai - cross section.jpg",
+      "reason": "Depicts cut/halved whole mango fruit, not discarded peel waste.",
+      "license": "CC BY-SA 4.0"
+    },
+    {
+      "class_name": "mango_peel",
+      "filename": "mango_peel_wm_018.jpg",
+      "title": "File:Mangos - single and halved.jpg",
+      "reason": "Depicts cut/halved whole mango fruit, not discarded peel waste.",
+      "license": "CC BY-SA 4.0"
+    }
+  ]
+}

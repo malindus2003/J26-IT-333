@@ -1,0 +1,298 @@
+import json
+from pathlib import Path
+
+notebook = {
+    "cells": [
+        {
+            "cell_type": "markdown",
+            "metadata": {},
+            "source": [
+                "# SLIIT IT4010 Research Project 2026 (Group J26-IT-333)\n",
+                "## Component 4: AI & IoT-Based Smart Waste Bin - Food Waste Recognition\n",
+                "### YOLO Pilot Training & Evaluation Notebook (Google Colab GPU Edition)\n",
+                "\n",
+                "This notebook trains and evaluates the lightweight YOLO object detection pilot for food waste recognition across **7 active classes**:\n",
+                "1. `rice`\n",
+                "2. `kottu`\n",
+                "3. `noodles`\n",
+                "4. `chicken`\n",
+                "5. `whole_mango`\n",
+                "6. `mango_flesh`\n",
+                "7. `mango_peel`\n",
+                "\n",
+                "> **Academic Methodology Note**:\n",
+                "> - In accordance with research integrity requirements, multi-photo capture sequences (e.g. `chicken_plate_001`–`020`, `mango_peel_wm_001`–`002` + `add_002`–`005`) are kept strictly isolated in the **Train** split to eliminate cross-split visual leakage.\n",
+                "> - Consequently, `chicken` and `mango_peel` have 0 evaluation samples in the initial pilot test split. Their mAP cannot be evaluated until independent unseen batches are captured."
+            ]
+        },
+        {
+            "cell_type": "markdown",
+            "metadata": {},
+            "source": [
+                "### 1. GPU Acceleration Verification\n",
+                "Ensure your Google Colab runtime is set to GPU (`Runtime` -> `Change runtime type` -> `T4 GPU`)."
+            ]
+        },
+        {
+            "cell_type": "code",
+            "execution_count": None,
+            "metadata": {},
+            "outputs": [],
+            "source": [
+                "# Verify NVIDIA GPU access\n",
+                "!nvidia-smi\n",
+                "import torch\n",
+                "print(f\"PyTorch Version : {torch.__version__}\")\n",
+                "print(f\"CUDA Available  : {torch.cuda.is_available()}\")\n",
+                "if torch.cuda.is_available():\n",
+                "    print(f\"GPU Device      : {torch.cuda.get_device_name(0)}\")"
+            ]
+        },
+        {
+            "cell_type": "markdown",
+            "metadata": {},
+            "source": [
+                "### 2. Install Required Dependencies\n",
+                "Install the official Ultralytics framework and utility libraries."
+            ]
+        },
+        {
+            "cell_type": "code",
+            "execution_count": None,
+            "metadata": {},
+            "outputs": [],
+            "source": [
+                "%pip install ultralytics pyyaml pillow matplotlib"
+            ]
+        },
+        {
+            "cell_type": "markdown",
+            "metadata": {},
+            "source": [
+                "### 3. Upload & Unpack the Pilot Dataset (`food_waste_pilot_v1.zip`)\n",
+                "Upload `food_waste_pilot_v1.zip` from your local repo (`backend/ai/datasets/food_waste_pilot_v1.zip`) or Google Drive."
+            ]
+        },
+        {
+            "cell_type": "code",
+            "execution_count": None,
+            "metadata": {},
+            "outputs": [],
+            "source": [
+                "import os\n",
+                "import shutil\n",
+                "import zipfile\n",
+                "import yaml\n",
+                "from pathlib import Path\n",
+                "\n",
+                "DATASET_ZIP = \"food_waste_pilot_v1.zip\"\n",
+                "TARGET_DIR = Path(\"/content/food_waste_pilot_v1\")\n",
+                "\n",
+                "if not Path(DATASET_ZIP).exists():\n",
+                "    print(f\"[*] Please upload '{DATASET_ZIP}' via the Files tab on the left sidebar...\")\n",
+                "    from google.colab import files\n",
+                "    uploaded = files.upload()\n",
+                "\n",
+                "TARGET_DIR.mkdir(parents=True, exist_ok=True)\n",
+                "print(f\"[*] Extracting {DATASET_ZIP} to {TARGET_DIR}...\")\n",
+                "with zipfile.ZipFile(DATASET_ZIP, 'r') as zf:\n",
+                "    zf.extractall(TARGET_DIR)\n",
+                "\n",
+                "# Update data.yaml with absolute Colab path\n",
+                "yaml_file = TARGET_DIR / \"data.yaml\"\n",
+                "with open(yaml_file, \"r\") as f:\n",
+                "    data_cfg = yaml.safe_load(f)\n",
+                "\n",
+                "data_cfg[\"path\"] = str(TARGET_DIR)\n",
+                "data_cfg[\"train\"] = \"images/train\"\n",
+                "data_cfg[\"val\"] = \"images/val\"\n",
+                "data_cfg[\"test\"] = \"images/test\"\n",
+                "\n",
+                "with open(yaml_file, \"w\") as f:\n",
+                "    yaml.dump(data_cfg, f, default_flow_style=False)\n",
+                "\n",
+                "print(f\"[+] Dataset ready at: {TARGET_DIR}\")\n",
+                "print(f\"[+] Configured classes: {data_cfg['names']}\")"
+            ]
+        },
+        {
+            "cell_type": "markdown",
+            "metadata": {},
+            "source": [
+                "### 4. Verify Dataset Split Counts & Integrity"
+            ]
+        },
+        {
+            "cell_type": "code",
+            "execution_count": None,
+            "metadata": {},
+            "outputs": [],
+            "source": [
+                "for split in [\"train\", \"val\", \"test\"]:\n",
+                "    img_count = len(list((TARGET_DIR / \"images\" / split).glob(\"*\")))\n",
+                "    lbl_count = len(list((TARGET_DIR / \"labels\" / split).glob(\"*\")))\n",
+                "    print(f\"{split.upper():6s} split: {img_count:3d} images, {lbl_count:3d} labels\")"
+            ]
+        },
+        {
+            "cell_type": "markdown",
+            "metadata": {},
+            "source": [
+                "### 5. Launch YOLO Pilot Training\n",
+                "Using pretrained `yolov8n.pt` weights:\n",
+                "- Image size: 640\n",
+                "- Target Epochs: 100\n",
+                "- Early Stopping Patience: 20\n",
+                "- Batch size: 16 (on GPU)\n",
+                "- Seed: 42 (reproducibility)\n",
+                "- Augmentation applied strictly to train split"
+            ]
+        },
+        {
+            "cell_type": "code",
+            "execution_count": None,
+            "metadata": {},
+            "outputs": [],
+            "source": [
+                "from ultralytics import YOLO\n",
+                "\n",
+                "model = YOLO(\"yolov8n.pt\")\n",
+                "\n",
+                "train_results = model.train(\n",
+                "    data=str(TARGET_DIR / \"data.yaml\"),\n",
+                "    epochs=100,\n",
+                "    imgsz=640,\n",
+                "    batch=16,\n",
+                "    patience=20,\n",
+                "    seed=42,\n",
+                "    device=0 if torch.cuda.is_available() else \"cpu\",\n",
+                "    project=\"/content/runs/train\",\n",
+                "    name=\"food-waste-yolo-pilot-colab\",\n",
+                "    save=True,\n",
+                "    verbose=True\n",
+                ")\n",
+                "\n",
+                "best_weights = Path(\"/content/runs/train/food-waste-yolo-pilot-colab/weights/best.pt\")\n",
+                "print(f\"[+] Training complete. Best weights saved at: {best_weights}\")"
+            ]
+        },
+        {
+            "cell_type": "markdown",
+            "metadata": {},
+            "source": [
+                "### 6. Evaluate Model on Held-Out Test Split\n",
+                "The test split was kept strictly untouched during training and model selection."
+            ]
+        },
+        {
+            "cell_type": "code",
+            "execution_count": None,
+            "metadata": {},
+            "outputs": [],
+            "source": [
+                "test_eval = model.val(\n",
+                "    data=str(TARGET_DIR / \"data.yaml\"),\n",
+                "    split=\"test\",\n",
+                "    imgsz=640,\n",
+                "    device=0 if torch.cuda.is_available() else \"cpu\",\n",
+                "    project=\"/content/runs/val\",\n",
+                "    name=\"test_eval\"\n",
+                ")\n",
+                "\n",
+                "metrics = test_eval.box\n",
+                "print(\"=\" * 60)\n",
+                "print(\"HELD-OUT TEST SET EVALUATION RESULTS\")\n",
+                "print(\"=\" * 60)\n",
+                "print(f\"Overall Precision (P) : {metrics.mp:.2%}\")\n",
+                "print(f\"Overall Recall (R)    : {metrics.mr:.2%}\")\n",
+                "print(f\"mAP@0.5               : {metrics.map50:.2%}\")\n",
+                "print(f\"mAP@0.5:0.95          : {metrics.map:.2%}\")\n",
+                "print(\"-\" * 60)\n",
+                "\n",
+                "ap_class_index = list(metrics.ap_class_index) if hasattr(metrics, \"ap_class_index\") else []\n",
+                "cid_to_idx = {int(cid): i for i, cid in enumerate(ap_class_index)}\n",
+                "\n",
+                "print(\"PER-CLASS PERFORMANCE:\")\n",
+                "for cid, cname in sorted(test_eval.names.items()):\n",
+                "    if cid in cid_to_idx:\n",
+                "        i = cid_to_idx[cid]\n",
+                "        p = metrics.p[i] if len(metrics.p) > i else 0.0\n",
+                "        r = metrics.r[i] if len(metrics.r) > i else 0.0\n",
+                "        ap50 = metrics.ap50[i] if len(metrics.ap50) > i else 0.0\n",
+                "        print(f\"  • {cname:12s}: P={p:.2%}, R={r:.2%}, mAP50={ap50:.2%}\")\n",
+                "    else:\n",
+                "        print(f\"  • {cname:12s}: UNASSESSED (0 test samples in split; isolated in Train)\")\n",
+                "print(\"=\" * 60)"
+            ]
+        },
+        {
+            "cell_type": "markdown",
+            "metadata": {},
+            "source": [
+                "### 7. Visualize Confusion Matrix and Loss Curves"
+            ]
+        },
+        {
+            "cell_type": "code",
+            "execution_count": None,
+            "metadata": {},
+            "outputs": [],
+            "source": [
+                "from IPython.display import Image, display\n",
+                "\n",
+                "run_dir = Path(\"/content/runs/train/food-waste-yolo-pilot-colab\")\n",
+                "for plot_name in [\"results.png\", \"confusion_matrix.png\", \"PR_curve.png\", \"val_batch0_pred.jpg\"]:\n",
+                "    p = run_dir / plot_name\n",
+                "    if p.exists():\n",
+                "        print(f\"Displaying {plot_name}:\")\n",
+                "        display(Image(filename=str(p)))\n",
+                "    else:\n",
+                "        print(f\"Plot {plot_name} not found.\")"
+            ]
+        },
+        {
+            "cell_type": "markdown",
+            "metadata": {},
+            "source": [
+                "### 8. Download Trained Model Weights (`best.pt`)\n",
+                "Download the best weights to save back to `Research-/backend/ai/models/best.pt`."
+            ]
+        },
+        {
+            "cell_type": "code",
+            "execution_count": None,
+            "metadata": {},
+            "outputs": [],
+            "source": [
+                "from google.colab import files\n",
+                "if best_weights.exists():\n",
+                "    print(f\"Downloading {best_weights.name}...\")\n",
+                "    files.download(str(best_weights))\n",
+                "else:\n",
+                "    print(\"best.pt not found!\")"
+            ]
+        }
+    ],
+    "metadata": {
+        "accelerator": "GPU",
+        "colab": {
+            "name": "Food_Waste_YOLO_Pilot_Training_Colab.ipynb",
+            "provenance": []
+        },
+        "kernelspec": {
+            "display_name": "Python 3",
+            "name": "python3"
+        },
+        "language_info": {
+            "name": "python"
+        }
+    },
+    "nbformat": 4,
+    "nbformat_minor": 0
+}
+
+output_path = Path("d:/SLIIT/Research/Research-/backend/ai/notebooks/Food_Waste_YOLO_Pilot_Training_Colab.ipynb")
+output_path.parent.mkdir(parents=True, exist_ok=True)
+with open(output_path, "w", encoding="utf-8") as f:
+    json.dump(notebook, f, indent=2)
+print("Notebook created successfully at:", output_path)

@@ -31,8 +31,8 @@
 // 1. Wi-Fi Configuration
 // ==========================================
 // Wi-Fi SSID and Password
-const char* WIFI_SSID     = "Malindu";
-const char* WIFI_PASSWORD = "12345678";
+const char* WIFI_SSID     = "YOUR_WIFI_SSID";
+const char* WIFI_PASSWORD = "YOUR_WIFI_PASSWORD";
 
 // Central FastAPI Backend IP & Port
 const char* BACKEND_SERVER_URL = "http://172.20.10.6:8000/api/vision/esp32/upload";

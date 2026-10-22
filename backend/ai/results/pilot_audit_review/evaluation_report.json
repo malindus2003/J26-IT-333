@@ -1,0 +1,94 @@
+{
+  "status": "COMPLETED",
+  "timestamp": "2026-10-21T15:55:56.823434",
+  "model_file": "D:\\SLIIT\\Research\\Research-\\backend\\ai\\models\\food-waste-yolo-pilot-v1_best.pt",
+  "split": "test",
+  "test_images_count": 15,
+  "overall_metrics": {
+    "precision": 0.7975,
+    "recall": 0.5951,
+    "f1_score": 0.6816,
+    "map50": 0.7239,
+    "map50_95": 0.6063,
+    "avg_latency_ms": 199.22
+  },
+  "target_comparison": {
+    "precision_met": false,
+    "recall_met": false,
+    "f1_score_met": false,
+    "map50_met": false,
+    "latency_met": true
+  },
+  "per_class_metrics": [
+    {
+      "class_id": 0,
+      "class_name": "rice",
+      "precision": 1.0,
+      "recall": 0.0,
+      "f1_score": 0.0,
+      "map50": 0.4783,
+      "map50_95": 0.3346,
+      "status": "EVALUATED"
+    },
+    {
+      "class_id": 1,
+      "class_name": "kottu",
+      "precision": 0.7919,
+      "recall": 0.5,
+      "f1_score": 0.613,
+      "map50": 0.695,
+      "map50_95": 0.6255,
+      "status": "EVALUATED"
+    },
+    {
+      "class_id": 2,
+      "class_name": "noodles",
+      "precision": 1.0,
+      "recall": 0.892,
+      "f1_score": 0.9429,
+      "map50": 0.995,
+      "map50_95": 0.8403,
+      "status": "EVALUATED"
+    },
+    {
+      "class_id": 3,
+      "class_name": "chicken",
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1_score": 0.0,
+      "map50": 0.0,
+      "map50_95": 0.0,
+      "status": "UNASSESSED (0 evaluation samples in split - isolated to Train to eliminate leakage)"
+    },
+    {
+      "class_id": 4,
+      "class_name": "whole_mango",
+      "precision": 0.2054,
+      "recall": 1.0,
+      "f1_score": 0.3407,
+      "map50": 0.8064,
+      "map50_95": 0.6216,
+      "status": "EVALUATED"
+    },
+    {
+      "class_id": 5,
+      "class_name": "mango_flesh",
+      "precision": 0.9902,
+      "recall": 0.5833,
+      "f1_score": 0.7342,
+      "map50": 0.6449,
+      "map50_95": 0.6092,
+      "status": "EVALUATED"
+    },
+    {
+      "class_id": 6,
+      "class_name": "mango_peel",
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1_score": 0.0,
+      "map50": 0.0,
+      "map50_95": 0.0,
+      "status": "UNASSESSED (0 evaluation samples in split - isolated to Train to eliminate leakage)"
+    }
+  ]
+}

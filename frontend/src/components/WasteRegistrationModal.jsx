@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { ClipboardPlus, X } from 'lucide-react';
 
-const MAIN_CATEGORIES = ['Food', 'Plastic', 'Paper'];
+const MAIN_CATEGORIES = ['Food', 'Plastic', 'Paper', 'General Waste'];
 
 const FOOD_ITEMS = {
   Fruit: ['Banana', 'Mango', 'Apple', 'Orange', 'Pineapple', 'Papaya', 'Other Fruit'],

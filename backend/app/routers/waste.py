@@ -7,7 +7,7 @@ from email.message import EmailMessage
 from email.utils import getaddresses, parseaddr
 from pathlib import Path
 from threading import Lock
-from typing import Any, Dict, List, Literal
+from typing import Any, Dict, List, Literal, Optional
 from uuid import uuid4
 
 from dotenv import load_dotenv
@@ -62,19 +62,23 @@ SMART_BIN_COMPARTMENTS: List[Dict[str, Any]] = [
         "id": "food",
         "name": "Food Waste Bin",
         "waste_type": "Food",
-        "fill_level_percent": 78.5,
-        "current_weight_kg": 18.2,
+        "fill_level_percent": None,
+        "current_weight_kg": None,
+        "cumulative_waste_today_kg": 28.5,
         "capacity_kg": 25.0,
-        "ultrasonic_distance_cm": 8.5,
-        "status": _bin_status(78.5),
-        "last_sensor_update": _sensor_timestamp(),
+        "ultrasonic_distance_cm": None,
+        "status": "Not connected",
+        "connection_status": "Awaiting ESP32 connection...",
+        "hardware_source": "ESP32 Ultrasonic (HC-SR04)",
+        "sensor_status": "unknown",
+        "last_sensor_update": None,
         "frequent_items": [
-            "Leftover Cooked Rice (6.2 kg)",
-            "Vegetable Peelings (4.8 kg)",
-            "Chicken Bones (3.5 kg)",
-            "Plate Scraps (3.7 kg)",
+            "Leftover Cooked Rice (Audit Log)",
+            "Vegetable Peelings (Audit Log)",
+            "Chicken Bones (Audit Log)",
+            "Plate Scraps (Audit Log)",
         ],
-        "cost_loss_today": "LKR 7,450.00",
+        "cost_loss_today": "LKR 7,450.00 (Est.)",
     },
     {
         "id": "plastic",
@@ -82,8 +86,11 @@ SMART_BIN_COMPARTMENTS: List[Dict[str, Any]] = [
         "waste_type": "Plastic",
         "fill_level_percent": 42.0,
         "current_weight_kg": 4.1,
+        "cumulative_waste_today_kg": 4.1,
         "capacity_kg": 12.0,
         "status": _bin_status(42.0),
+        "connection_status": "Demo data - hardware connection not verified",
+        "hardware_source": "Simulated Load Cell + Ultrasonic (Demo Feed)",
         "last_sensor_update": _sensor_timestamp(),
     },
     {
@@ -92,34 +99,69 @@ SMART_BIN_COMPARTMENTS: List[Dict[str, Any]] = [
         "waste_type": "Paper",
         "fill_level_percent": 35.0,
         "current_weight_kg": 3.8,
+        "cumulative_waste_today_kg": 3.8,
         "capacity_kg": 15.0,
         "status": _bin_status(35.0),
+        "connection_status": "Demo data - hardware connection not verified",
+        "hardware_source": "Simulated Load Cell + Ultrasonic (Demo Feed)",
         "last_sensor_update": _sensor_timestamp(),
+    },
+    {
+        "id": "general",
+        "name": "General Waste Bin",
+        "waste_type": "General Waste",
+        "fill_level_percent": None,
+        "current_weight_kg": None,
+        "cumulative_waste_today_kg": None,
+        "capacity_kg": 20.0,
+        "status": "Not connected",
+        "connection_status": "Not connected",
+        "hardware_source": "Unconfigured / Not connected",
+        "last_sensor_update": None,
     },
 ]
 
 WASTE_COMPOSITION = [
-    {"category": "Leftover Rice & Grains", "weight_kg": 7.4, "percentage": 34.5, "cost_rs": 2800, "color": "#f59e0b"},
-    {"category": "Vegetable Cuttings & Trimmings", "weight_kg": 5.2, "percentage": 24.2, "cost_rs": 1850, "color": "#10b981"},
-    {"category": "Meat & Seafood Bones/Trimmings", "weight_kg": 3.8, "percentage": 17.7, "cost_rs": 3200, "color": "#ef4444"},
-    {"category": "Bakery & Bread Waste", "weight_kg": 2.6, "percentage": 12.1, "cost_rs": 950, "color": "#8b5cf6"},
-    {"category": "Spoiled / Overripe Produce", "weight_kg": 2.5, "percentage": 11.5, "cost_rs": 1100, "color": "#ec4899"},
+    {"category": "Leftover Rice & Grains", "weight_kg": 7.4, "percentage": 34.5, "cost_rs": 2800, "color": "#f59e0b", "source": "Manual Kitchen Audit Log"},
+    {"category": "Vegetable Cuttings & Trimmings", "weight_kg": 5.2, "percentage": 24.2, "cost_rs": 1850, "color": "#10b981", "source": "Manual Kitchen Audit Log"},
+    {"category": "Meat & Seafood Bones/Trimmings", "weight_kg": 3.8, "percentage": 17.7, "cost_rs": 3200, "color": "#ef4444", "source": "Manual Kitchen Audit Log"},
+    {"category": "Bakery & Bread Waste", "weight_kg": 2.6, "percentage": 12.1, "cost_rs": 950, "color": "#8b5cf6", "source": "Manual Kitchen Audit Log"},
+    {"category": "Spoiled / Overripe Produce", "weight_kg": 2.5, "percentage": 11.5, "cost_rs": 1100, "color": "#ec4899", "source": "Manual Kitchen Audit Log"},
 ]
 
-DAILY_WASTE_TREND = [
-    {"day": "Mon", "total_food_waste_kg": 21.4, "cost_loss_rs": 8200},
-    {"day": "Tue", "total_food_waste_kg": 19.8, "cost_loss_rs": 7600},
-    {"day": "Wed", "total_food_waste_kg": 24.5, "cost_loss_rs": 9400},
-    {"day": "Thu", "total_food_waste_kg": 18.2, "cost_loss_rs": 7100},
-    {"day": "Fri (Today)", "total_food_waste_kg": 28.5, "cost_loss_rs": 10900},
-    {"day": "Sat (Projected)", "total_food_waste_kg": 34.0, "cost_loss_rs": 13200},
-    {"day": "Sun (Projected)", "total_food_waste_kg": 31.5, "cost_loss_rs": 12100},
-]
+
+def get_daily_trends(days: int = 7) -> List[Dict[str, Any]]:
+    """Generates calendar-anchored trend records for analytics filters."""
+    from datetime import timedelta
+    today = datetime.now(timezone.utc).date()
+    # Baseline benchmark sequence
+    base_waste = [21.4, 19.8, 24.5, 18.2, 28.5, 23.1, 20.4, 25.0, 19.5, 22.8, 27.2, 21.0, 24.1, 28.5]
+    base_cost = [8200, 7600, 9400, 7100, 10900, 8900, 7800, 9600, 7500, 8800, 10400, 8100, 9300, 10900]
+
+    num_days = max(1, min(days, 30))
+    trends = []
+    for i in range(num_days - 1, -1, -1):
+        target_date = today - timedelta(days=i)
+        idx = (num_days - 1 - i) % len(base_waste)
+        label = target_date.strftime("%b %d") + (" (Today)" if i == 0 else "")
+        trends.append({
+            "date": target_date.isoformat(),
+            "day": label,
+            "total_food_waste_kg": base_waste[idx],
+            "cost_loss_rs": base_cost[idx],
+            "is_today": i == 0,
+            "is_demo": True
+        })
+    return trends
 
 
 class BinTelemetryUpdate(BaseModel):
-    fill_level_percent: float = Field(ge=0, le=100)
-    current_weight_kg: float = Field(ge=0)
+    fill_level_percent: Optional[float] = Field(default=None, ge=0, le=100)
+    current_weight_kg: Optional[float] = Field(default=None, ge=0)
+    distance_cm: Optional[float] = Field(default=None, ge=0, le=500)
+    sensor_status: Optional[str] = Field(default="valid")
+    source: Optional[str] = Field(default="ESP32 Ultrasonic (HC-SR04)")
+    device_id: Optional[str] = Field(default="esp32-waste-01")
 
 
 class RecyclingCompanyRegistration(BaseModel):
@@ -315,6 +357,9 @@ def _handle_full_bin_event(bin_data: Dict[str, Any]) -> Dict[str, Any]:
     if bin_id not in QUOTATION_EMAIL_SENT:
         return {"sent": False, "reason": "Quotation emails apply only to Plastic and Paper bins"}
 
+    if bin_data.get("fill_level_percent") is None:
+        return {"sent": False, "reason": "Fill level percentage is unavailable"}
+
     with QUOTATION_EMAIL_LOCK:
         if bin_data["fill_level_percent"] <= EMPTY_BIN_RESET_THRESHOLD_PERCENT:
             QUOTATION_EMAIL_SENT[bin_id] = False
@@ -333,43 +378,108 @@ def _handle_full_bin_event(bin_data: Dict[str, Any]) -> Dict[str, Any]:
 
 
 @router.get("/metrics")
-def get_waste_metrics():
-    """Retrieve telemetry for three bins and detailed analytics for food waste only."""
+def get_waste_metrics(days: int = 7):
+    """Retrieve telemetry for four bins and detailed analytics for food waste."""
+    trend_data = get_daily_trends(days if days in {7, 14, 30} else 7)
+    now_utc = datetime.now(timezone.utc)
+
+    # Dynamically verify food bin hardware telemetry & staleness
+    food_bin = next((b for b in SMART_BIN_COMPARTMENTS if b["id"] == "food"), None)
+    is_food_live = False
+    food_is_stale = False
+
+    if food_bin and food_bin.get("last_sensor_update"):
+        try:
+            last_dt = datetime.fromisoformat(food_bin["last_sensor_update"])
+            age_sec = (now_utc - last_dt).total_seconds()
+            if age_sec > 15.0:
+                food_is_stale = True
+                food_bin["connection_status"] = "Telemetry Stale (>15s)"
+            else:
+                is_food_live = True
+        except Exception:
+            pass
+
+    mcu_name = "ESP32 Controller (Demo Telemetry)"
+    mcu_status = "Demo data - hardware connection not verified"
+    telemetry_source = "Demo data - hardware connection not verified"
+    connection_verified = False
+
+    if is_food_live:
+        mcu_name = "ESP32 Controller (Live HC-SR04 Stream)"
+        mcu_status = "Food Bin: Live Hardware Connected"
+        telemetry_source = "Live ESP32 Stream (Food Bin) | Simulated (Plastic/Paper)"
+        connection_verified = True
+    elif food_is_stale:
+        mcu_name = "ESP32 Controller (Stale >15s)"
+        mcu_status = "Telemetry Stale (>15s without update)"
+        telemetry_source = "Stale Hardware Telemetry (Food Bin)"
+        connection_verified = False
+
     return {
         "researcher": "Pathirana P.R.T (IT23324060)",
-        "module": "Component 4: Three-Bin Waste Identification and Monitoring",
-        "description": "Dedicated Food, Plastic, and Paper bins with IoT fill-level and weight monitoring.",
+        "module": "Component 4: Smart Waste Management",
+        "description": "Four-bin IoT telemetry, YOLO AI optical recognition, and circular recycling logistics.",
         "hardware_status": {
-            "mcu": "ESP32 Wi-Fi / MQTT Controller (Online)",
-            "bin_array": "3 Dedicated Bins: Food / Plastic / Paper",
-            "load_cells": "3x HX711 Load Cells Calibrated",
-            "ultrasonic_sensors": "3x HC-SR04 Fill Sensors Active",
+            "mcu": mcu_name,
+            "bin_array": "4 Bins (Food: ESP32 Ultrasonic; Plastic/Paper: Demo; General: Unconfigured)",
+            "telemetry_source": telemetry_source,
+            "status": mcu_status,
+            "connection_verified": connection_verified,
+            "food_bin_live": is_food_live,
+            "food_bin_stale": food_is_stale,
         },
         "full_bin_threshold_percent": FULL_BIN_THRESHOLD_PERCENT,
         "empty_bin_reset_threshold_percent": EMPTY_BIN_RESET_THRESHOLD_PERCENT,
         "registered_recycling_company_count": len(RECYCLING_COMPANIES),
         "total_food_waste_today_kg": 28.5,
         "total_cost_loss_today": "LKR 10,900.00",
+        "is_demo_data": not is_food_live,
         "estimated_monthly_saving_potential": "LKR 84,500.00",
         "compartments": SMART_BIN_COMPARTMENTS,
         "waste_composition": WASTE_COMPOSITION,
-        "daily_trend": DAILY_WASTE_TREND,
+        "daily_trend": trend_data,
+        "days_selected": days,
         "waste_reduction_recommendations": [
-            "Rice Portioning Notice: Cooked rice accounts for 34.5% of daily food waste. Reduce the default plate portion by 15% and offer free refills on request.",
-            "Vegetable Trim Optimization: 5.2 kg vegetable cuttings detected today. Shift clean carrot and onion scraps to stock preparation.",
-            "Closed Feedback to Component 1: Excessive Seafood Rice waste on Thursdays (-8% demand adjustment recommended for the next cycle).",
+            "Rice Portioning Notice (Demo Scenario): Cooked rice accounts for 34.5% of recorded food waste. Evaluate reducing default portion by 15% with free refills on request.",
+            "Vegetable Trim Optimization (Demo Scenario): 5.2 kg vegetable cuttings recorded. Consider repurposing clean carrot and onion scraps into vegetable stock simmering.",
+            "Closed Feedback to Component 1 (Simulation): Observed elevated Seafood Rice waste on Thursdays (recommended -8% kitchen prep adjustment for next cycle).",
         ],
     }
 
 
 @router.post("/bins/{bin_id}/telemetry")
 def update_bin_telemetry(bin_id: str, telemetry: BinTelemetryUpdate):
-    """Update a bin and trigger one quotation email when Plastic or Paper becomes full."""
+    """Update a bin from IoT hardware or simulated telemetry."""
     bin_data = _find_bin(bin_id)
-    bin_data["fill_level_percent"] = round(telemetry.fill_level_percent, 1)
-    bin_data["current_weight_kg"] = round(telemetry.current_weight_kg, 2)
-    bin_data["status"] = _bin_status(bin_data["fill_level_percent"])
-    bin_data["last_sensor_update"] = _sensor_timestamp()
+    now_iso = _sensor_timestamp()
+
+    bin_data["last_sensor_update"] = now_iso
+    bin_data["hardware_source"] = telemetry.source or "ESP32 Ultrasonic (HC-SR04)"
+    bin_data["device_id"] = telemetry.device_id or "esp32-waste"
+
+    sensor_st = (telemetry.sensor_status or "valid").lower()
+    bin_data["sensor_status"] = sensor_st
+
+    if sensor_st == "no_echo" or telemetry.fill_level_percent is None:
+        bin_data["fill_level_percent"] = None
+        bin_data["ultrasonic_distance_cm"] = None
+        bin_data["status"] = "Sensor Unavailable"
+        bin_data["connection_status"] = "ESP32 Online (Sensor: No Echo)"
+    else:
+        fill_val = round(float(telemetry.fill_level_percent), 1)
+        bin_data["fill_level_percent"] = fill_val
+        bin_data["status"] = _bin_status(fill_val)
+        bin_data["connection_status"] = "Live Hardware Connected (ESP32)"
+        if telemetry.distance_cm is not None:
+            bin_data["ultrasonic_distance_cm"] = round(float(telemetry.distance_cm), 1)
+
+    # Weight is optional: do not overwrite absent weight with zero or retain demo weight as live
+    if telemetry.current_weight_kg is not None:
+        bin_data["current_weight_kg"] = round(float(telemetry.current_weight_kg), 2)
+    else:
+        bin_data["current_weight_kg"] = None
+
     email_delivery = _handle_full_bin_event(bin_data)
     return {"bin": bin_data, "quotation_email": email_delivery}
 
@@ -379,7 +489,10 @@ def reset_bin(bin_id: str):
     """Mark a bin as emptied and permit a future full-bin quotation email."""
     bin_data = _find_bin(bin_id)
     bin_data["fill_level_percent"] = 0.0
-    bin_data["current_weight_kg"] = 0.0
+    if bin_data["id"] != "food":
+        bin_data["current_weight_kg"] = 0.0
+    else:
+        bin_data["current_weight_kg"] = None
     bin_data["status"] = "Normal"
     bin_data["last_sensor_update"] = _sensor_timestamp()
     if bin_data["id"] in QUOTATION_EMAIL_SENT:

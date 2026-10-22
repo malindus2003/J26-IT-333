@@ -40,8 +40,8 @@ bool oledFound = false;
 // ============================================================================
 // 2. NETWORK & BACKEND CONFIGURATION
 // ============================================================================
-const char* WIFI_SSID     = "Malindu";
-const char* WIFI_PASSWORD = "12345678";
+const char* WIFI_SSID     = "YOUR_WIFI_SSID";
+const char* WIFI_PASSWORD = "YOUR_WIFI_PASSWORD";
 const char* BACKEND_URL   = "http://172.20.10.6:8000/api/sensors/telemetry";
 
 const char* STORAGE_ZONE_NAME = "Zone 1: Tropical Fruit Chiller (11°C)";

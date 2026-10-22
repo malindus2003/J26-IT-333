@@ -1,0 +1,89 @@
+{
+  "dataset_path": "D:\\SLIIT\\Research\\Research-\\backend\\ai\\datasets\\food_waste_pilot_v2",
+  "data_yaml_present": true,
+  "total_images": 127,
+  "total_labels": 0,
+  "splits": {
+    "train": {
+      "images_found": 95,
+      "labels_found": 95,
+      "corrupt_images": [],
+      "missing_labels": [],
+      "unannotated_background_images": [],
+      "invalid_labels": [],
+      "duplicate_images_in_split": []
+    },
+    "val": {
+      "images_found": 18,
+      "labels_found": 18,
+      "corrupt_images": [],
+      "missing_labels": [],
+      "unannotated_background_images": [],
+      "invalid_labels": [],
+      "duplicate_images_in_split": []
+    },
+    "test": {
+      "images_found": 14,
+      "labels_found": 14,
+      "corrupt_images": [],
+      "missing_labels": [],
+      "unannotated_background_images": [],
+      "invalid_labels": [],
+      "duplicate_images_in_split": []
+    }
+  },
+  "class_counts_by_split": {
+    "train": {
+      "rice": 42,
+      "kottu": 9,
+      "noodles": 14,
+      "chicken": 42,
+      "whole_mango": 148,
+      "mango_flesh": 61,
+      "mango_peel": 8
+    },
+    "val": {
+      "rice": 4,
+      "kottu": 2,
+      "noodles": 4,
+      "chicken": 0,
+      "whole_mango": 5,
+      "mango_flesh": 7,
+      "mango_peel": 0
+    },
+    "test": {
+      "rice": 10,
+      "kottu": 2,
+      "noodles": 3,
+      "chicken": 0,
+      "whole_mango": 3,
+      "mango_flesh": 7,
+      "mango_peel": 0
+    }
+  },
+  "overall_class_counts": {
+    "rice": 56,
+    "kottu": 13,
+    "noodles": 21,
+    "chicken": 42,
+    "whole_mango": 156,
+    "mango_flesh": 75,
+    "mango_peel": 8
+  },
+  "errors": [],
+  "warnings": [],
+  "duplicates": [],
+  "is_valid": true,
+  "is_empty": false,
+  "status": "VALID",
+  "yaml_nc": 7,
+  "yaml_names": {
+    "0": "rice",
+    "1": "kottu",
+    "2": "noodles",
+    "3": "chicken",
+    "4": "whole_mango",
+    "5": "mango_flesh",
+    "6": "mango_peel"
+  }
+}

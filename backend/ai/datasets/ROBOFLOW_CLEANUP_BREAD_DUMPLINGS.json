@@ -1,0 +1,107 @@
+{
+  "total_candidates": 14,
+  "class_name": "bread",
+  "action": "EXCLUDE_FROM_TRAINING_CLASS",
+  "status": "PENDING_USER_APPROVAL",
+  "note": "Preserved locally in staging_open_images/bread/. Remote deletion deferred pending user confirmation.",
+  "candidates": [
+    {
+      "filename": "bread_plate_001.jpg",
+      "class_name": "bread",
+      "batch_name": "pilot-bread",
+      "roboflow_id": "iGAl7GgdnYM5rfXql2Ml",
+      "reason": "Bavarian bread dumpling leftover scraps (Semmelknoedel) with dark beer-mustard gravy smears; unrepresentative of standard bread waste (slices, buns, crusts) and risks model confusion with gravy/meat stains."
+    },
+    {
+      "filename": "bread_plate_002.jpg",
+      "class_name": "bread",
+      "batch_name": "pilot-bread",
+      "roboflow_id": "CdAVxxDhIp4xNMhlCexi",
+      "reason": "Bavarian bread dumpling leftover scraps (Semmelknoedel) with dark beer-mustard gravy smears; unrepresentative of standard bread waste (slices, buns, crusts) and risks model confusion with gravy/meat stains."
+    },
+    {
+      "filename": "bread_plate_003.jpg",
+      "class_name": "bread",
+      "batch_name": "pilot-bread",
+      "roboflow_id": "RbEIlh8dLlk1ri4leimR",
+      "reason": "Bavarian bread dumpling leftover scraps (Semmelknoedel) with dark beer-mustard gravy smears; unrepresentative of standard bread waste (slices, buns, crusts) and risks model confusion with gravy/meat stains."
+    },
+    {
+      "filename": "bread_plate_004.jpg",
+      "class_name": "bread",
+      "batch_name": "pilot-bread",
+      "roboflow_id": "RjnUlJdT3svrAxPs6eTN",
+      "reason": "Bavarian bread dumpling leftover scraps (Semmelknoedel) with dark beer-mustard gravy smears; unrepresentative of standard bread waste (slices, buns, crusts) and risks model confusion with gravy/meat stains."
+    },
+    {
+      "filename": "bread_plate_005.jpg",
+      "class_name": "bread",
+      "batch_name": "pilot-bread",
+      "roboflow_id": "ZUPm2S8WucHXCkKZglQY",
+      "reason": "Bavarian bread dumpling leftover scraps (Semmelknoedel) with dark beer-mustard gravy smears; unrepresentative of standard bread waste (slices, buns, crusts) and risks model confusion with gravy/meat stains."
+    },
+    {
+      "filename": "bread_plate_006.jpg",
+      "class_name": "bread",
+      "batch_name": "pilot-bread",
+      "roboflow_id": "IAYRNucILRQtdfNPy6lo",
+      "reason": "Bavarian bread dumpling leftover scraps (Semmelknoedel) with dark beer-mustard gravy smears; unrepresentative of standard bread waste (slices, buns, crusts) and risks model confusion with gravy/meat stains."
+    },
+    {
+      "filename": "bread_plate_007.jpg",
+      "class_name": "bread",
+      "batch_name": "pilot-bread",
+      "roboflow_id": "FIgjfj1udUdRafUEXwgT",
+      "reason": "Bavarian bread dumpling leftover scraps (Semmelknoedel) with dark beer-mustard gravy smears; unrepresentative of standard bread waste (slices, buns, crusts) and risks model confusion with gravy/meat stains."
+    },
+    {
+      "filename": "bread_plate_008.jpg",
+      "class_name": "bread",
+      "batch_name": "pilot-bread",
+      "roboflow_id": "isTok30wSfeVA3Yxwwi4",
+      "reason": "Bavarian bread dumpling leftover scraps (Semmelknoedel) with dark beer-mustard gravy smears; unrepresentative of standard bread waste (slices, buns, crusts) and risks model confusion with gravy/meat stains."
+    },
+    {
+      "filename": "bread_plate_009.jpg",
+      "class_name": "bread",
+      "batch_name": "pilot-bread",
+      "roboflow_id": "19LS5Tu5zxpgDh01bRVT",
+      "reason": "Bavarian bread dumpling leftover scraps (Semmelknoedel) with dark beer-mustard gravy smears; unrepresentative of standard bread waste (slices, buns, crusts) and risks model confusion with gravy/meat stains."
+    },
+    {
+      "filename": "bread_plate_010.jpg",
+      "class_name": "bread",
+      "batch_name": "pilot-bread",
+      "roboflow_id": "T23ufQ2e9TPVVSt0B815",
+      "reason": "Bavarian bread dumpling leftover scraps (Semmelknoedel) with dark beer-mustard gravy smears; unrepresentative of standard bread waste (slices, buns, crusts) and risks model confusion with gravy/meat stains."
+    },
+    {
+      "filename": "bread_plate_011.jpg",
+      "class_name": "bread",
+      "batch_name": "pilot-bread",
+      "roboflow_id": "LdzoEEsHMz0KPrq72Xil",
+      "reason": "Bavarian bread dumpling leftover scraps (Semmelknoedel) with dark beer-mustard gravy smears; unrepresentative of standard bread waste (slices, buns, crusts) and risks model confusion with gravy/meat stains."
+    },
+    {
+      "filename": "bread_plate_012.jpg",
+      "class_name": "bread",
+      "batch_name": "pilot-bread",
+      "roboflow_id": "ggaHZSYn1G0aggyTLXvj",
+      "reason": "Bavarian bread dumpling leftover scraps (Semmelknoedel) with dark beer-mustard gravy smears; unrepresentative of standard bread waste (slices, buns, crusts) and risks model confusion with gravy/meat stains."
+    },
+    {
+      "filename": "bread_plate_013.jpg",
+      "class_name": "bread",
+      "batch_name": "pilot-bread",
+      "roboflow_id": "4wMcAv49vXdmNCLr5evY",
+      "reason": "Bavarian bread dumpling leftover scraps (Semmelknoedel) with dark beer-mustard gravy smears; unrepresentative of standard bread waste (slices, buns, crusts) and risks model confusion with gravy/meat stains."
+    },
+    {
+      "filename": "bread_plate_014.jpg",
+      "class_name": "bread",
+      "batch_name": "pilot-bread",
+      "roboflow_id": "D3P5jRpb8agUqrbJmjQz",
+      "reason": "Bavarian bread dumpling leftover scraps (Semmelknoedel) with dark beer-mustard gravy smears; unrepresentative of standard bread waste (slices, buns, crusts) and risks model confusion with gravy/meat stains."
+    }
+  ]
+}

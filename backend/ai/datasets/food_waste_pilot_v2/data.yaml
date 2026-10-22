@@ -1,0 +1,20 @@
+# SLIIT IT4010 Research Project J26-IT-333
+# Component 4: Smart Waste Bin - Food Recognition YOLO Pilot Configuration v2
+# Versioned Pilot Dataset v2 (127 Approved Images, 7 Active Classes, Zero Bread, Zero Rejected Images)
+# Generated: 2026-10-21
+
+path: D:\SLIIT\Research\Research-\backend\ai\datasets\food_waste_pilot_v2
+train: images/train
+val: images/val
+test: images/test
+
+nc: 7
+
+names:
+  0: rice
+  1: kottu
+  2: noodles
+  3: chicken
+  4: whole_mango
+  5: mango_flesh
+  6: mango_peel

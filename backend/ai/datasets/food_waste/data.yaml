@@ -1,0 +1,19 @@
+# SLIIT IT4010 Research Project J26-IT-333
+# Component 4: Smart Waste Bin - Food Waste Detection Dataset Configuration
+# Classes: 7 Food Waste Categories
+
+path: .
+train: images/train
+val: images/val
+test: images/test
+
+nc: 7
+
+names:
+  0: rice
+  1: kottu
+  2: noodles
+  3: chicken
+  4: bread
+  5: whole_mango
+  6: mango_peel

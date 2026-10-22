@@ -1,0 +1,10 @@
+Class ID,Class Name,Precision,Recall,F1-Score,mAP@0.5,mAP@0.5:0.95,Status
+0,rice,1.0,0.0,0.0,0.4783,0.3346,EVALUATED
+1,kottu,0.7919,0.5,0.613,0.695,0.6255,EVALUATED
+2,noodles,1.0,0.892,0.9429,0.995,0.8403,EVALUATED
+3,chicken,0.0,0.0,0.0,0.0,0.0,UNASSESSED (0 evaluation samples in split - isolated to Train to eliminate leakage)
+4,whole_mango,0.2054,1.0,0.3407,0.8064,0.6216,EVALUATED
+5,mango_flesh,0.9902,0.5833,0.7342,0.6449,0.6092,EVALUATED
+6,mango_peel,0.0,0.0,0.0,0.0,0.0,UNASSESSED (0 evaluation samples in split - isolated to Train to eliminate leakage)
+
+Overall,ALL_CLASSES,0.7975,0.5951,0.6816,0.7239,0.6063,OVERALL
