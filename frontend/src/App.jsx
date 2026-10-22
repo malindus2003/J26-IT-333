@@ -7,7 +7,6 @@ import StorageZoneTelemetry from './components/StorageZoneTelemetry';
 import VisionInspector from './components/VisionInspector';
 import MultiModalAssessor from './components/MultiModalAssessor';
 import InventoryHealthTable from './components/InventoryHealthTable';
-import StatsCards from './components/StatsCards';
 import ActionRecommendations from './components/ActionRecommendations';
 import AlertNotificationCenter from './components/AlertNotificationCenter';
 import ESP32Simulator from './components/ESP32Simulator';
@@ -483,7 +482,6 @@ export default function App() {
 
             </div>
 
-            <StatsCards stats={stats} isDarkMode={isDarkMode} />
             {/* Sub-View 1: Optical Camera Scanner & CV Bounding Box Inspector */}
             {spoilageSubTab === 'vision' && (
               <div className="space-y-4 sm:space-y-6 animate-fade-in">
