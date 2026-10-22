@@ -518,6 +518,7 @@ INITIAL_ORDERS = [
         "station_id": "station-1",
         "station_name": "Hot Kitchen",
         "created_at": (datetime.now() - timedelta(minutes=6)).strftime("%H:%M:%S"),
+        "created_date": datetime.now().strftime("%Y-%m-%d"),
         "elapsed_mins": 6,
         "target_prep_mins": 8,
         "ingredients_deducted": [
@@ -542,6 +543,7 @@ INITIAL_ORDERS = [
         "station_id": "station-2",
         "station_name": "Grill",
         "created_at": (datetime.now() - timedelta(minutes=10)).strftime("%H:%M:%S"),
+        "created_date": datetime.now().strftime("%Y-%m-%d"),
         "elapsed_mins": 10,
         "target_prep_mins": 14,
         "ingredients_deducted": [
@@ -564,6 +566,7 @@ INITIAL_ORDERS = [
         "station_id": "station-1",
         "station_name": "Hot Kitchen",
         "created_at": (datetime.now() - timedelta(minutes=18)).strftime("%H:%M:%S"),
+        "created_date": datetime.now().strftime("%Y-%m-%d"),
         "elapsed_mins": 18,
         "target_prep_mins": 6,
         "ingredients_deducted": [
@@ -586,6 +589,7 @@ INITIAL_ORDERS = [
         "station_id": "station-2",
         "station_name": "Grill",
         "created_at": (datetime.now() - timedelta(minutes=35)).strftime("%H:%M:%S"),
+        "created_date": datetime.now().strftime("%Y-%m-%d"),
         "elapsed_mins": 35,
         "target_prep_mins": 15,
         "ingredients_deducted": [
@@ -595,7 +599,7 @@ INITIAL_ORDERS = [
     }
 ]
 
-orders_db = list(INITIAL_ORDERS)
+orders_db = [dict(o) for o in INITIAL_ORDERS]
 
 # --- REQUEST SCHEMAS ---
 class OrderItemPayload(BaseModel):
@@ -936,6 +940,7 @@ def place_new_order(payload: CreateOrderPayload):
         "station_id": primary_station_id,
         "station_name": primary_station_name,
         "created_at": datetime.now().strftime("%H:%M:%S"),
+        "created_date": datetime.now().strftime("%Y-%m-%d"),
         "elapsed_mins": 0,
         "target_prep_mins": max_prep_time,
         "ingredients_deducted": deducted_log,

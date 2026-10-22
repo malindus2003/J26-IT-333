@@ -93,6 +93,15 @@ export default function KitchenStaffDashboard({
   const [demandItemSearch, setDemandItemSearch] = useState('');
   const [demandStationFilter, setDemandStationFilter] = useState('all');
   const [showItemPrepTable, setShowItemPrepTable] = useState(true);
+  const [currentLiveDate, setCurrentLiveDate] = useState(() => new Date());
+
+  // Periodically refresh real-time calendar date every 30 seconds
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentLiveDate(new Date());
+    }, 30000);
+    return () => clearInterval(timer);
+  }, []);
 
   // --- Staff Sub-Tab State & Admin Onboarding State ---
   const [staffSubTab, setStaffSubTab] = useState('directory'); // 'directory' | 'onboard'
@@ -249,39 +258,117 @@ export default function KitchenStaffDashboard({
 
   // Real-Time Today Order Intake & Meal Period Aggregation (Updates Reactively on Incoming Orders)
   const todayMealStats = useMemo(() => {
-    let liveMorning = 0;
-    let liveAfternoon = 0;
-    let liveEvening = 0;
+    const now = new Date();
+    const curHour = now.getHours();
+    const curMin = now.getMinutes();
+    const curTime = curHour + curMin / 60;
+    const todayDateStr = now.toISOString().slice(0, 10); // "YYYY-MM-DD"
 
-    liveOrders.forEach(o => {
-      const timeStr = o.created_at || "";
-      const [hStr, mStr] = timeStr.split(":");
-      const h = parseInt(hStr, 10);
-      const m = parseInt(mStr, 10) || 0;
-      const t = isNaN(h) ? 13 : h + m / 60;
-      if (t < 11.5) liveMorning++;
-      else if (t < 16.5) liveAfternoon++;
-      else liveEvening++;
+    const activeShift = curTime < 11.5 ? 'morning' : (curTime < 16.5 ? 'afternoon' : 'evening');
+
+    const morningOrders = [];
+    const afternoonOrders = [];
+    const eveningOrders = [];
+
+    (liveOrders || []).forEach(o => {
+      // 1. Date check if order has explicit date
+      if (o.created_date && o.created_date !== todayDateStr) {
+        return; // Skip orders from other days
+      }
+
+      // 2. Parse time
+      let t = null;
+      const timeStr = String(o.created_at || o.timestamp || "").trim();
+      if (timeStr) {
+        if (timeStr.includes("T") || (timeStr.includes("-") && timeStr.includes(":"))) {
+          const d = new Date(timeStr);
+          if (!isNaN(d.getTime())) {
+            const ordDateStr = d.toISOString().slice(0, 10);
+            if (ordDateStr !== todayDateStr) return;
+            t = d.getHours() + d.getMinutes() / 60;
+          }
+        }
+        if (t === null) {
+          const match = timeStr.match(/(\d{1,2}):(\d{2})(?::\d{2})?\s*(AM|PM)?/i);
+          if (match) {
+            let h = parseInt(match[1], 10);
+            const m = parseInt(match[2], 10) || 0;
+            const meridiem = match[3] ? match[3].toUpperCase() : null;
+            if (meridiem === 'PM' && h < 12) h += 12;
+            if (meridiem === 'AM' && h === 12) h = 0;
+            t = h + m / 60;
+          }
+        }
+      }
+
+      // If no valid time string, assume it's a live incoming order right now
+      const orderTime = (t !== null && !isNaN(t)) ? t : curTime;
+
+      // Filter into shifts based on sequential progression of the day
+      // An upcoming shift that hasn't started yet CANNOT have orders yet
+      if (orderTime < 11.5) {
+        // Morning shift (06:00 – 11:30)
+        if (orderTime >= 5.5 && (curTime >= 11.5 || orderTime <= curTime + 0.1)) {
+          morningOrders.push(o);
+        }
+      } else if (orderTime < 16.5) {
+        // Afternoon shift (11:30 – 16:30)
+        // Only valid if afternoon has started or completed
+        if (curTime >= 11.5 && (curTime >= 16.5 || orderTime <= curTime + 0.1)) {
+          afternoonOrders.push(o);
+        }
+      } else {
+        // Evening shift (16:30 – 23:00)
+        // Only valid if evening has started
+        if (curTime >= 16.5 && orderTime <= curTime + 0.1) {
+          eveningOrders.push(o);
+        }
+      }
     });
 
-    const morningBase = 92;
-    const afternoonBase = 124;
-    const eveningBase = 28;
+    const countDishes = (ordersList) => {
+      return ordersList.reduce((sum, order) => {
+        const items = Array.isArray(order.items) ? order.items : [];
+        const orderDishes = items.reduce((iSum, it) => iSum + (parseInt(it.quantity, 10) || 1), 0);
+        return sum + (orderDishes > 0 ? orderDishes : 1);
+      }, 0);
+    };
 
-    const morningTotal = morningBase + liveMorning;
-    const afternoonTotal = afternoonBase + liveAfternoon;
-    const eveningTotal = eveningBase + liveEvening;
+    const extractTopDishes = (ordersList, fallbackText) => {
+      const counts = {};
+      ordersList.forEach(order => {
+        const items = Array.isArray(order.items) ? order.items : [];
+        items.forEach(it => {
+          const name = it.name || it.item_name;
+          if (name) {
+            counts[name] = (counts[name] || 0) + (parseInt(it.quantity, 10) || 1);
+          }
+        });
+      });
+      const sorted = Object.keys(counts).sort((a, b) => counts[b] - counts[a]);
+      if (sorted.length > 0) {
+        return sorted.slice(0, 3).join(", ");
+      }
+      return fallbackText;
+    };
+
+    const morningTotal = morningOrders.length;
+    const afternoonTotal = afternoonOrders.length;
+    const eveningTotal = eveningOrders.length;
+
+    const morningDishes = countDishes(morningOrders);
+    const afternoonDishes = countDishes(afternoonOrders);
+    const eveningDishes = countDishes(eveningOrders);
+
     const totalActualToday = morningTotal + afternoonTotal + eveningTotal;
+    const totalDishesToday = morningDishes + afternoonDishes + eveningDishes;
 
     const predictedToday = workloadAnalytics?.predicted_daily_orders?.[0]?.predicted_orders || 417;
-    const progressPct = Math.min(100, Math.round((totalActualToday / predictedToday) * 100));
-
-    const now = new Date();
-    const curTime = now.getHours() + now.getMinutes() / 60;
-    const activeShift = curTime < 11.5 ? 'morning' : (curTime < 16.5 ? 'afternoon' : 'evening');
+    const progressPct = totalActualToday > 0 ? Math.min(100, Math.round((totalActualToday / predictedToday) * 100)) : 0;
 
     return {
       totalActualToday,
+      totalDishesToday,
       predictedToday,
       progressPct,
       activeShift,
@@ -293,11 +380,11 @@ export default function KitchenStaffDashboard({
           shiftLabel: 'Breakfast Shift',
           timeRange: '06:00 – 11:30',
           orders: morningTotal,
-          dishes: Math.round(morningTotal * 0.21),
+          dishes: morningDishes,
           status: curTime >= 11.5 ? 'Completed' : 'Active Now',
           isCurrent: activeShift === 'morning',
           icon: '🌅',
-          popularItems: 'Fresh Berry Smoothie Bowl, Belgian Waffle'
+          popularItems: extractTopDishes(morningOrders, 'Fresh Berry Smoothie Bowl, Belgian Waffle')
         },
         {
           key: 'afternoon',
@@ -305,11 +392,11 @@ export default function KitchenStaffDashboard({
           shiftLabel: 'Lunch Rush Peak',
           timeRange: '11:30 – 16:30',
           orders: afternoonTotal,
-          dishes: Math.round(afternoonTotal * 0.22),
+          dishes: afternoonDishes,
           status: curTime >= 16.5 ? 'Completed' : (curTime >= 11.5 ? 'Active Now' : 'Upcoming'),
           isCurrent: activeShift === 'afternoon',
           icon: '☀️',
-          popularItems: 'Chicken Kottu Roti, Salmon Steak, Garden Salad'
+          popularItems: extractTopDishes(afternoonOrders, 'Chicken Kottu Roti, Salmon Steak, Garden Salad')
         },
         {
           key: 'evening',
@@ -317,11 +404,11 @@ export default function KitchenStaffDashboard({
           shiftLabel: 'Dinner & Late Service',
           timeRange: '16:30 – 23:00',
           orders: eveningTotal,
-          dishes: Math.round(eveningTotal * 0.24),
+          dishes: eveningDishes,
           status: curTime >= 16.5 ? 'Active Now' : 'Upcoming',
           isCurrent: activeShift === 'evening',
           icon: '🌙',
-          popularItems: 'Prime Beef Sirloin, Woodfired Pizza, Calamari'
+          popularItems: extractTopDishes(eveningOrders, 'Prime Beef Sirloin, Woodfired Pizza, Calamari')
         }
       ]
     };
@@ -336,21 +423,30 @@ export default function KitchenStaffDashboard({
         await fetchLiveOrders();
       }
     } catch (e) {
+      const fallbackDishes = [
+        { name: "Artisan Wood-Fired Margherita Pizza", station: "Pizza", price: 1850 },
+        { name: "Grilled Atlantic Salmon Steak", station: "Seafood", price: 2850 },
+        { name: "Artisan Garden Harvest Salad", station: "Cold Salad", price: 980 },
+        { name: "Belgian Berry & Banana Waffle", station: "Dessert", price: 1150 },
+        { name: "Fresh Berry Smoothie Bowl", station: "Beverages", price: 850 }
+      ];
+      const pick = fallbackDishes[Date.now() % fallbackDishes.length];
       setLiveOrders(prev => [
         {
           id: `ORD-${Date.now().toString().slice(-4)}`,
           order_number: prev.length + 85,
-          table_no: "Table 08",
+          table_no: `Table 0${(prev.length % 8) + 1}`,
           order_type: "Dine-In",
-          items: [{ menu_id: "sim-quick", name: "Chicken Kottu Roti Supreme", quantity: 1, unit_price: 1450 }],
-          total_amount_lkr: 1450,
+          station_name: pick.station,
+          items: [{ menu_id: "sim-quick", name: pick.name, quantity: 1, unit_price: pick.price }],
+          total_amount_lkr: pick.price,
           status: "in_prep",
           created_at: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
           target_prep_mins: 8
         },
         ...prev
       ]);
-      setDismissedToast("⚡ Live order received! Real-time intake updated.");
+      setDismissedToast(`⚡ Live incoming order received (${pick.name} - ${pick.station})! Real-time intake updated.`);
       setTimeout(() => setDismissedToast(""), 3500);
     }
   };
@@ -807,9 +903,9 @@ export default function KitchenStaffDashboard({
   const getStationForDish = (dishName = "") => {
     const nl = (dishName || "").toLowerCase();
     if (nl.includes("pizza") || nl.includes("margherita") || nl.includes("calzone") || nl.includes("diavola") || nl.includes("pepperoni") || nl.includes("garlic pizza")) return "Pizza";
+    if (nl.includes("smoothie") || nl.includes("juice") || nl.includes("tea") || nl.includes("coke") || nl.includes("sprite") || nl.includes("beverage") || nl.includes("coffee") || nl.includes("cola") || nl.includes("shake") || nl.includes("drink") || nl.includes("quencher")) return "Beverages";
     if (nl.includes("salad") || nl.includes("greens") || nl.includes("avocado") || nl.includes("feta") || nl.includes("bowl") || nl.includes("fruit") || nl.includes("harvest")) return "Cold Salad";
     if (nl.includes("waffle") || nl.includes("dessert") || nl.includes("cake") || nl.includes("pastry") || nl.includes("ice cream") || nl.includes("pancake") || nl.includes("pudding")) return "Dessert";
-    if (nl.includes("juice") || nl.includes("tea") || nl.includes("coke") || nl.includes("sprite") || nl.includes("beverage") || nl.includes("coffee") || nl.includes("cola") || nl.includes("smoothie") || nl.includes("shake") || nl.includes("drink")) return "Beverages";
     // Seafood station covers seafood (salmon, cuttlefish, calamari, prawns, crab) as well as general line cooking
     return "Seafood";
   };
@@ -1367,11 +1463,11 @@ export default function KitchenStaffDashboard({
   // Dynamic Real-Time 5-Station Workload Capacity derived from live incoming and completed orders
   const dynamicStations = useMemo(() => {
     const baseConfig = [
-      { id: "station-1", name: "Seafood", baseShift: 3.0, targetPrep: 10.0, defaultCooks: 2, thresh: 20.0 },
+      { id: "station-1", name: "Seafood", baseShift: 0.0, targetPrep: 10.0, defaultCooks: 2, thresh: 20.0 },
       { id: "station-2", name: "Pizza", baseShift: 0.0, targetPrep: 7.0, defaultCooks: 3, thresh: 16.3 },
       { id: "station-3", name: "Cold Salad", baseShift: 0.0, targetPrep: 4.0, defaultCooks: 1, thresh: 17.6 },
-      { id: "station-4", name: "Dessert", baseShift: 1.0, targetPrep: 6.0, defaultCooks: 1, thresh: 15.0 },
-      { id: "station-5", name: "Beverages", baseShift: 1.0, targetPrep: 4.0, defaultCooks: 1, thresh: 25.0 }
+      { id: "station-4", name: "Dessert", baseShift: 0.0, targetPrep: 6.0, defaultCooks: 1, thresh: 15.0 },
+      { id: "station-5", name: "Beverages", baseShift: 0.0, targetPrep: 4.0, defaultCooks: 1, thresh: 25.0 }
     ];
 
     const currentDataStations = data?.stations || [];
@@ -1384,7 +1480,8 @@ export default function KitchenStaffDashboard({
         (o.status === 'pending' || o.status === 'in_prep') &&
         (
           (o.station_name && o.station_name.toLowerCase().includes(cfg.name.toLowerCase())) ||
-          (o.items && o.items.some(it => getStationForDish(it.name) === cfg.name))
+          (cfg.name === "Seafood" && o.station_name && (o.station_name.toLowerCase().includes("hot") || o.station_name.toLowerCase().includes("grill") || o.station_name.toLowerCase().includes("fryer"))) ||
+          (o.items && o.items.some(it => getStationForDish(it.name || it.item_name || "") === cfg.name))
         )
       );
 
@@ -1393,21 +1490,22 @@ export default function KitchenStaffDashboard({
         !clearedCompletedIds.has(o.id) &&
         (
           (o.station_name && o.station_name.toLowerCase().includes(cfg.name.toLowerCase())) ||
-          (o.items && o.items.some(it => getStationForDish(it.name) === cfg.name))
+          (cfg.name === "Seafood" && o.station_name && (o.station_name.toLowerCase().includes("hot") || o.station_name.toLowerCase().includes("grill") || o.station_name.toLowerCase().includes("fryer"))) ||
+          (o.items && o.items.some(it => getStationForDish(it.name || it.item_name || "") === cfg.name))
         )
       );
 
       const liveQueue = activeStationOrders.length;
       const liveCompleted = completedStationOrders.length;
 
-      // Actual load: base shift baseline + active queue + completed orders
-      const actualLoad = Number((cfg.baseShift + liveQueue + liveCompleted).toFixed(1));
+      // Actual load: pure real-time count of orders placed for this station
+      const actualLoad = liveQueue + liveCompleted;
 
       // Predicted load from ML regression formula (0.94 factor)
       const predictedLoad = actualLoad > 0 ? Number((actualLoad * 0.94 + 0.1).toFixed(1)) : 0.0;
 
       // Load vs capacity percentage
-      const rawLoadPercentage = actualLoad > 0 ? Math.min(100, Math.round((actualLoad / cfg.thresh) * 80)) : 0;
+      const rawLoadPercentage = actualLoad > 0 ? Math.min(100, Math.round((actualLoad / cfg.thresh) * 100)) : 0;
       const isStabilized = stabilizedStations.has(cfg.name);
       const isBottleneck = !isStabilized && (actualLoad >= cfg.thresh || liveQueue >= 6);
       const loadPercentage = isStabilized ? Math.min(rawLoadPercentage, 35) : rawLoadPercentage;
@@ -1523,6 +1621,7 @@ export default function KitchenStaffDashboard({
       const isOverloaded = (pendingCount >= 5) || (pendingCount >= 3 && ratio >= 1.4) || (stats[st].pendingTickets >= 4);
 
       stats[st].currentCooks = currentCooks;
+      stats[st].activeCooks = currentCooks;
       stats[st].ratio = ratio;
       stats[st].isOverloaded = isOverloaded;
 
@@ -1842,48 +1941,100 @@ export default function KitchenStaffDashboard({
       return "Seafood";
     };
 
+    // Calculate real-time dynamic date components from current live clock
+    const getDynamicDateComponents = (offsetDays = 0) => {
+      const d = new Date(currentLiveDate);
+      d.setDate(d.getDate() + offsetDays);
+      const dayNum = d.getDate();
+      const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+      const monthStr = monthNames[d.getMonth()];
+      const yearStr = d.getFullYear();
+      return {
+        dayNum,
+        monthStr,
+        yearStr,
+        dateStr: `${dayNum} ${monthStr} ${yearStr}`
+      };
+    };
+
+    const todayDate = getDynamicDateComponents(0);
+    const tomorrowDate = getDynamicDateComponents(1);
+    const dayAfterDate = getDynamicDateComponents(2);
+
+    // Dynamic Live Staff mapper: Pull actual active kitchen staff from data.staff if available
+    const getLiveChefsForStation = (stationKey, defaultChefs = []) => {
+      if (!data?.staff || data.staff.length === 0) return defaultChefs;
+      const matched = data.staff.filter(s => {
+        const assigned = (s.reallocatedTo || s.assigned_station || s.station || s.base_station || "").toLowerCase();
+        const key = stationKey.toLowerCase();
+        if (key === "seafood") return assigned.includes("seafood") || assigned.includes("grill") || assigned.includes("hot") || assigned.includes("kitchen");
+        if (key === "pizza") return assigned.includes("pizza") || assigned.includes("pasta") || assigned.includes("italian");
+        if (key === "cold salad") return assigned.includes("salad") || assigned.includes("cold") || assigned.includes("pantry");
+        if (key === "dessert") return assigned.includes("dessert") || assigned.includes("pastry") || assigned.includes("sweet") || assigned.includes("bakery");
+        if (key === "beverages") return assigned.includes("beverage") || assigned.includes("bar") || assigned.includes("drink");
+        return assigned.includes(key);
+      });
+
+      if (matched.length === 0) return defaultChefs;
+      return matched.map(s => ({
+        name: s.name,
+        role: s.role || s.designation || "Chef",
+        shift: s.shift || "08:00 AM - 05:00 PM",
+        eff: s.efficiency_score ? `${Math.round(s.efficiency_score * 100)}%` : (s.efficiency_rating ? `${s.efficiency_rating}%` : "92%"),
+        isLead: (s.role || "").toLowerCase().includes("lead") || (s.role || "").toLowerCase().includes("head") || (s.role || "").toLowerCase().includes("senior")
+      }));
+    };
+
     const daysConfig = [
       {
         id: "today",
         key: "today",
-        daySinhala: "Today (අද)",
+        daySinhala: "Today",
         dayLabel: "Today",
-        dateStr: "17 Oct 2026",
+        daySinhalaSub: "",
+        dateStr: todayDate.dateStr,
+        dayNum: todayDate.dayNum,
+        monthStr: todayDate.monthStr,
+        yearStr: todayDate.yearStr,
         shiftHighlight: "Active Shift • Peak Dinner & Delivery Surge",
         factor: 1.0,
         weather: "Coastal Heavy Rain (24°C)",
         weatherImpact: "+18% comfort meal & delivery surge",
         targetConfidence: "95.1%",
         stationChefs: {
-          "Seafood": [
+          "Seafood": getLiveChefsForStation("Seafood", [
             { name: "Chef Samantha", role: "Lead Seafood Master", shift: "07:00 AM - 04:00 PM", eff: "94%", isLead: true },
             { name: "Chef Nimal", role: "Senior Sous Chef", shift: "03:30 PM - 11:30 PM", eff: "96%", isLead: false },
             { name: "Chef Dilshan", role: "CDP - Grill & Saute", shift: "11:00 AM - 08:30 PM", eff: "91%", isLead: false }
-          ],
-          "Pizza": [
+          ]),
+          "Pizza": getLiveChefsForStation("Pizza", [
             { name: "Chef Amara", role: "Italian Pizza Lead", shift: "10:00 AM - 08:30 PM", eff: "93%", isLead: true },
             { name: "Chef Nuwan", role: "Pizza Baker", shift: "02:00 PM - 10:30 PM", eff: "89%", isLead: false }
-          ],
-          "Cold Salad": [
+          ]),
+          "Cold Salad": getLiveChefsForStation("Cold Salad", [
             { name: "Chef Priyantha", role: "Pantry & Salad In-Charge", shift: "07:00 AM - 04:30 PM", eff: "92%", isLead: true }
-          ],
-          "Dessert": [
+          ]),
+          "Dessert": getLiveChefsForStation("Dessert", [
             { name: "Chef Roshan", role: "Senior Pastry Chef", shift: "08:00 AM - 05:00 PM", eff: "90%", isLead: true },
             { name: "Chef Lahiru", role: "Commis I", shift: "03:00 PM - 10:30 PM", eff: "87%", isLead: false }
-          ],
-          "Beverages": [
+          ]),
+          "Beverages": getLiveChefsForStation("Beverages", [
             { name: "Chef Tharindu", role: "Beverage Bar Lead", shift: "09:00 AM - 06:00 PM", eff: "88%", isLead: true },
             { name: "Trainee Janith", role: "Bar Prep Assistant", shift: "04:30 PM - 11:30 PM", eff: "85%", isLead: false }
-          ]
+          ])
         }
       },
       {
         id: "tomorrow",
         key: "tomorrow",
-        daySinhala: "Tomorrow (හෙට)",
+        daySinhala: "Tomorrow",
         dayLabel: "Tomorrow",
-        dateStr: "18 Oct 2026",
-        shiftHighlight: "Weekend Peak Surge • High Reservation Volume",
+        daySinhalaSub: "",
+        dateStr: tomorrowDate.dateStr,
+        dayNum: tomorrowDate.dayNum,
+        monthStr: tomorrowDate.monthStr,
+        yearStr: tomorrowDate.yearStr,
+        shiftHighlight: "Upcoming Shift • High Reservation Volume",
         factor: 1.16,
         weather: "Monsoon Showers & Evening Breeze",
         weatherImpact: "+24% weekend dine-in & family platters surge",
@@ -1917,9 +2068,13 @@ export default function KitchenStaffDashboard({
       {
         id: "day_after",
         key: "day_after",
-        daySinhala: "Day After Tomorrow (අනිද්දා)",
+        daySinhala: "Day After Tomorrow",
         dayLabel: "Day After Tomorrow",
-        dateStr: "19 Oct 2026",
+        daySinhalaSub: "",
+        dateStr: dayAfterDate.dateStr,
+        dayNum: dayAfterDate.dayNum,
+        monthStr: dayAfterDate.monthStr,
+        yearStr: dayAfterDate.yearStr,
         shiftHighlight: "Post-Weekend Normalized Service",
         factor: 0.92,
         weather: "Clear Skies & Sunny Coastal Heat (29°C)",
@@ -2006,7 +2161,7 @@ export default function KitchenStaffDashboard({
         stationLoads
       };
     });
-  }, [demandForecastData]);
+  }, [demandForecastData, data?.staff, currentLiveDate]);
 
   // Dynamic AI Staff Allocation Directives Engine: updates in real-time based on station queues & load surges
   const generateDynamicDirectives = (currentStations = [], currentStaff = [], customSurges = [], resolvedSet = new Set(), dishSurgeAlerts = [], stabilizedSet = new Set()) => {
@@ -3624,14 +3779,14 @@ export default function KitchenStaffDashboard({
                       </span>
                     </h4>
                     <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
-                      Dynamically categorizes incoming orders by dish type, tracks cooks vs queue ratio, and recommends skilled chefs
+                      Dynamically categorizes incoming orders by dish type, tracks station workload, and recommends skilled chefs
                     </p>
                   </div>
                 </div>
 
                 <div className="flex items-center gap-1.5">
                   <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 bg-white dark:bg-slate-900 px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-800">
-                    Surge Threshold: &gt; 2.5 dishes/cook
+                    Surge Alert Threshold: 5+ dishes
                   </span>
                 </div>
               </div>
@@ -3683,15 +3838,8 @@ export default function KitchenStaffDashboard({
                           {stStats.pendingDishes} <span className="text-[10px] font-medium text-slate-500">dishes</span>
                         </div>
                         <div className="text-[11px] font-bold text-slate-600 dark:text-slate-300">
-                          {stStats.activeCooks} {stStats.activeCooks === 1 ? 'cook' : 'cooks'}
+                          {stStats.activeCooks || stStats.currentCooks || 1} {(stStats.activeCooks || stStats.currentCooks || 1) === 1 ? 'cook' : 'cooks'}
                         </div>
-                      </div>
-
-                      <div className="mt-1 text-[10px] text-slate-500 dark:text-slate-400 flex items-center justify-between font-mono">
-                        <span>Ratio:</span>
-                        <span className={isOver ? 'text-rose-600 dark:text-rose-400 font-bold' : 'text-slate-700 dark:text-slate-300'}>
-                          {stStats.ratio} / cook
-                        </span>
                       </div>
                     </div>
                   );
@@ -4420,7 +4568,7 @@ export default function KitchenStaffDashboard({
                             Daily Target Fulfillment Progress ({todayMealStats.totalActualToday} of {todayMealStats.predictedToday} expected orders)
                           </span>
                           <span className="font-mono font-bold text-emerald-700 dark:text-emerald-400">
-                            {todayMealStats.progressPct}% • {Math.round(todayMealStats.totalActualToday * 0.2)} kitchen food dishes cooked
+                            {todayMealStats.progressPct}% • {todayMealStats.totalDishesToday} kitchen food dishes cooked
                           </span>
                         </div>
                         <div className="w-full bg-slate-100 dark:bg-slate-800 h-2.5 rounded-full overflow-hidden p-0.5">
@@ -4476,26 +4624,19 @@ export default function KitchenStaffDashboard({
                                 </span>
                               </div>
 
-                              <div className="mt-2.5 flex items-baseline justify-between pt-2 border-t border-slate-100 dark:border-slate-800">
+                              <div className="mt-2.5 flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-800">
                                 <div>
                                   <div className="text-xl font-mono font-black text-slate-900 dark:text-white">
                                     {period.orders}{' '}
                                     <span className="text-[11px] font-semibold text-slate-500 font-sans">orders</span>
                                   </div>
-                                  <span className="text-[10px] text-slate-400 font-medium">
-                                    ~{period.dishes} food dishes prepared
-                                  </span>
                                 </div>
                                 <div className="text-right">
                                   <span className="text-[11px] font-bold text-emerald-700 dark:text-emerald-400">
-                                    {Math.round((period.orders / Math.max(1, todayMealStats.totalActualToday)) * 100)}%
+                                    {todayMealStats.totalActualToday > 0 ? Math.round((period.orders / todayMealStats.totalActualToday) * 100) : 0}%
                                   </span>
                                   <span className="text-[9px] text-slate-400 block">of day's total</span>
                                 </div>
-                              </div>
-
-                              <div className="mt-2 pt-2 border-t border-slate-100 dark:border-slate-800 text-[10px] text-slate-500 dark:text-slate-400 truncate" title={period.popularItems}>
-                                🌟 <span className="font-medium text-slate-600 dark:text-slate-300">{period.popularItems}</span>
                               </div>
                             </div>
                           ))}
@@ -4534,7 +4675,7 @@ export default function KitchenStaffDashboard({
                                   </span>
                                 </div>
                                 <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mt-1">
-                                  Exact shift prep sizing, safety buffers, and station chef assignments computed dynamically for <b>Ada (Today)</b>, <b>Heta (Tomorrow)</b>, and <b>Anidda (Day After Tomorrow)</b>.
+                                  Exact shift prep sizing, safety buffers, and station chef assignments computed dynamically for <b>Today</b>, <b>Tomorrow</b>, and <b>Day After Tomorrow</b>.
                                 </p>
                               </div>
 
@@ -4546,18 +4687,20 @@ export default function KitchenStaffDashboard({
                                     <button
                                       key={dayCfg.id}
                                       onClick={() => setSelected3DayTab(dayCfg.id)}
-                                      className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
                                         isActive
                                           ? 'bg-emerald-600 text-white shadow-sm ring-2 ring-emerald-500/20'
                                           : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-white/80 dark:hover:bg-slate-700/60'
                                       }`}
                                     >
-                                      <Calendar className="h-3.5 w-3.5" />
-                                      <span>{dayCfg.daySinhala}</span>
-                                      <span className={`text-[10px] px-1.5 py-0.2 rounded font-mono ${
-                                        isActive ? 'bg-emerald-700/80 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
+                                      <Calendar className="h-3.5 w-3.5 shrink-0" />
+                                      <span className="text-left font-bold">{dayCfg.dayLabel}</span>
+                                      <span className={`px-1.5 py-0.5 rounded font-mono flex flex-col items-center justify-center text-center leading-none min-w-[34px] ${
+                                        isActive ? 'bg-emerald-700/90 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300'
                                       }`}>
-                                        {dayCfg.dateStr}
+                                        <span className="font-extrabold text-[11px] leading-tight">{dayCfg.dayNum}</span>
+                                        <span className="text-[9px] uppercase font-semibold leading-tight">{dayCfg.monthStr}</span>
+                                        <span className="text-[8px] leading-tight opacity-80">{dayCfg.yearStr}</span>
                                       </span>
                                     </button>
                                   );
@@ -5080,14 +5223,6 @@ export default function KitchenStaffDashboard({
                 <span className="text-[10px] font-black px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800 flex items-center gap-1">
                   <span className="h-2 w-2 rounded-full bg-emerald-500 animate-ping"></span> Live Kitchen Engine
                 </span>
-                <button
-                  onClick={handleSimulateSurge}
-                  className="px-3 py-1 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-bold text-xs shadow-xs transition-all flex items-center gap-1 cursor-pointer whitespace-nowrap"
-                  title="Simulate sudden order queue spike"
-                >
-                  <TrendingUp className="h-3.5 w-3.5" />
-                  <span>Simulate Order Queue Surge</span>
-                </button>
               </div>
             </div>
 
@@ -5225,7 +5360,7 @@ export default function KitchenStaffDashboard({
               const targetCooks = stationsList.reduce((acc, s) => acc + (s.recommended_cooks || 0), 0);
 
               const totalLoadForProportion = stationsList.reduce((acc, s) => acc + (Number(s.actual_load) || 0), 0);
-              let seafoodPct = 20, pizzaPct = 20, coldSaladPct = 20, dessertPct = 20, beveragesPct = 20;
+              let seafoodPct = 0, pizzaPct = 0, coldSaladPct = 0, dessertPct = 0, beveragesPct = 0;
               if (totalLoadForProportion > 0) {
                 const rawSeafood = ((Number(stationsList.find(s => s.name === "Seafood")?.actual_load) || 0) / totalLoadForProportion) * 100;
                 const rawPizza = ((Number(stationsList.find(s => s.name === "Pizza")?.actual_load) || 0) / totalLoadForProportion) * 100;

@@ -2216,21 +2216,28 @@ def get_workload_analytics_trends():
 
 @router.post("/simulate-quick-order")
 def simulate_quick_order():
-    """Simulates an arriving order in real time so the user can see live order intake update."""
+    """Simulates an arriving order in real time across the 5 stations so workload updates reactively."""
     from .orders import orders_db
     now = datetime.now()
-    cur_time_float = now.hour + now.minute / 60.0
     
-    # Pick a suitable dish based on meal period
-    if cur_time_float < 11.5:
-        dish_name = "Fresh Berry Smoothie Bowl"
-        station_id, station_name = "station-1", "Hot Kitchen"
-    elif cur_time_float < 16.5:
-        dish_name = "Chicken Kottu Roti Supreme"
-        station_id, station_name = "station-1", "Hot Kitchen"
-    else:
-        dish_name = "Prime Beef Sirloin Medallion"
-        station_id, station_name = "station-2", "Grill"
+    # Dynamic catalogue of dishes mapped across all 5 kitchen production stations
+    sim_catalogue = [
+        {"name": "Artisan Wood-Fired Margherita Pizza", "station_id": "station-2", "station_name": "Pizza", "prep_mins": 7, "price": 1850.0},
+        {"name": "Grilled Atlantic Salmon Steak", "station_id": "station-1", "station_name": "Seafood", "prep_mins": 12, "price": 2850.0},
+        {"name": "Artisan Garden Harvest Salad", "station_id": "station-3", "station_name": "Cold Salad", "prep_mins": 5, "price": 980.0},
+        {"name": "Belgian Berry & Banana Waffle", "station_id": "station-4", "station_name": "Dessert", "prep_mins": 6, "price": 1150.0},
+        {"name": "Fresh Berry Smoothie Bowl", "station_id": "station-5", "station_name": "Beverages", "prep_mins": 4, "price": 850.0},
+        {"name": "Spicy Diavola Pepperoni Pizza", "station_id": "station-2", "station_name": "Pizza", "prep_mins": 9, "price": 2250.0},
+        {"name": "Chicken Kottu Roti Supreme", "station_id": "station-1", "station_name": "Seafood", "prep_mins": 8, "price": 1450.0},
+        {"name": "Cold Pressed Citrus Quencher", "station_id": "station-5", "station_name": "Beverages", "prep_mins": 3, "price": 650.0}
+    ]
+    
+    choice = sim_catalogue[len(orders_db) % len(sim_catalogue)]
+    dish_name = choice["name"]
+    station_id = choice["station_id"]
+    station_name = choice["station_name"]
+    prep_time = choice["prep_mins"]
+    price = choice["price"]
         
     order_num = len(orders_db) + 81
     order_id = f"ORD-{order_num:04d}"
@@ -2239,16 +2246,17 @@ def simulate_quick_order():
         "order_number": order_num,
         "table_no": f"Table {(order_num % 12) + 1:02d}",
         "order_type": "Dine-In",
-        "items": [{"menu_id": "sim-quick", "name": dish_name, "quantity": 1, "unit_price": 1450.0}],
-        "total_amount_lkr": 1450.0,
+        "items": [{"menu_id": "sim-quick", "name": dish_name, "quantity": 1, "unit_price": price}],
+        "total_amount_lkr": price,
         "status": "in_prep",
         "table_status": "occupied",
         "station_id": station_id,
         "station_name": station_name,
         "created_at": now.strftime("%H:%M:%S"),
+        "created_date": now.strftime("%Y-%m-%d"),
         "elapsed_mins": 0,
-        "target_prep_mins": 8,
-        "customer_note": "Simulated live incoming order"
+        "target_prep_mins": prep_time,
+        "customer_note": f"Simulated live incoming order for {station_name} line"
     }
     orders_db.append(new_ord)
     return {"status": "success", "order": new_ord, "total_live_orders": len(orders_db)}
