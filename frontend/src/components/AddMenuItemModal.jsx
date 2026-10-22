@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { 
   X, 
@@ -14,9 +14,40 @@ import {
   Sparkles, 
   CheckCircle2, 
   AlertCircle,
-  CloudUpload
+  CloudUpload,
+  PackageCheck
 } from 'lucide-react';
 import axios from 'axios';
+
+const DEFAULT_INVENTORY_ITEMS = [
+  { name: 'Fresh Atlantic Salmon Fillet', category: 'Fish', quantity: '24.5 kg' },
+  { name: 'Fresh Broiler Chicken Breast Cuts', category: 'Meat', quantity: '35.0 kg' },
+  { name: 'Prime Beef Sirloin Medallion', category: 'Meat', quantity: '18.0 kg' },
+  { name: 'Calamari & Prawns Mix', category: 'Fish', quantity: '15.0 kg' },
+  { name: 'Garlic Butter Jumbo King Prawns', category: 'Fish', quantity: '12.0 kg' },
+  { name: 'Embul Banana (Ambul Kesel)', category: 'Fruits', quantity: '28.0 kg' },
+  { name: 'Karthakolomban Mango (Ripe)', category: 'Fruits', quantity: '20.0 kg' },
+  { name: 'Red Lady Papaya (Rathu Papol)', category: 'Fruits', quantity: '18.5 kg' },
+  { name: 'Mauritius Pineapple (Gampaha Annasi)', category: 'Fruits', quantity: '22.0 kg' },
+  { name: 'Local Tomatoes (Thakkali - Maheshi)', category: 'Vegetables', quantity: '19.0 kg' },
+  { name: 'Nuwara Eliya Carrots (Premium Kuroda)', category: 'Vegetables', quantity: '16.5 kg' },
+  { name: 'Green Beans (Welimada Bonchi)', category: 'Vegetables', quantity: '14.0 kg' },
+  { name: 'Green Chillies (Amu Miris - MI-2)', category: 'Vegetables', quantity: '8.0 kg' },
+  { name: 'Kankun (Water Spinach)', category: 'Vegetables', quantity: '12.0 kg' },
+  { name: 'Gotukola (Centella Asiatica)', category: 'Vegetables', quantity: '6.5 kg' },
+  { name: 'Hydroponic Romaine Lettuce (Crisp)', category: 'Vegetables', quantity: '15.0 kg' },
+  { name: 'Pasteurized Fresh Buffalo Curd & Milk', category: 'Dairy', quantity: '25.0 kg' },
+  { name: 'Aged Cheddar & Mozzarella Blocks', category: 'Dairy', quantity: '14.0 kg' },
+  { name: 'Basmati Rice', category: 'Grains & Flour', quantity: '45.0 kg' },
+  { name: 'Samba/Keeri Rice', category: 'Grains & Flour', quantity: '50.0 kg' },
+  { name: 'Godamba Roti Shreds', category: 'Grains & Flour', quantity: '30.0 kg' },
+  { name: 'Dhal / Lentils', category: 'Grains & Flour', quantity: '25.0 kg' },
+  { name: 'Ceylon Cinnamon & Cardamom', category: 'Spices', quantity: '5.0 kg' },
+  { name: 'Crushed Tellicherry Black Pepper', category: 'Spices', quantity: '4.5 kg' },
+  { name: 'Coconut Milk & Spices', category: 'Oils & Condiments', quantity: '18.0 L' },
+  { name: 'Spiced Kottu Gravy', category: 'Oils & Condiments', quantity: '15.0 L' },
+  { name: 'Fresh Basil & Olive Oil', category: 'Oils & Condiments', quantity: '8.0 L' }
+];
 
 const STATION_OPTIONS = [
   { id: 'station-1', name: 'Hot Wok & Kottu Station' },
@@ -37,17 +68,6 @@ const CATEGORY_OPTIONS = [
   'Snacks & Appetizers'
 ];
 
-const INGREDIENT_CATEGORIES = [
-  'Fish',
-  'Meat',
-  'Vegetables',
-  'Dairy',
-  'Fruits',
-  'Spices',
-  'Grains & Flour',
-  'Oils & Condiments'
-];
-
 const PRESET_IMAGES = [
   { label: 'Seafood Rice', url: '/images/dishes/dish_7.jpg' },
   { label: 'Grilled Salmon', url: '/images/dishes/dish_2.jpg' },
@@ -61,18 +81,49 @@ export default function AddMenuItemModal({ isOpen, onClose, onItemAdded }) {
   const [name, setName] = useState('');
   const [category, setCategory] = useState('Main Course');
   const [priceLkr, setPriceLkr] = useState('');
+  const [hasPortions, setHasPortions] = useState(false);
+  const [portionPrices, setPortionPrices] = useState({ Small: '', Medium: '', Large: '' });
   const [prepTimeMins, setPrepTimeMins] = useState('12');
   const [stationId, setStationId] = useState('station-1');
   const [description, setDescription] = useState('');
   const [imageUrl, setImageUrl] = useState('');
   const [imagePreview, setImagePreview] = useState('');
+  const [availableInventory, setAvailableInventory] = useState(DEFAULT_INVENTORY_ITEMS);
   const [ingredients, setIngredients] = useState([
-    { ingredient_name: 'Fresh Atlantic Salmon Fillet', category: 'Fish', required_kg: 0.25 },
-    { ingredient_name: 'Hydroponic Romaine Lettuce (Crisp)', category: 'Vegetables', required_kg: 0.10 }
+    { ingredient_name: 'Fresh Atlantic Salmon Fillet', category: 'Fish', required_kg: 0.25, small_kg: 0.18, large_kg: 0.38, isCustom: false },
+    { ingredient_name: 'Hydroponic Romaine Lettuce (Crisp)', category: 'Vegetables', required_kg: 0.10, small_kg: 0.07, large_kg: 0.15, isCustom: false }
   ]);
 
   const [saving, setSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+
+  useEffect(() => {
+    if (isOpen) {
+      fetchInventoryItems();
+    }
+  }, [isOpen]);
+
+  const fetchInventoryItems = async () => {
+    try {
+      const res = await axios.get('http://localhost:8000/api/inventory/items');
+      if (res.data?.items && Array.isArray(res.data.items) && res.data.items.length > 0) {
+        const liveItems = res.data.items.map(it => ({
+          name: it.name,
+          category: it.category || 'Vegetables',
+          quantity: it.quantity || 'In Stock'
+        }));
+        const map = new Map();
+        [...liveItems, ...DEFAULT_INVENTORY_ITEMS].forEach(it => {
+          if (!map.has(it.name.toLowerCase())) {
+            map.set(it.name.toLowerCase(), it);
+          }
+        });
+        setAvailableInventory(Array.from(map.values()));
+      }
+    } catch (err) {
+      console.warn("Using offline default inventory items for recipe BOM", err);
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -125,10 +176,41 @@ export default function AddMenuItemModal({ isOpen, onClose, onItemAdded }) {
   };
 
   const handleAddIngredient = () => {
+    const nextItem = availableInventory[ingredients.length % availableInventory.length] || DEFAULT_INVENTORY_ITEMS[0];
     setIngredients([
       ...ingredients,
-      { ingredient_name: '', category: 'Vegetables', required_kg: 0.10 }
+      { 
+        ingredient_name: nextItem.name, 
+        category: nextItem.category, 
+        required_kg: 0.10, 
+        small_kg: 0.07, 
+        large_kg: 0.15,
+        isCustom: false
+      }
     ]);
+  };
+
+  const handleSelectInventoryIngredient = (index, selectedName) => {
+    const found = availableInventory.find(i => i.name === selectedName);
+    const updated = [...ingredients];
+    updated[index].ingredient_name = selectedName;
+    if (found) {
+      updated[index].category = found.category;
+    }
+    updated[index].isCustom = false;
+    setIngredients(updated);
+  };
+
+  const handleToggleCustom = (index, isCustom) => {
+    const updated = [...ingredients];
+    updated[index].isCustom = isCustom;
+    if (isCustom) {
+      updated[index].ingredient_name = '';
+    } else {
+      updated[index].ingredient_name = availableInventory[0]?.name || '';
+      updated[index].category = availableInventory[0]?.category || 'Vegetables';
+    }
+    setIngredients(updated);
   };
 
   const handleRemoveIngredient = (index) => {
@@ -137,7 +219,16 @@ export default function AddMenuItemModal({ isOpen, onClose, onItemAdded }) {
 
   const handleIngredientChange = (index, field, value) => {
     const updated = [...ingredients];
-    updated[index][field] = field === 'required_kg' ? parseFloat(value) || 0 : value;
+    if (field === 'required_kg') {
+      const num = parseFloat(value) || 0;
+      updated[index].required_kg = num;
+      updated[index].small_kg = parseFloat((num * 0.7).toFixed(2));
+      updated[index].large_kg = parseFloat((num * 1.5).toFixed(2));
+    } else if (field === 'small_kg' || field === 'large_kg') {
+      updated[index][field] = parseFloat(value) || 0;
+    } else {
+      updated[index][field] = value;
+    }
     setIngredients(updated);
   };
 
@@ -147,10 +238,64 @@ export default function AddMenuItemModal({ isOpen, onClose, onItemAdded }) {
       setErrorMsg('Dish name is required.');
       return;
     }
-    const parsedPrice = parseFloat(priceLkr);
-    if (isNaN(parsedPrice) || parsedPrice <= 0) {
-      setErrorMsg('Please enter a valid price in LKR greater than zero.');
-      return;
+
+    let finalPrice = parseFloat(priceLkr);
+    let portionsList = [];
+
+    if (hasPortions) {
+      const pSmall = parseFloat(portionPrices.Small);
+      const pMed = parseFloat(portionPrices.Medium) || finalPrice;
+      const pLarge = parseFloat(portionPrices.Large);
+
+      if (isNaN(pMed) || pMed <= 0) {
+        setErrorMsg('Please enter a valid Medium (standard) price in LKR.');
+        return;
+      }
+      finalPrice = pMed;
+
+      const validIngredients = ingredients.filter(i => i.ingredient_name.trim() !== '');
+
+      portionsList = [
+        {
+          size: 'Small',
+          price_lkr: !isNaN(pSmall) && pSmall > 0 ? pSmall : Math.round(pMed * 0.7),
+          prep_time_mins: Math.max(1, (parseInt(prepTimeMins) || 12) - 2),
+          recipe_bom: validIngredients.map(ing => ({
+            ingredient_name: ing.ingredient_name.trim(),
+            category: ing.category,
+            required_kg: ing.small_kg !== undefined && !isNaN(parseFloat(ing.small_kg)) && parseFloat(ing.small_kg) > 0
+              ? parseFloat(ing.small_kg)
+              : parseFloat((ing.required_kg * 0.7).toFixed(2)) || 0.1
+          }))
+        },
+        {
+          size: 'Medium',
+          price_lkr: pMed,
+          prep_time_mins: parseInt(prepTimeMins) || 12,
+          recipe_bom: validIngredients.map(ing => ({
+            ingredient_name: ing.ingredient_name.trim(),
+            category: ing.category,
+            required_kg: parseFloat(ing.required_kg) || 0.2
+          }))
+        },
+        {
+          size: 'Large',
+          price_lkr: !isNaN(pLarge) && pLarge > 0 ? pLarge : Math.round(pMed * 1.4),
+          prep_time_mins: (parseInt(prepTimeMins) || 12) + 3,
+          recipe_bom: validIngredients.map(ing => ({
+            ingredient_name: ing.ingredient_name.trim(),
+            category: ing.category,
+            required_kg: ing.large_kg !== undefined && !isNaN(parseFloat(ing.large_kg)) && parseFloat(ing.large_kg) > 0
+              ? parseFloat(ing.large_kg)
+              : parseFloat((ing.required_kg * 1.5).toFixed(2)) || 0.3
+          }))
+        }
+      ];
+    } else {
+      if (isNaN(finalPrice) || finalPrice <= 0) {
+        setErrorMsg('Please enter a valid price in LKR greater than zero.');
+        return;
+      }
     }
 
     const selectedStation = STATION_OPTIONS.find(s => s.id === stationId);
@@ -158,12 +303,14 @@ export default function AddMenuItemModal({ isOpen, onClose, onItemAdded }) {
     const payload = {
       name: name.trim(),
       category: category.trim(),
-      price_lkr: parsedPrice,
+      price_lkr: finalPrice,
       prep_time_mins: parseInt(prepTimeMins) || 12,
       station_id: stationId,
       station_name: selectedStation ? selectedStation.name : 'Hot Wok & Kottu Station',
       image_url: imageUrl || '/images/dishes/dish_1.jpg',
       description: description.trim(),
+      has_portions: hasPortions,
+      portions: portionsList,
       recipe_bom: ingredients.filter(i => i.ingredient_name.trim() !== '')
     };
 
@@ -326,32 +473,147 @@ export default function AddMenuItemModal({ isOpen, onClose, onItemAdded }) {
               <select
                 value={category}
                 onChange={(e) => setCategory(e.target.value)}
-                className="w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                className="w-full px-3 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-xs font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer"
               >
                 {CATEGORY_OPTIONS.map((cat) => (
-                  <option key={cat} value={cat}>{cat}</option>
+                  <option key={cat} value={cat} className="text-slate-900 dark:text-white bg-white dark:bg-slate-900 py-1">
+                    {cat}
+                  </option>
                 ))}
               </select>
             </div>
 
-            {/* Price (LKR) */}
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
-                Selling Price (LKR) <span className="text-rose-500">*</span>
-              </label>
-              <div className="relative">
-                <span className="absolute left-3 top-2.5 text-xs font-bold text-slate-400">Rs.</span>
-                <input
-                  type="number"
-                  step="50"
-                  value={priceLkr}
-                  onChange={(e) => setPriceLkr(e.target.value)}
-                  placeholder="2450.00"
-                  className="w-full pl-10 pr-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                  required
-                />
+            {/* Portion Strategy Switcher */}
+            <div className="sm:col-span-2 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+              <div>
+                <label className="text-xs font-bold text-slate-800 dark:text-slate-200 block">
+                  Portion Sizes & Sizing Strategy
+                </label>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                  Select single standard portion or multi-tier (Small, Medium, Large)
+                </p>
+              </div>
+
+              <div className="flex items-center gap-1 p-1 bg-slate-200/70 dark:bg-slate-900 rounded-xl self-start sm:self-auto border border-slate-300 dark:border-slate-700">
+                <button
+                  type="button"
+                  onClick={() => setHasPortions(false)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    !hasPortions
+                      ? 'bg-emerald-700 text-white shadow-xs'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                  }`}
+                >
+                  Single Portion
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setHasPortions(true);
+                    if (!portionPrices.Medium && priceLkr) {
+                      const p = parseFloat(priceLkr) || 1500;
+                      setPortionPrices({
+                        Small: (p * 0.7).toFixed(0),
+                        Medium: p.toString(),
+                        Large: (p * 1.4).toFixed(0)
+                      });
+                    }
+                  }}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    hasPortions
+                      ? 'bg-emerald-700 text-white shadow-xs'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                  }`}
+                >
+                  Small / Med / Large
+                </button>
               </div>
             </div>
+
+            {/* Pricing Section */}
+            {!hasPortions ? (
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                  Selling Price (LKR) <span className="text-rose-500">*</span>
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-2.5 text-xs font-bold text-slate-400">Rs.</span>
+                  <input
+                    type="number"
+                    step="50"
+                    value={priceLkr}
+                    onChange={(e) => setPriceLkr(e.target.value)}
+                    placeholder="2450.00"
+                    className="w-full pl-10 pr-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    required
+                  />
+                </div>
+              </div>
+            ) : (
+              <div className="sm:col-span-2 space-y-1.5">
+                <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block">
+                  Portion Tier Pricing (LKR) <span className="text-rose-500">*</span>
+                </label>
+                <div className="grid grid-cols-3 gap-2.5">
+                  <div className="space-y-1">
+                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Small Price:</span>
+                    <div className="relative">
+                      <span className="absolute left-2.5 top-2 text-[11px] font-bold text-slate-400">Rs.</span>
+                      <input
+                        type="number"
+                        step="50"
+                        value={portionPrices.Small}
+                        onChange={(e) => setPortionPrices({ ...portionPrices, Small: e.target.value })}
+                        placeholder="1100"
+                        className="w-full pl-8 pr-2.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider block">Medium (Standard) Price:</span>
+                    <div className="relative">
+                      <span className="absolute left-2.5 top-2 text-[11px] font-bold text-emerald-600">Rs.</span>
+                      <input
+                        type="number"
+                        step="50"
+                        value={portionPrices.Medium}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setPriceLkr(val);
+                          const p = parseFloat(val);
+                          setPortionPrices({
+                            Small: portionPrices.Small || (p ? (p * 0.7).toFixed(0) : ''),
+                            Medium: val,
+                            Large: portionPrices.Large || (p ? (p * 1.4).toFixed(0) : '')
+                          });
+                        }}
+                        placeholder="1650"
+                        className="w-full pl-8 pr-2.5 py-2 rounded-xl border border-emerald-300 dark:border-emerald-700 bg-emerald-50/40 dark:bg-emerald-950/30 text-emerald-950 dark:text-emerald-100 text-xs font-black focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Large Price:</span>
+                    <div className="relative">
+                      <span className="absolute left-2.5 top-2 text-[11px] font-bold text-slate-400">Rs.</span>
+                      <input
+                        type="number"
+                        step="50"
+                        value={portionPrices.Large}
+                        onChange={(e) => setPortionPrices({ ...portionPrices, Large: e.target.value })}
+                        placeholder="2250"
+                        className="w-full pl-8 pr-2.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono"
+                        required
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Prep Time */}
             <div className="space-y-1">
@@ -378,10 +640,12 @@ export default function AddMenuItemModal({ isOpen, onClose, onItemAdded }) {
               <select
                 value={stationId}
                 onChange={(e) => setStationId(e.target.value)}
-                className="w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                className="w-full px-3 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-xs font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer"
               >
                 {STATION_OPTIONS.map((st) => (
-                  <option key={st.id} value={st.id}>{st.name}</option>
+                  <option key={st.id} value={st.id} className="text-slate-900 dark:text-white bg-white dark:bg-slate-900 py-1">
+                    {st.name}
+                  </option>
                 ))}
               </select>
             </div>
@@ -410,7 +674,9 @@ export default function AddMenuItemModal({ isOpen, onClose, onItemAdded }) {
                   Recipe Bill of Materials (BOM Ingredients)
                 </label>
                 <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                  Required ingredients automatically deducted from batches with lowest shelf-life upon order
+                  {hasPortions
+                    ? "Specify required ingredient weights for Small, Medium, and Large portions"
+                    : "Required ingredients automatically deducted from batches with lowest shelf-life upon order"}
                 </p>
               </div>
               <button
@@ -423,47 +689,142 @@ export default function AddMenuItemModal({ isOpen, onClose, onItemAdded }) {
               </button>
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-2.5">
               {ingredients.map((ing, idx) => (
                 <div 
                   key={idx}
-                  className="flex flex-col sm:flex-row items-center gap-2 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-xs"
+                  className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-xs space-y-2.5 shadow-xs"
                 >
-                  <input
-                    type="text"
-                    value={ing.ingredient_name}
-                    onChange={(e) => handleIngredientChange(idx, 'ingredient_name', e.target.value)}
-                    placeholder="Ingredient Name (e.g. Fresh Chicken Breast)"
-                    className="flex-1 w-full px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 font-semibold"
-                  />
-                  <select
-                    value={ing.category}
-                    onChange={(e) => handleIngredientChange(idx, 'category', e.target.value)}
-                    className="w-full sm:w-32 px-2 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 font-semibold"
-                  >
-                    {INGREDIENT_CATEGORIES.map(c => (
-                      <option key={c} value={c}>{c}</option>
-                    ))}
-                  </select>
-                  <div className="flex items-center gap-1 w-full sm:w-28">
-                    <input
-                      type="number"
-                      step="0.05"
-                      min="0.01"
-                      value={ing.required_kg}
-                      onChange={(e) => handleIngredientChange(idx, 'required_kg', e.target.value)}
-                      className="w-full px-2 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 font-mono font-bold"
-                    />
-                    <span className="text-[11px] text-slate-500 font-bold">kg</span>
+                  <div className="flex items-center gap-2">
+                    {/* Inventory Database Dropdown or Custom Name */}
+                    {!ing.isCustom ? (
+                      <div className="flex-1">
+                        <select
+                          value={ing.ingredient_name}
+                          onChange={(e) => {
+                            if (e.target.value === '__custom__') {
+                              handleToggleCustom(idx, true);
+                            } else {
+                              handleSelectInventoryIngredient(idx, e.target.value);
+                            }
+                          }}
+                          className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white font-bold text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer shadow-2xs"
+                        >
+                          <option value="" disabled className="text-slate-500 bg-white dark:bg-slate-900">
+                            -- Select Ingredient from Inventory --
+                          </option>
+                          {availableInventory.map((item) => (
+                            <option 
+                              key={item.name} 
+                              value={item.name}
+                              className="text-slate-900 dark:text-white bg-white dark:bg-slate-900 py-1"
+                            >
+                              {item.name} {item.category ? `(${item.category})` : ''} {item.quantity ? `• Stock: ${item.quantity}` : ''}
+                            </option>
+                          ))}
+                          <option value="__custom__" className="text-emerald-700 dark:text-emerald-400 font-extrabold bg-white dark:bg-slate-900">
+                            + Enter Custom Ingredient...
+                          </option>
+                        </select>
+                      </div>
+                    ) : (
+                      <div className="flex-1 flex items-center gap-1.5">
+                        <input
+                          type="text"
+                          value={ing.ingredient_name}
+                          onChange={(e) => handleIngredientChange(idx, 'ingredient_name', e.target.value)}
+                          placeholder="Type custom ingredient name..."
+                          className="w-full px-3 py-2 rounded-lg border border-emerald-400 dark:border-emerald-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white placeholder:text-slate-400 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                          autoFocus
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleToggleCustom(idx, false)}
+                          className="text-[11px] font-bold text-emerald-700 dark:text-emerald-400 hover:underline px-1.5 whitespace-nowrap cursor-pointer"
+                        >
+                          Inventory List
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Single Portion Quantity */}
+                    {!hasPortions && (
+                      <div className="flex items-center gap-1.5 shrink-0 bg-white dark:bg-slate-900 px-2.5 py-1.5 rounded-lg border border-slate-300 dark:border-slate-600">
+                        <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300">
+                          Qty:
+                        </span>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0.001"
+                          value={ing.required_kg}
+                          onChange={(e) => handleIngredientChange(idx, 'required_kg', e.target.value)}
+                          className="w-16 px-1.5 py-0.5 rounded border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white font-mono font-bold text-xs text-right focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                        />
+                        <span className="text-[11px] text-slate-700 dark:text-slate-300 font-bold">kg</span>
+                      </div>
+                    )}
+
+                    {/* Delete button */}
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveIngredient(idx)}
+                      className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg transition-colors cursor-pointer shrink-0"
+                      title="Remove ingredient"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => handleRemoveIngredient(idx)}
-                    className="p-1.5 text-slate-400 hover:text-rose-600 transition-colors"
-                    title="Remove ingredient"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+
+                  {/* Multi-Portion Tier Weights if hasPortions is active */}
+                  {hasPortions && (
+                    <div className="grid grid-cols-3 gap-2 bg-white dark:bg-slate-900/80 p-2.5 rounded-lg border border-slate-200 dark:border-slate-700">
+                      <div>
+                        <span className="text-[10px] font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider block mb-0.5">Small Portion:</span>
+                        <div className="flex items-center gap-1">
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0.001"
+                            value={ing.small_kg ?? (ing.required_kg ? (ing.required_kg * 0.7).toFixed(2) : 0.07)}
+                            onChange={(e) => handleIngredientChange(idx, 'small_kg', e.target.value)}
+                            className="w-full px-2 py-1 rounded border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white font-mono font-bold text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                          />
+                          <span className="text-[10px] text-slate-700 dark:text-slate-300 font-bold">kg</span>
+                        </div>
+                      </div>
+
+                      <div>
+                        <span className="text-[10px] font-bold text-emerald-700 dark:text-emerald-400 uppercase tracking-wider block mb-0.5">Medium (Base):</span>
+                        <div className="flex items-center gap-1">
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0.001"
+                            value={ing.required_kg}
+                            onChange={(e) => handleIngredientChange(idx, 'required_kg', e.target.value)}
+                            className="w-full px-2 py-1 rounded border border-emerald-400 dark:border-emerald-600 bg-emerald-50/60 dark:bg-emerald-950/40 text-slate-900 dark:text-white font-mono font-bold text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                          />
+                          <span className="text-[10px] text-slate-700 dark:text-slate-300 font-bold">kg</span>
+                        </div>
+                      </div>
+
+                      <div>
+                        <span className="text-[10px] font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider block mb-0.5">Large Portion:</span>
+                        <div className="flex items-center gap-1">
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0.001"
+                            value={ing.large_kg ?? (ing.required_kg ? (ing.required_kg * 1.5).toFixed(2) : 0.15)}
+                            onChange={(e) => handleIngredientChange(idx, 'large_kg', e.target.value)}
+                            className="w-full px-2 py-1 rounded border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white font-mono font-bold text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                          />
+                          <span className="text-[10px] text-slate-700 dark:text-slate-300 font-bold">kg</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

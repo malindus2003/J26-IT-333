@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+﻿import React, { useState, useEffect, useMemo } from 'react';
 import {
   Users, Clock, Flame, Award, AlertTriangle, ArrowRight, ShieldCheck, CheckCircle2,
   TrendingUp, Utensils, X, Lock, LogIn, Key, Smartphone, Coffee, ChefHat, Send,

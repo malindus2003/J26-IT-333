@@ -1,4 +1,4 @@
-import os
+﻿import os
 import re
 import pandas as pd
 from fastapi import APIRouter, HTTPException
@@ -596,6 +596,7 @@ orders_db = list(INITIAL_ORDERS)
 class OrderItemPayload(BaseModel):
     menu_id: str
     quantity: int
+    portion_size: Optional[str] = None
 
 class CreateOrderPayload(BaseModel):
     table_no: str
@@ -617,6 +618,8 @@ class CreateMenuItemPayload(BaseModel):
     image_url: Optional[str] = ""
     description: Optional[str] = ""
     recipe_bom: Optional[List[Dict[str, Any]]] = []
+    has_portions: Optional[bool] = False
+    portions: Optional[List[Dict[str, Any]]] = []
     current_stock: Optional[int] = 25
     branch_id: Optional[str] = "branch-hikkaduwa"
 
@@ -781,6 +784,24 @@ def add_menu_item(payload: CreateMenuItemPayload):
         for b in bom_list
     ]
 
+    cleaned_portions = []
+    for p in (payload.portions or []):
+        if p.get("size"):
+            p_boms = []
+            for b in p.get("recipe_bom", []):
+                if b.get("ingredient_name"):
+                    p_boms.append({
+                        "ingredient_name": b.get("ingredient_name", "").strip(),
+                        "category": b.get("category", "Vegetables"),
+                        "required_kg": float(b.get("required_kg", 0.1))
+                    })
+            cleaned_portions.append({
+                "size": p.get("size"),
+                "price_lkr": float(p.get("price_lkr", payload.price_lkr)),
+                "prep_time_mins": int(p.get("prep_time_mins", payload.prep_time_mins)),
+                "recipe_bom": p_boms
+            })
+
     cost = float(payload.cost_lkr) if payload.cost_lkr else round(float(payload.price_lkr) * 0.45, 2)
 
     new_dish = {
@@ -796,6 +817,8 @@ def add_menu_item(payload: CreateMenuItemPayload):
         "station_name": station_name,
         "image_url": payload.image_url.strip() if payload.image_url else "/images/dishes/dish_1.jpg",
         "description": payload.description.strip() if payload.description else "",
+        "has_portions": bool(payload.has_portions and cleaned_portions),
+        "portions": cleaned_portions,
         "recipe_bom": bom_list,
         "ingredients": ingredients_compat,
         "current_stock": payload.current_stock or 25,
@@ -869,21 +892,33 @@ def place_new_order(payload: CreateOrderPayload):
             menu_item = MENU_ITEMS[0]
         
         qty = max(1, it.quantity)
-        subtotal = menu_item["price_lkr"] * qty
+
+        # Portion variant resolution
+        portion_variant = None
+        if it.portion_size and menu_item.get("has_portions") and menu_item.get("portions"):
+            portion_variant = next((p for p in menu_item["portions"] if str(p.get("size", "")).lower() == str(it.portion_size).lower()), None)
+
+        unit_price = float(portion_variant["price_lkr"]) if (portion_variant and portion_variant.get("price_lkr")) else float(menu_item["price_lkr"])
+        recipe_bom_to_use = portion_variant["recipe_bom"] if (portion_variant and portion_variant.get("recipe_bom")) else menu_item.get("recipe_bom", [])
+        
+        subtotal = unit_price * qty
         total_amount += subtotal
         primary_station_id = menu_item["station_id"]
         primary_station_name = menu_item["station_name"]
         max_prep_time = max(max_prep_time, menu_item["prep_time_mins"])
 
+        item_display_name = f"{menu_item['name']} ({it.portion_size})" if it.portion_size else menu_item["name"]
+
         order_items.append({
             "menu_id": menu_item["id"],
-            "name": menu_item["name"],
+            "name": item_display_name,
+            "portion_size": it.portion_size or "",
             "quantity": qty,
-            "unit_price": menu_item["price_lkr"]
+            "unit_price": unit_price
         })
 
         # Smart FIFO Ingredient Deduction from Inventory
-        for bom in menu_item["recipe_bom"]:
+        for bom in recipe_bom_to_use:
             total_req = bom["required_kg"] * qty
             candidates = [
                 inv for inv in inventory_db 
@@ -1050,3 +1085,127 @@ def get_historical_daily_sales(days: int = 14):
         "avg_daily_revenue_lkr": round(total_period_rev / days, 2),
         "history": history
     }
+
+
+# --- TABLE RESERVATIONS INTEGRATION ---
+
+class OrderReservationPayload(BaseModel):
+    customer_name: str
+    pax: int
+    date: Optional[str] = None
+    shift: Optional[str] = "Dinner"
+    table_number: Optional[str] = "Table 01"
+    phone: Optional[str] = ""
+    notes: Optional[str] = ""
+    status: Optional[str] = "Confirmed"
+
+class UpdateReservationStatusPayload(BaseModel):
+    status: str
+
+@router.get("/reservations")
+def get_order_reservations(date: Optional[str] = None):
+    """
+    Retrieve live customer table reservations directly from Firebase Realtime Database (/reservations).
+    Returns both filtered reservations for target date and the full list across dates.
+    """
+    target_date = date or datetime.now().strftime("%Y-%m-%d")
+    all_res_list = []
+    
+    if firebase_service and firebase_service.is_connected:
+        try:
+            raw_all = firebase_service.get_reservations() or {}
+            if isinstance(raw_all, dict):
+                all_res_list = list(raw_all.values())
+            elif isinstance(raw_all, list):
+                all_res_list = raw_all
+        except Exception as e:
+            print(f"[!] Warning fetching reservations in orders: {e}")
+            all_res_list = []
+
+    # Sort reservations by date descending
+    all_res_list.sort(key=lambda x: (x.get("date", ""), x.get("id", "")), reverse=True)
+
+    # Filter for target date
+    today_matching = [
+        r for r in all_res_list 
+        if r.get("date") == target_date and str(r.get("status", "")).lower() != "cancelled"
+    ]
+    total_pax = sum(int(r.get("pax", 2)) for r in today_matching)
+
+    return {
+        "status": "success",
+        "date": target_date,
+        "reservations_booked": len(today_matching),
+        "total_pax": total_pax,
+        "status_text": f"{len(today_matching)} Bookings ({total_pax} Guests)" if today_matching else "0 Table Reservations (0 Guests)",
+        "today_reservations": today_matching,
+        "reservations": all_res_list if all_res_list else today_matching,
+        "all_reservations": all_res_list,
+        "all_reservations_count": len(all_res_list)
+    }
+
+@router.post("/reservations")
+def create_order_reservation(payload: OrderReservationPayload):
+    """
+    Create a new customer table reservation in Firebase Realtime Database (/reservations).
+    Persists to cloud and automatically impacts AI food demand prediction.
+    """
+    res_date = payload.date or datetime.now().strftime("%Y-%m-%d")
+    res_id = f"res-{int(datetime.now().timestamp())}"
+    res_data = {
+        "id": res_id,
+        "customer_name": payload.customer_name.strip(),
+        "pax": max(1, payload.pax),
+        "date": res_date,
+        "shift": payload.shift or "Dinner",
+        "table_number": payload.table_number or "Table 01",
+        "phone": payload.phone or "",
+        "notes": payload.notes or "",
+        "status": payload.status or "Confirmed",
+        "created_at": datetime.now().isoformat()
+    }
+
+    saved = False
+    if firebase_service and firebase_service.is_connected:
+        try:
+            saved = firebase_service.save_reservation(res_id, res_data)
+        except Exception as e:
+            print(f"[!] Error saving reservation in orders router: {e}")
+            saved = False
+
+    return {
+        "status": "success",
+        "message": f"Reservation for {payload.customer_name} ({payload.pax} pax) on {res_date} registered successfully.",
+        "reservation_id": res_id,
+        "firebase_synced": saved,
+        "data": res_data,
+        "reservation": res_data
+    }
+
+@router.patch("/reservations/{res_id}/status")
+def update_order_reservation_status(res_id: str, payload: Optional[UpdateReservationStatusPayload] = None, status: Optional[str] = None):
+    """Update status of a reservation (Confirmed, Seated, Completed, Cancelled)."""
+    new_status = (payload.status if payload else None) or status or "Confirmed"
+    if firebase_service and firebase_service.is_connected:
+        try:
+            all_res = firebase_service.get_reservations() or {}
+            target = all_res.get(res_id)
+            if target and isinstance(target, dict):
+                target["status"] = new_status
+                firebase_service.save_reservation(res_id, target)
+                return {"status": "success", "message": f"Reservation {res_id} marked as {new_status}", "data": target}
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+    return {"status": "success", "message": f"Reservation {res_id} status updated to {new_status}"}
+
+@router.delete("/reservations/{res_id}")
+def delete_order_reservation(res_id: str):
+    """Delete a customer reservation from Firebase Realtime Database."""
+    deleted = False
+    if firebase_service and firebase_service.is_connected:
+        try:
+            deleted = firebase_service.delete_reservation(res_id)
+        except Exception as e:
+            print(f"[!] Error deleting reservation in orders: {e}")
+    return {"status": "success", "deleted": deleted, "message": f"Reservation {res_id} removed"}
+
