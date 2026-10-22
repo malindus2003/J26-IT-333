@@ -529,7 +529,7 @@ export default function DemandForecastingDashboard({ isDarkMode, currentRole = '
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4">
         
         {/* Weather Driver */}
-        <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-slate-900 border border-[#cbdad0] dark:border-slate-800 shadow-sm flex items-start gap-3.5 min-h-[110px]">
+        <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-slate-900 border border-[#cbdad0] dark:border-slate-800 shadow-sm flex items-start gap-3.5 min-h-[90px]">
           <div className="p-2.5 rounded-xl bg-sky-50 text-sky-700 dark:bg-sky-500/10 dark:text-sky-400 border border-sky-200 dark:border-sky-500/20 flex-shrink-0 mt-0.5">
             <CloudRain className="h-5 w-5" />
           </div>
@@ -543,14 +543,11 @@ export default function DemandForecastingDashboard({ isDarkMode, currentRole = '
             <div className="text-xs font-extrabold text-slate-900 dark:text-white leading-snug break-words">
               {activeWeather.weather_condition || data.contextual_factors?.weather_condition}
             </div>
-            <div className="text-[11px] text-sky-700 dark:text-sky-400 font-bold leading-snug mt-1 break-words">
-              {activeWeather.weather_impact || data.contextual_factors?.weather_impact}
-            </div>
           </div>
         </div>
 
         {/* Reservations Driver */}
-        <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-slate-900 border border-[#cbdad0] dark:border-slate-800 shadow-sm flex items-start gap-3.5 min-h-[110px]">
+        <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-slate-900 border border-[#cbdad0] dark:border-slate-800 shadow-sm flex items-start gap-3.5 min-h-[90px]">
           <div className="p-2.5 rounded-xl bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400 border border-amber-200 dark:border-amber-500/20 flex-shrink-0 mt-0.5">
             <Calendar className="h-5 w-5" />
           </div>
@@ -564,14 +561,11 @@ export default function DemandForecastingDashboard({ isDarkMode, currentRole = '
             <div className="text-xs font-extrabold text-slate-900 dark:text-white leading-snug break-words">
               {activeReservations.status_text || activeReservations.reservations_text || `${activeReservations.reservations_booked ?? 0} Table Reservations`}
             </div>
-            <div className="text-[11px] text-amber-700 dark:text-amber-400 font-bold leading-snug mt-1 break-words">
-              {activeReservations.impact_text || activeReservations.reservations_impact || "Standard walk-in customer flow"}
-            </div>
           </div>
         </div>
 
         {/* Local Events Driver */}
-        <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-slate-900 border border-[#cbdad0] dark:border-slate-800 shadow-sm flex items-start gap-3.5 min-h-[110px]">
+        <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-slate-900 border border-[#cbdad0] dark:border-slate-800 shadow-sm flex items-start gap-3.5 min-h-[90px]">
           <div className="p-2.5 rounded-xl bg-purple-50 text-purple-700 dark:bg-purple-500/10 dark:text-purple-400 border border-purple-200 dark:border-purple-500/20 flex-shrink-0 mt-0.5">
             <Award className="h-5 w-5" />
           </div>
@@ -585,14 +579,11 @@ export default function DemandForecastingDashboard({ isDarkMode, currentRole = '
             <div className="text-xs font-extrabold text-slate-900 dark:text-white leading-snug break-words">
               {activeCalendar.local_events || data.contextual_factors?.local_events}
             </div>
-            <div className="text-[11px] text-purple-700 dark:text-purple-400 font-bold leading-snug mt-1 break-words">
-              {activeCalendar.event_impact || data.contextual_factors?.event_impact || "Standard regular dining (0% surge)"}
-            </div>
           </div>
         </div>
 
         {/* Active Promotions Driver */}
-        <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-slate-900 border border-[#cbdad0] dark:border-slate-800 shadow-sm flex items-start gap-3.5 min-h-[110px]">
+        <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-slate-900 border border-[#cbdad0] dark:border-slate-800 shadow-sm flex items-start gap-3.5 min-h-[90px]">
           <div className="p-2.5 rounded-xl bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20 flex-shrink-0 mt-0.5">
             <ShoppingBag className="h-5 w-5" />
           </div>
@@ -605,9 +596,6 @@ export default function DemandForecastingDashboard({ isDarkMode, currentRole = '
             </div>
             <div className="text-xs font-extrabold text-slate-900 dark:text-white leading-snug break-words">
               {activePromotions.active_promotions || data.contextual_factors?.active_promotions}
-            </div>
-            <div className="text-[11px] text-emerald-700 dark:text-emerald-400 font-bold leading-snug mt-1 break-words">
-              {activePromotions.promo_impact || data.contextual_factors?.promo_impact || (activePromotions.has_active_promo ? "+10% dining surge" : "Standard regular pricing (0% surge)")}
             </div>
           </div>
         </div>
@@ -628,9 +616,7 @@ export default function DemandForecastingDashboard({ isDarkMode, currentRole = '
                 <h4 className="text-sm font-black text-slate-900 dark:text-white">
                   Multi-Horizon Forecasting Horizon
                 </h4>
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/70 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800">
-                  Open-Meteo & Firebase Live
-                </span>
+            
               </div>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                 Switch planning horizon to preview dynamic item-level demand, kitchen prep guidance, and ingredient requirements
