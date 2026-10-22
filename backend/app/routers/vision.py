@@ -167,6 +167,32 @@ async def inspect_food_image(
     }
     _save_to_inspection_history(history_entry)
 
+    # Sync to physical ESP32 OLED display state
+    try:
+        from ..services.oled_service import oled_service
+        oled_service.update_from_vision_result(
+            produce_name=response_data.get("identified_produce", "Produce"),
+            visual_score=response_data.get("visual_spoilage_score", 20.0),
+            risk_level=response_data.get("risk_level", "Low"),
+            mould_detected=response_data.get("mould_detected", False),
+            rsl_hours=response_data.get("remaining_shelf_life_hours", 72.0),
+            source="Manual Upload"
+        )
+    except Exception as e:
+        print(f"[VisionRouter] Warning updating OLED state: {e}")
+
+    try:
+        from .inventory import update_inventory_from_inspection
+        update_inventory_from_inspection(
+            response_data.get("identified_produce"),
+            response_data.get("spoilage_probability", 0.0),
+            response_data.get("remaining_shelf_life_hours", 72.0),
+            response_data.get("risk_level", "Low"),
+            response_data.get("action_recommendation")
+        )
+    except Exception:
+        pass
+
     return response_data
 
 @router.post("/esp32/capture")
@@ -185,7 +211,7 @@ async def capture_from_esp32_camera(payload: ESP32CaptureRequest):
             clean_url,
             headers={"User-Agent": "GreenPulse-Smart-Restaurant-Server/2.2"}
         )
-        with urllib.request.urlopen(req, timeout=7.0) as resp:
+        with urllib.request.urlopen(req, timeout=20.0) as resp:
             image_bytes = resp.read()
             if not image_bytes or len(image_bytes) < 100:
                 raise HTTPException(status_code=502, detail="Empty frame received from ESP32-CAM module")
@@ -203,7 +229,7 @@ async def capture_from_esp32_camera(payload: ESP32CaptureRequest):
         )
 
     results = vision_engine.analyze_image(image_bytes, category=payload.category)
-    b64_str = base64.b64encode(image_bytes).decode("utf-8")
+    b64_str = results.get("enhanced_image_base64") or base64.b64encode(image_bytes).decode("utf-8")
     data_url = f"data:image/jpeg;base64,{b64_str}"
 
     response_data = _format_vision_response(results, payload.category)
@@ -212,6 +238,20 @@ async def capture_from_esp32_camera(payload: ESP32CaptureRequest):
     response_data["camera_url"] = clean_url
     response_data["container_id"] = payload.container_id
     response_data["captured_at"] = datetime.now().isoformat()
+
+    # Sync to physical ESP32 OLED display state
+    try:
+        from ..services.oled_service import oled_service
+        oled_service.update_from_vision_result(
+            produce_name=response_data.get("identified_produce", "Produce"),
+            visual_score=response_data.get("visual_spoilage_score", 20.0),
+            risk_level=response_data.get("risk_level", "Low"),
+            mould_detected=response_data.get("mould_detected", False),
+            rsl_hours=response_data.get("remaining_shelf_life_hours", 72.0),
+            source="ESP32-CAM"
+        )
+    except Exception as e:
+        print(f"[VisionRouter] Warning updating OLED state: {e}")
 
     latest_esp32_scan.update({
         "status": "success",

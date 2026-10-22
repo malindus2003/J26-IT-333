@@ -321,6 +321,71 @@ export default function ESP32Simulator({ zones = [], onTelemetrySent, isDarkMode
           </div>
         </div>
 
+        {/* ESP32 Hardware 0.96" I2C OLED Screen (SSD1306 128x64 Emulation) */}
+        {(() => {
+          const isSpoiledState = voc > 0.60 || (temp - Number(activeStorage?.target_temp || 11.0) > 7.0) || co2 > 1100;
+          const isWarningState = !isSpoiledState && (voc > 0.35 || (temp - Number(activeStorage?.target_temp || 11.0) > 3.0) || co2 > 800);
+
+          return (
+            <div className="p-4 rounded-2xl bg-black border-2 border-slate-700 shadow-xl relative overflow-hidden font-mono text-cyan-400 select-none">
+              <div className="flex items-center justify-between pb-1.5 border-b border-cyan-900/60 text-[10px] uppercase font-bold text-cyan-300">
+                <div className="flex items-center gap-1.5">
+                  <span className="h-2 w-2 rounded-full bg-cyan-400 animate-pulse shadow-sm shadow-cyan-400/80" />
+                  <span className="tracking-wide">PHYSICAL OLED 128x64 EMULATION (I2C 0x3C • GPIO 21/22)</span>
+                </div>
+                <span className="text-[9px] text-cyan-500 font-mono">SSD1306 • LIVE FIRMWARE DISPLAY</span>
+              </div>
+
+              <div className="pt-2 pb-1 space-y-2">
+                <div className="flex items-center justify-between text-xs font-black tracking-widest text-cyan-200 border-b border-dashed border-cyan-800 pb-1">
+                  <span>FRUIT &amp; VEG STORAGE</span>
+                  <span className="text-[10px] text-cyan-400 font-semibold">{activeStorage?.node_id || "ESP32-NODE-01"}</span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs font-bold text-cyan-300">
+                  <div className="flex items-center justify-between">
+                    <span className="text-cyan-500 font-medium">T :</span>
+                    <span className="text-white font-mono font-black">{temp}&deg;C</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-cyan-500 font-medium">RH:</span>
+                    <span className="text-white font-mono font-black">{humidity}%</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-cyan-500 font-medium">CO2:</span>
+                    <span className="text-white font-mono font-black">{co2} ppm</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-cyan-500 font-medium">VOC:</span>
+                    <span className="text-white font-mono font-black">{voc} ppm</span>
+                  </div>
+                </div>
+
+                {isSpoiledState ? (
+                  <div className="p-2 rounded bg-cyan-100 text-slate-950 font-black text-center text-xs tracking-wider animate-pulse shadow-lg">
+                    <div className="text-[13px] leading-tight">!! SPOILED / RISK !!</div>
+                    <div className="text-[10px] font-bold text-rose-950 tracking-normal pt-0.5">
+                      Produce Spoilage &amp; Thermal Runaway Triggered
+                    </div>
+                  </div>
+                ) : isWarningState ? (
+                  <div className="p-2 rounded border border-amber-400 bg-amber-950/40 text-amber-300 font-bold text-center text-xs tracking-wider">
+                    <div className="text-[12px]">[ WARN: DRIFT/RESPIRE ]</div>
+                    <div className="text-[10px] font-medium text-amber-200 pt-0.5">Accelerated Microbial Decay Phase</div>
+                  </div>
+                ) : (
+                  <div className="p-2 rounded border border-cyan-400/80 bg-cyan-950/40 text-cyan-300 font-bold text-center text-xs tracking-wider">
+                    <div className="text-[12px]">[ FRESH / OPTIMAL ]</div>
+                    <div className="text-[10px] font-medium text-cyan-200 pt-0.5">Produce Quality: Safe</div>
+                  </div>
+                )}
+              </div>
+
+              <div className="absolute inset-0 pointer-events-none bg-gradient-to-b from-transparent via-cyan-400/5 to-transparent opacity-30" />
+            </div>
+          );
+        })()}
+
         {/* 4 Core Parameters Controls Grid (Matching Chamber Inspector) */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-1">
           

@@ -259,6 +259,41 @@ const generateCulinaryDirective = (produceName, category, spoilageScore, rslHour
   }
 };
 
+
+// Unified Multi-Modal Fusion Calculator (60% Optical Vision + 40% IoT Environmental Sensor Stress)
+export const calculateMultiModalFusion = (storage, cvResult, simOverride = undefined) => {
+  if (simOverride !== undefined) {
+    return {
+      fusedScore: simOverride.spoilageScore,
+      fusedRsl: simOverride.rslHours,
+      sensorScore: simOverride.spoilageScore >= 70 ? 80.0 : 10.0,
+      visualScore: simOverride.spoilageScore
+    };
+  }
+
+  const tempDev = Math.max(0, Number(storage?.current_temp || 11.0) - Number(storage?.target_temp || 11.0));
+  const tempPenalty = tempDev * 3.5;
+  const vocExcess = Math.max(0, Number(storage?.voc || 0.32) - 0.35);
+  const vocPenalty = vocExcess * 25.0;
+  const co2Excess = Math.max(0, Number(storage?.co2 || 450) - 900);
+  const co2Penalty = (co2Excess / 1000.0) * 20.0;
+  const curHum = Number(storage?.current_humidity || 90.0);
+  const humPenalty = curHum < 75 ? (75 - curHum) * 0.8 : (curHum > 95 ? (curHum - 95) * 2.0 : 0);
+
+  const sensorScore = Math.min(100, Math.round(tempPenalty + vocPenalty + co2Penalty + humPenalty));
+  const visualScore = cvResult?.visual_spoilage_score || cvResult?.spoilage_probability || cvResult?.ripeness_percent || 15.0;
+
+  const fusedScore = Math.min(99.0, Math.round(((sensorScore * 0.40) + (visualScore * 0.60)) * 10) / 10);
+  
+  const baseRsl = cvResult?.remaining_shelf_life_hours !== undefined 
+    ? Number(cvResult.remaining_shelf_life_hours)
+    : 120.0;
+  const dynamicHours = Math.max(1.0, Math.round((baseRsl * (1 - (sensorScore / 130.0))) * 10) / 10);
+  const fusedRsl = fusedScore >= 75.0 ? 0.0 : dynamicHours;
+
+  return { fusedScore, fusedRsl, sensorScore, visualScore };
+};
+
 export default function MultiModalAssessor({ currentVisionFeatures, selectedZone, isDarkMode, targetProduce }) {
   // Storages State - loaded from localStorage to reflect Storage 1, Storage 2, etc.
   const [storages, setStorages] = useState(() => {
@@ -272,7 +307,7 @@ export default function MultiModalAssessor({ currentVisionFeatures, selectedZone
     return DEFAULT_FALLBACK_STORAGES;
   });
 
-  const [selectedStorageId, setSelectedStorageId] = useState(() => storages[0]?.id || "storage-1");
+  const [selectedStorageId, setSelectedStorageId] = useState(null);
   const [dispatchedMap, setDispatchedMap] = useState({});
   const [toastMessage, setToastMessage] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -320,36 +355,22 @@ export default function MultiModalAssessor({ currentVisionFeatures, selectedZone
     }
   }, [targetProduce, storages]);
 
-  // Active Storage Object
-  const activeStorage = storages.find(s => s.id === selectedStorageId) || storages[0] || DEFAULT_FALLBACK_STORAGES[0];
-  const activeProduce = activeStorage?.assignedProduce || DEFAULT_FALLBACK_STORAGES[0].assignedProduce;
+  // Active Storage Object (only active when user clicks a storage chamber)
+  const activeStorage = selectedStorageId ? storages.find(s => s.id === selectedStorageId) : null;
+  const activeProduce = activeStorage?.assignedProduce;
   const activeCv = activeProduce?.cvResult;
 
-  // Calculate Effective Spoilage Percentage
-  // Priority: 1. Simulation override, 2. CV inspection result, 3. Sensor degradation penalty
-  const simulation = simulationOverrides[activeStorage.id];
+  // Unified Multi-Modal Fusion: fuses 60% optical vision features with 40% IoT environmental sensor telemetry
+  const simulation = activeStorage ? simulationOverrides[activeStorage.id] : undefined;
+  const { fusedScore, fusedRsl, sensorScore, visualScore } = activeStorage
+    ? calculateMultiModalFusion(activeStorage, activeCv, simulation)
+    : { fusedScore: 0, fusedRsl: 0, sensorScore: 0, visualScore: 0 };
 
-  const baseSpoilage = simulation !== undefined
-    ? simulation.spoilageScore
-    : (activeCv?.visual_spoilage_score || activeCv?.ripeness_percent || 15.0);
-
-  // Environmental stress penalty: elevated temperature or high VOC/ethylene increases effective spoilage
-  const tempExcess = Math.max(0, (activeStorage.current_temp || 11.0) - (activeStorage.target_temp || 11.0));
-  const vocExcess = Math.max(0, (activeStorage.voc || 0.2) - 0.35);
-  const sensorStressFactor = (tempExcess * 2.5) + (vocExcess * 18.0);
-
-  const effectiveSpoilageScore = simulation !== undefined
-    ? simulation.spoilageScore
-    : Math.min(99.0, Math.round((baseSpoilage + sensorStressFactor) * 10) / 10);
-
-  const effectiveRslHours = simulation !== undefined
-    ? simulation.rslHours
-    : (activeCv?.remaining_shelf_life_hours !== undefined 
-        ? Math.max(1.0, Math.round((activeCv.remaining_shelf_life_hours - (tempExcess * 1.5)) * 10) / 10)
-        : 115.0);
+  const effectiveSpoilageScore = fusedScore;
+  const effectiveRslHours = fusedRsl;
 
   // Spoilage Threshold Trigger: Around 70% - 75% spoilage, High Risk, or RSL <= 24h
-  const isNearSpoil = effectiveSpoilageScore >= 70.0 || effectiveRslHours <= 24.0 || activeCv?.risk_level === 'High' || activeCv?.risk_level === 'Critical';
+  const isNearSpoil = Boolean(activeStorage) && (effectiveSpoilageScore >= 70.0 || effectiveRslHours <= 24.0 || activeCv?.risk_level === 'High' || activeCv?.risk_level === 'Critical');
 
   const showToast = (msg) => {
     setToastMessage(msg);
@@ -358,6 +379,7 @@ export default function MultiModalAssessor({ currentVisionFeatures, selectedZone
 
   const handleDispatchKDS = (recipe, e) => {
     e?.stopPropagation();
+    if (!activeStorage) return;
     const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     setDispatchedMap(prev => ({
       ...prev,
@@ -470,6 +492,7 @@ export default function MultiModalAssessor({ currentVisionFeatures, selectedZone
 
   // Toggle ~75% Spoilage Simulation for Testing
   const handleToggleSimulation = () => {
+    if (!activeStorage) return;
     if (simulationOverrides[activeStorage.id]) {
       // Reset
       setSimulationOverrides(prev => {
@@ -494,18 +517,18 @@ export default function MultiModalAssessor({ currentVisionFeatures, selectedZone
   };
 
   // Generate the active culinary directive if near spoil
-  const activeDirective = isNearSpoil 
+  const activeDirective = (isNearSpoil && activeStorage) 
     ? generateCulinaryDirective(
         activeProduce?.produceName || "Food Specimen",
         activeProduce?.category || "Fruits",
         effectiveSpoilageScore,
         effectiveRslHours,
-        activeStorage.name
+        activeStorage?.name || "Storage Chamber"
       )
     : null;
 
-  const isDispatched = dispatchedMap[activeStorage.id]?.dispatched;
-  const dispatchTime = dispatchedMap[activeStorage.id]?.time;
+  const isDispatched = activeStorage ? Boolean(dispatchedMap[activeStorage.id]?.dispatched) : false;
+  const dispatchTime = activeStorage ? dispatchedMap[activeStorage.id]?.time : null;
 
   return (
     <div className="glass-panel p-4 sm:p-6 rounded-2xl space-y-5 bg-white dark:bg-slate-900 border border-[#d1ded5] dark:border-slate-800 relative">
@@ -548,44 +571,7 @@ export default function MultiModalAssessor({ currentVisionFeatures, selectedZone
           </div>
         </div>
 
-        {/* Real-Time Action Triggers for Active Storage */}
-        <div className="flex flex-wrap items-center gap-2 self-start lg:self-auto">
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={isUploading}
-            className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 text-xs font-bold flex items-center gap-1.5 border border-slate-300 dark:border-slate-700 cursor-pointer transition-colors"
-            title="Upload an image to inspect produce in this storage"
-          >
-            <Upload className="h-3.5 w-3.5 text-slate-600 dark:text-slate-300" />
-            <span>{isUploading ? "Scanning Image..." : "Upload Image"}</span>
-          </button>
 
-          <button
-            type="button"
-            onClick={handlePullEsp32}
-            disabled={isPullingEsp32}
-            className="px-3 py-1.5 rounded-xl bg-sky-50 hover:bg-sky-100 dark:bg-sky-950/60 dark:hover:bg-sky-900/60 text-sky-800 dark:text-sky-300 text-xs font-bold flex items-center gap-1.5 border border-sky-300 dark:border-sky-800 cursor-pointer transition-colors"
-            title="Pull live frame from ESP32 camera node"
-          >
-            <Cpu className="h-3.5 w-3.5 text-sky-600 dark:text-sky-400" />
-            <span>{isPullingEsp32 ? "Pulling..." : "ESP32 Snapshot"}</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={handleToggleSimulation}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 border transition-all cursor-pointer ${
-              simulationOverrides[activeStorage.id]
-                ? 'bg-amber-600 hover:bg-amber-700 text-white border-amber-600 shadow-sm'
-                : 'bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/50 dark:hover:bg-amber-900/50 text-amber-900 dark:text-amber-200 border-amber-300 dark:border-amber-800'
-            }`}
-            title="Toggle simulated ~75% spoilage trigger to test recipe generation"
-          >
-            <Flame className="h-3.5 w-3.5" />
-            <span>{simulationOverrides[activeStorage.id] ? "Reset to Live Data" : "Test ~75% Trigger"}</span>
-          </button>
-        </div>
       </div>
 
       {/* ─────────────────────────────────────────────────────────────
@@ -609,16 +595,14 @@ export default function MultiModalAssessor({ currentVisionFeatures, selectedZone
             const p = storage.assignedProduce;
             const cv = p?.cvResult;
             const sim = simulationOverrides[storage.id];
-            const currentSpoilage = sim !== undefined 
-              ? sim.spoilageScore 
-              : (cv?.visual_spoilage_score || cv?.ripeness_percent || 15);
+            const { fusedScore: currentSpoilage } = calculateMultiModalFusion(storage, cv, sim);
             const isStorageSpoiling = currentSpoilage >= 70.0 || (cv?.risk_level === 'High' || cv?.risk_level === 'Critical');
 
             return (
               <button
                 key={storage.id}
                 type="button"
-                onClick={() => setSelectedStorageId(storage.id)}
+                onClick={() => setSelectedStorageId(prev => prev === storage.id ? null : storage.id)}
                 className={`p-3.5 rounded-2xl border text-left transition-all relative overflow-hidden group cursor-pointer ${
                   isSelected
                     ? 'bg-emerald-50/90 dark:bg-emerald-950/60 border-emerald-500 shadow-md ring-1 ring-emerald-500/40'
@@ -677,9 +661,10 @@ export default function MultiModalAssessor({ currentVisionFeatures, selectedZone
       </div>
 
       {/* ─────────────────────────────────────────────────────────────
-          ACTIVE STORAGE LIVE STATUS & CULINARY DIRECTIVE SECTION
+          ACTIVE STORAGE LIVE STATUS & CULINARY DIRECTIVE SECTION (ONLY ON CLICK)
           ───────────────────────────────────────────────────────────── */}
-      <div className="pt-2 border-t border-[#e1eae4] dark:border-slate-800 space-y-4">
+      {selectedStorageId && activeStorage ? (
+      <div className="pt-2 border-t border-[#e1eae4] dark:border-slate-800 space-y-4 animate-fade-in">
         
         {/* Active Storage Chamber Header Banner */}
         <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 flex flex-col md:flex-row md:items-center justify-between gap-3">
@@ -755,10 +740,7 @@ export default function MultiModalAssessor({ currentVisionFeatures, selectedZone
                 </div>
               </div>
 
-              <div className="flex-shrink-0 text-right hidden sm:block">
-                <span className="text-[10px] font-bold uppercase text-amber-800 dark:text-amber-400 block">Inventory Value</span>
-                <span className="text-base font-black text-amber-950 dark:text-amber-100">${activeDirective.wasteCost.toFixed(2)} Protected</span>
-              </div>
+
             </div>
 
             {/* Generated Chef Recipe Directives Card */}
@@ -804,7 +786,7 @@ export default function MultiModalAssessor({ currentVisionFeatures, selectedZone
               </div>
 
               {/* Recipe Highlights Metrics */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs">
                 <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700">
                   <span className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold block">Prep Time</span>
                   <span className="font-extrabold text-slate-900 dark:text-white">{activeDirective.prepTimeMinutes} Mins</span>
@@ -816,10 +798,6 @@ export default function MultiModalAssessor({ currentVisionFeatures, selectedZone
                 <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700">
                   <span className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold block">Shelf-Life Extended</span>
                   <span className="font-extrabold text-emerald-700 dark:text-emerald-400">{activeDirective.extendedShelfLife}</span>
-                </div>
-                <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700">
-                  <span className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold block">Food Cost Protected</span>
-                  <span className="font-extrabold text-emerald-700 dark:text-emerald-400">${activeDirective.wasteCost.toFixed(2)}</span>
                 </div>
               </div>
 
@@ -909,6 +887,21 @@ export default function MultiModalAssessor({ currentVisionFeatures, selectedZone
         )}
 
       </div>
+      ) : (
+        <div className="pt-2 border-t border-[#e1eae4] dark:border-slate-800">
+          <div className="p-6 sm:p-8 rounded-2xl bg-slate-50/80 dark:bg-slate-800/40 border border-dashed border-slate-300 dark:border-slate-700 text-center space-y-2 animate-fade-in">
+            <div className="h-12 w-12 rounded-2xl bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mx-auto border border-emerald-200 dark:border-emerald-800/60">
+              <Boxes className="h-6 w-6" />
+            </div>
+            <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200">
+              Select a Storage Chamber Above
+            </h4>
+            <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md mx-auto">
+              Click on <strong>Storage 1</strong>, <strong>Storage 2</strong>, or any other chamber card above to view its real-time sensor telemetry, spoilage index, and culinary directives.
+            </p>
+          </div>
+        </div>
+      )}
 
     </div>
   );

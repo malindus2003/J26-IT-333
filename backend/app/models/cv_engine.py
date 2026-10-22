@@ -45,6 +45,7 @@ import uuid
 import json
 
 import hashlib
+import base64
 
 import logging
 
@@ -315,8 +316,9 @@ class FoodQualityVisionEngine:
         fg_cov = float(feat_vec[40])
         aspect_val = float(feat_vec[41])
 
-        # 1. Out-of-distribution rejection for flat non-produce surfaces (e.g. gray canvas)
-        is_non_produce = (s_mean < 12.0) or (lap_var < 1.0) or (fg_cov < 3.0)
+        # 1. Out-of-distribution rejection for flat non-produce surfaces or pitch-black underexposed frames
+        is_too_dark = (v_mean < 35.0) or ((r_mean + g_mean + b_mean) / 3.0 < 30.0)
+        is_non_produce = (s_mean < 12.0) or (lap_var < 1.0) or (fg_cov < 3.0) or is_too_dark
         if is_non_produce:
             return FALLBACK_SPECIES, 0.0, False, {}, []
 
@@ -385,7 +387,7 @@ class FoodQualityVisionEngine:
         is_citrus_peel_texture = (
             (120.0 <= lap_var <= 450.0) and (edge_density > 12.0) and (green_pct < 2.0) and
             (yellow_pct < 5.0) and (glare_pct < 2.5) and (h_mean < 75.0) and (b_lab_val >= 150.0) and
-            (0.85 <= aspect_val <= 1.15)
+            (0.85 <= aspect_val <= 1.15) and (red_pct < 18.0)
         )
 
         if (red_pct > 15.0 or (s_mean > 70.0 and (h_mean < 20.0 or h_mean > 160.0))):
@@ -436,23 +438,47 @@ class FoodQualityVisionEngine:
             species_probs["Watermelon"] = species_probs.get("Watermelon", 0.0) * 0.02
 
         # E. ORANGE (Monochromatic citrus orange, pebbled flavedo)
-        if (10.0 <= h_mean <= 25.0) and yellow_pct < 14.0 and green_pct < 3.0 and (0.88 <= aspect_val <= 1.15) and not is_trained_banana and not is_banana_peel:
+        if (10.0 <= h_mean <= 25.0) and yellow_pct < 14.0 and green_pct < 3.0 and (0.88 <= aspect_val <= 1.15) and not is_trained_banana and not is_banana_peel and (red_pct < 18.0) and not is_apple_smooth_wax:
             species_probs["Orange"] = max(species_probs.get("Orange", 0.0) * 3.5, 0.95)
             species_probs["Mango"] = species_probs.get("Mango", 0.0) * 0.08
             species_probs["Apple"] = species_probs.get("Apple", 0.0) * 0.08
             species_probs["Banana"] = species_probs.get("Banana", 0.0) * 0.05
 
         # F. TOMATO (High lycopene red, smooth thin cuticle, spherical, no achenes)
-        if red_pct >= 45.0 and glare_pct >= 0.8 and (0.88 <= aspect_val <= 1.15) and not is_strawberry_calyx and not is_strawberry_seed_texture:
-            species_probs["Tomato"] = max(species_probs.get("Tomato", 0.0), 1.50)
+        is_tomato = (
+            (red_pct >= 28.0 or (r_mean >= 170.0 and g_mean < 115.0 and b_mean < 115.0)) and
+            (0.75 <= aspect_val <= 1.28) and
+            not is_strawberry_calyx and not is_strawberry_seed_texture and not is_trained_apple
+        )
+        if is_tomato:
+            species_probs["Tomato"] = max(species_probs.get("Tomato", 0.0), 1.60)
+            species_probs["Apple"] = species_probs.get("Apple", 0.0) * 0.02
+            species_probs["Red Onion"] = species_probs.get("Red Onion", 0.0) * 0.01
+            species_probs["Watermelon"] = species_probs.get("Watermelon", 0.0) * 0.01
 
-        # G. CARROT (Beta-carotene orange, elongated taproot)
-        if (12.0 <= h_mean <= 28.0) and (yellow_pct + red_pct >= 45.0) and (aspect_val > 1.35 or aspect_val < 0.70):
-            species_probs["Carrot"] = max(species_probs.get("Carrot", 0.0), 1.50)
+        # G. CARROT (Beta-carotene orange, elongated taproot, carotenoid orange NOT bright banana yellow)
+        is_carrot = (
+            not is_trained_banana and not is_trained_citrus_orange and
+            yellow_pct < 45.0 and
+            (10.0 <= h_mean <= 24.0) and
+            (r_mean > 165.0 and g_mean > 65.0 and b_mean < 100.0) and
+            (r_mean > g_mean * 1.18) and
+            (aspect_val > 1.25 or aspect_val < 0.75)
+        )
+        if is_carrot:
+            species_probs["Carrot"] = max(species_probs.get("Carrot", 0.0), 1.60)
+            species_probs["Orange"] = species_probs.get("Orange", 0.0) * 0.01
+            species_probs["Banana"] = species_probs.get("Banana", 0.0) * 0.01
 
         # H. CUCUMBER (Elongated cylindrical green)
-        if green_pct >= 40.0 and (aspect_val > 1.45 or aspect_val < 0.68):
-            species_probs["Cucumber"] = max(species_probs.get("Cucumber", 0.0), 1.50)
+        is_cucumber = (
+            (green_pct >= 25.0 or (45.0 <= h_mean <= 90.0 and g_mean > r_mean and g_mean > b_mean)) and
+            (aspect_val > 1.30 or aspect_val < 0.72) and
+            red_pct < 8.0 and yellow_pct < 15.0
+        )
+        if is_cucumber:
+            species_probs["Cucumber"] = max(species_probs.get("Cucumber", 0.0), 1.60)
+            species_probs["Watermelon"] = species_probs.get("Watermelon", 0.0) * 0.01
 
         # I. LETTUCE (Iceberg / Romaine / Butterhead: Light chlorophyll green, ruffled crinkled foliage, crisp pale inner core)
         is_lettuce = (
@@ -542,18 +568,22 @@ class FoodQualityVisionEngine:
 
         # P. POTATO (Earthy starchy buff/brown skin, matte low glare, moderate saturation)
         is_potato = (
-            (14.0 <= h_mean <= 38.0) and (20.0 <= s_mean <= 75.0) and (105.0 <= v_mean <= 190.0) and
-            green_pct < 6.0 and glare_pct < 1.0 and edge_density < 12.0 and
-            not is_trained_banana and not is_trained_citrus_orange
+            (12.0 <= h_mean <= 38.0) and
+            (r_mean > 130.0 and g_mean > 100.0 and b_mean < 120.0 and r_mean > g_mean) and
+            green_pct < 8.0 and glare_pct < 1.2 and
+            (0.70 <= aspect_val <= 1.50) and
+            not is_trained_banana and not is_banana_peel
         )
         if is_potato:
-            species_probs["Potato"] = max(species_probs.get("Potato", 0.0), 1.50)
-            species_probs["Banana"] = species_probs.get("Banana", 0.0) * 0.05
-            species_probs["Orange"] = species_probs.get("Orange", 0.0) * 0.05
+            species_probs["Potato"] = max(species_probs.get("Potato", 0.0), 1.60)
+            species_probs["Banana"] = species_probs.get("Banana", 0.0) * 0.02
+            species_probs["Orange"] = species_probs.get("Orange", 0.0) * 0.02
 
         # Q. RED ONION (Concentric dry papery reddish-purple tunic)
         is_red_onion = (
-            (h_mean > 135.0 or h_mean < 18.0) and red_pct >= 12.0 and
+            not is_tomato and
+            (h_mean > 135.0 or (h_mean < 18.0 and s_mean > 50.0 and b_mean > 60.0)) and
+            red_pct >= 12.0 and
             (0.80 <= aspect_val <= 1.25) and not is_trained_apple and not is_strawberry_calyx
         )
         if is_red_onion:
@@ -634,6 +664,24 @@ class FoodQualityVisionEngine:
             return self._default_features(category, analysis_id, img_hash)
 
 
+
+        # Automatic adaptive illumination for dark container captures (CLAHE + Gamma Expansion)
+        enhanced_image_b64 = None
+        gray_test = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2GRAY)
+        if np.mean(gray_test) < 80.0 or np.max(gray_test) < 140:
+            lab = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2LAB)
+            l_chan, a_chan, b_chan = cv2.split(lab)
+            clahe = cv2.createCLAHE(clipLimit=3.5, tileGridSize=(8, 8))
+            l_enh = clahe.apply(l_chan)
+            curr_mean = float(np.mean(l_enh))
+            if curr_mean < 110.0:
+                gamma = max(0.4, min(2.5, np.log(128.0 / 255.0) / np.log(max(10.0, curr_mean) / 255.0)))
+                inv_g = 1.0 / gamma
+                lut = np.array([((i / 255.0) ** inv_g) * 255 for i in np.arange(0, 256)]).astype("uint8")
+                l_enh = cv2.LUT(l_enh, lut)
+            img_bgr = cv2.cvtColor(cv2.merge([l_enh, a_chan, b_chan]), cv2.COLOR_LAB2BGR)
+            _, enc = cv2.imencode('.jpg', img_bgr)
+            enhanced_image_b64 = base64.b64encode(enc.tobytes()).decode("utf-8")
 
         orig_h, orig_w = img_bgr.shape[:2]
 
@@ -1261,6 +1309,7 @@ class FoodQualityVisionEngine:
             "feature_dimensions": len(feat_vec),
 
             "model_version": self.produce_metadata.get("model_version", "v2.3-calibrated"),
+            "enhanced_image_base64": enhanced_image_b64,
 
             "species_probabilities": species_probs_dict,
 

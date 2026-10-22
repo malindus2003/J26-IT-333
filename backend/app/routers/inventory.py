@@ -259,3 +259,48 @@ def quarantine_item_to_waste(item_id: str):
         "timestamp": datetime.now().isoformat(),
         "message": f"Batch {target_item.get('batch_number')} successfully quarantined and logged to Smart Waste Bin."
     }
+
+
+def update_inventory_from_inspection(
+    produce_name: Optional[str],
+    spoilage_prob: float,
+    rsl_hours: float,
+    risk_level: str,
+    recommendation: Optional[str] = None
+) -> Optional[Dict[str, Any]]:
+    """Updates active inventory items matching the inspected produce species with live vision inspection telemetry."""
+    if not produce_name or "unknown" in produce_name.lower():
+        return None
+    matched = None
+    prod_lower = produce_name.lower()
+    for it in inventory_db:
+        it_name = it.get("name", "").lower()
+        if prod_lower in it_name or it_name in prod_lower or any(w in it_name for w in prod_lower.split() if len(w) > 3):
+            it["spoilage_prob"] = round(float(spoilage_prob), 1)
+            it["remaining_shelf_life_hours"] = round(float(rsl_hours), 1)
+            it["risk_level"] = risk_level
+            if risk_level == "Critical":
+                it["status"] = "Critical (Quarantine Required)"
+            elif risk_level == "High":
+                it["status"] = "Near Spoilage (~75%) - Prioritize FIFO"
+            else:
+                it["status"] = "Fresh Inspection Verified"
+            if recommendation:
+                it["recommendation"] = recommendation
+            matched = it
+            break
+    return matched
+
+@router.post("/sync-inspection")
+def sync_inspection(payload: Dict[str, Any]):
+    """Syncs an optical inspection result directly to active inventory."""
+    produce_name = payload.get("identified_produce") or payload.get("produce")
+    spoilage_prob = float(payload.get("spoilage_probability", 0.0))
+    rsl_hours = float(payload.get("remaining_shelf_life_hours", payload.get("rsl_hours", 72.0)))
+    risk_level = payload.get("risk_level", "Low")
+    recommendation = payload.get("action_recommendation") or payload.get("recommendation")
+    
+    updated = update_inventory_from_inspection(produce_name, spoilage_prob, rsl_hours, risk_level, recommendation)
+    if updated:
+        return {"status": "synced", "item": updated}
+    return {"status": "no_matching_item", "produce": produce_name}

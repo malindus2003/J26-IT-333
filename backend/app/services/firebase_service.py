@@ -200,6 +200,18 @@ class FirebaseRealtimeDBService:
             logger.error(f"[FirebaseService] Error publishing alert: {e}")
             return False
 
+    def publish_oled_display(self, oled_data: Dict[str, Any]) -> bool:
+        """Publishes real-time OLED display screen content for physical ESP32 nodes to Firebase at /oled_display."""
+        if not self.is_connected:
+            return False
+        try:
+            ref = db.reference("oled_display")
+            ref.set(oled_data)
+            return True
+        except Exception as e:
+            logger.error(f"[FirebaseService] Error publishing oled display: {e}")
+            return False
+
     def sync_storage_zones(self, zones: List[Dict[str, Any]]) -> bool:
         """Syncs all storage zone statuses and baselines to Firebase."""
         if not self.is_connected:

@@ -441,7 +441,7 @@ export default function VisionInspector({ zones = [], onRefreshTelemetry, onInsp
     } catch {}
     return DEFAULT_SYSTEM_STORAGES;
   });
-  const [selectedStorageId, setSelectedStorageId] = useState("storage-1");
+  const [selectedStorageId, setSelectedStorageId] = useState(null);
   const [isAddStorageModalOpen, setIsAddStorageModalOpen] = useState(false);
   const [isChangeProduceModalOpen, setIsChangeProduceModalOpen] = useState(false);
   const [newStorageForm, setNewStorageForm] = useState({
@@ -511,7 +511,9 @@ export default function VisionInspector({ zones = [], onRefreshTelemetry, onInsp
     try {
       localStorage.setItem('smart_restaurant_storages', JSON.stringify(updated));
     } catch {}
-    setSelectedStorageId("storage-1");
+    if (selectedStorageId === storageId) {
+      setSelectedStorageId(null);
+    }
     const primaryContainer = storages[0]?.containers[0]?.name || "Container #C-101 (Zone 1: Fruit Chiller 11°C)";
     setCurrentContainerName(primaryContainer);
   };
@@ -531,6 +533,10 @@ export default function VisionInspector({ zones = [], onRefreshTelemetry, onInsp
 
   // Switch active storage chamber and load its assigned produce & telemetry
   const handleSelectStorage = (storage) => {
+    if (selectedStorageId === storage.id) {
+      setSelectedStorageId(null);
+      return;
+    }
     setSelectedStorageId(storage.id);
     setCurrentContainerName(storage.name);
     const insp = getStorageInspection(storage);
@@ -542,12 +548,65 @@ export default function VisionInspector({ zones = [], onRefreshTelemetry, onInsp
     }
   };
 
-  // Update the currently active storage's assigned produce
-  const updateActiveStorageInspection = (presetOrCvResult, imageUrl) => {
+  // Update the currently active storage's assigned produce AND dynamically synchronize IoT telemetry
+  const updateActiveStorageInspection = async (presetOrCvResult, imageUrl) => {
+    if (!selectedStorageId) return;
+
+    const visualScore = presetOrCvResult?.visual_spoilage_score !== undefined 
+      ? presetOrCvResult.visual_spoilage_score 
+      : (presetOrCvResult?.ripeness_percent || 15);
+    const isMould = Boolean(presetOrCvResult?.mould_detected);
+    const isCritical = presetOrCvResult?.risk_level === 'Critical' || visualScore >= 65.0 || isMould;
+    const isWarning = !isCritical && (presetOrCvResult?.risk_level === 'High' || visualScore >= 45.0);
+
+    let synchronizedTelemetry = null;
+
     const updated = storages.map(s => {
       if (s.id === selectedStorageId) {
+        const targetTemp = Number(s.target_temp || 11.0);
+        const targetHum = Number(s.target_humidity || 89.0);
+
+        let newTemp, newHum, newVoc, newCo2, newStatus;
+
+        if (isCritical) {
+          // SPOILED: Thermal runaway respiration, elevated ethylene & decay volatiles
+          newTemp = Math.round((targetTemp + 9.5) * 10) / 10;
+          newHum = Math.round(Math.max(68.0, targetHum - 16.0) * 10) / 10;
+          newVoc = 0.88;
+          newCo2 = 1250;
+          newStatus = "warning";
+        } else if (isWarning) {
+          // NEAR SPOIL / OVERRIPE: Rising respiration & ripening gas emission
+          newTemp = Math.round((targetTemp + 4.2) * 10) / 10;
+          newHum = Math.round(Math.max(74.0, targetHum - 9.0) * 10) / 10;
+          newVoc = 0.45;
+          newCo2 = 780;
+          newStatus = "warning";
+        } else {
+          // FRESH / OPTIMAL: Steady target cold chain, hydrated turgor, clean dormancy baseline
+          newTemp = Math.round((targetTemp + 0.4) * 10) / 10;
+          newHum = Math.round(targetHum * 10) / 10;
+          newVoc = 0.18;
+          newCo2 = 415;
+          newStatus = "optimal";
+        }
+
+        synchronizedTelemetry = {
+          storage_zone: s.name,
+          temperature: newTemp,
+          humidity: newHum,
+          voc: newVoc,
+          co2: newCo2,
+          nh3: isCritical ? 0.045 : 0.015
+        };
+
         return {
           ...s,
+          current_temp: newTemp,
+          current_humidity: newHum,
+          voc: newVoc,
+          co2: newCo2,
+          status: newStatus,
           assignedProduce: {
             presetId: presetOrCvResult.id || s.assignedProduce?.presetId || null,
             produceName: presetOrCvResult.identified_produce || presetOrCvResult.name || s.assignedProduce?.produceName || "Produce",
@@ -559,10 +618,22 @@ export default function VisionInspector({ zones = [], onRefreshTelemetry, onInsp
       }
       return s;
     });
+
     setStorages(updated);
     try {
       localStorage.setItem('smart_restaurant_storages', JSON.stringify(updated));
     } catch {}
+
+    // Transmit to FastAPI backend REST telemetry endpoint so system dashboards update in sync
+    if (synchronizedTelemetry) {
+      try {
+        await axios.post("http://localhost:8000/api/sensors/telemetry", synchronizedTelemetry);
+        if (onRefreshTelemetry) onRefreshTelemetry();
+        setLastSensorSyncTime(new Date().toLocaleTimeString());
+      } catch (err) {
+        console.warn("Sensor sync broadcast error:", err);
+      }
+    }
   };
 
   const handleOpenEditStorage = (storage, e) => {
@@ -648,13 +719,13 @@ export default function VisionInspector({ zones = [], onRefreshTelemetry, onInsp
     } catch {}
 
     if (selectedStorageId === storageToDelete.id) {
-      const fallback = updated[0];
-      handleSelectStorage(fallback);
+
+      setSelectedStorageId(null);
     }
     setStorageToDelete(null);
   };
 
-const activeStorage = storages.find(s => s?.id === selectedStorageId) || storages[0] || DEFAULT_SYSTEM_STORAGES[0];
+  const activeStorage = selectedStorageId ? (storages.find(s => s?.id === selectedStorageId) || null) : null;
   const [selectedPresetId, setSelectedPresetId] = useState(() => activeStorage?.assignedProduce?.presetId || SAMPLE_PRESETS[0].id);
   const [previewImage, setPreviewImage] = useState(SAMPLE_PRESETS[0].imageUrl);
   const [currentContainerName, setCurrentContainerName] = useState(SAMPLE_PRESETS[0]?.container || "Container #C-101 (Zone 1: Fruit Chiller 11°C)");
@@ -685,6 +756,14 @@ const activeStorage = storages.find(s => s?.id === selectedStorageId) || storage
         (term.includes("avocado") && pid.includes("avocado"));
     });
     if (matchedPreset) {
+      const targetStorage = storages.find(s => 
+        (s.assignedProduce?.produceName || "").toLowerCase().includes(term) ||
+        (s.assignedProduce?.presetId || "").toLowerCase().includes(term)
+      ) || storages[0];
+      if (targetStorage) {
+        setSelectedStorageId(targetStorage.id);
+        setCurrentContainerName(targetStorage.name);
+      }
       setSelectedPresetId(matchedPreset.id);
       setPreviewImage(matchedPreset.imageUrl);
       setCvResult(matchedPreset);
@@ -1535,6 +1614,19 @@ const activeStorage = storages.find(s => s?.id === selectedStorageId) || storage
                     <span className="truncate">{storage.assignedProduce?.produceName || "Embul Banana"}</span>
                   </span>
                 </div>
+                {/* Inspection Status Pill */}
+                <div className="mt-2 pt-2 border-t border-slate-200/60 dark:border-slate-800 flex items-center justify-between text-[10px]">
+                  <span className="font-bold text-slate-500 dark:text-slate-400">Chamber View:</span>
+                  {isSelected ? (
+                    <span className="font-extrabold px-2 py-0.5 rounded-full bg-emerald-700 text-white flex items-center gap-1 shadow-2xs">
+                      <CheckCircle2 className="h-3 w-3" /> Active Inspection
+                    </span>
+                  ) : (
+                    <span className="font-bold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 group-hover:bg-emerald-100 group-hover:text-emerald-800 dark:group-hover:bg-emerald-950/60 dark:group-hover:text-emerald-300 transition-colors">
+                      Click to inspect →
+                    </span>
+                  )}
+                </div>
               </div>
             );
           })}
@@ -2142,7 +2234,13 @@ const activeStorage = storages.find(s => s?.id === selectedStorageId) || storage
         </div>
       )}
 
-      {/* Chamber Header & Synchronization Banner */}
+      {/* ─────────────────────────────────────────────────────────────
+          UNIFIED SECTION: OPTICAL COMPUTER VISION + IOT TELEMETRY
+          Only appears when Storage 1 or any other storage chamber is clicked
+          ───────────────────────────────────────────────────────────── */}
+      {selectedStorageId && activeStorage ? (
+        <>
+          {/* Chamber Header & Synchronization Banner */}
       <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-emerald-50 via-teal-50/60 to-emerald-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 border border-emerald-200 dark:border-emerald-800 shadow-2xs space-y-3">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-3">
@@ -2182,6 +2280,15 @@ const activeStorage = storages.find(s => s?.id === selectedStorageId) || storage
             >
               <Flame className="h-3.5 w-3.5" />
               <span>{simulationSpoilageOverride !== null ? "Reset to Live Data" : "Test ~75% Spoilage"}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setSelectedStorageId(null)}
+              className="px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition-colors cursor-pointer shadow-2xs"
+              title="Close Chamber Inspection"
+            >
+              <X className="h-3.5 w-3.5" />
+              <span>Close Inspection</span>
             </button>
           </div>
         </div>
@@ -2508,302 +2615,340 @@ const activeStorage = storages.find(s => s?.id === selectedStorageId) || storage
         </div>
 
         {/* UNIT 2: IoT Environmental Telemetry Array (Right Side) */}
-        <div className="lg:col-span-6 flex flex-col p-4 sm:p-5 bg-[#f8faf9] dark:bg-slate-800/80 rounded-2xl border border-[#d1ded5] dark:border-slate-700 shadow-2xs space-y-3.5">
-          
-          {/* Header Bar: Node Identification, Live Stream Status & Telemetry Controls */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-[#e1eae4] dark:border-slate-700/80 text-xs gap-2.5">
-            <div className="flex items-center gap-2.5">
-              <div className="p-2 rounded-xl bg-sky-100 dark:bg-sky-950/80 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800 flex-shrink-0 shadow-2xs">
-                <Activity className="h-4 w-4" />
-              </div>
-              <div>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="font-extrabold text-slate-900 dark:text-white text-xs sm:text-sm">
-                    Unit 2: IoT Chamber Sensors
+        {(() => {
+          const displayTemp = simulationSpoilageOverride !== null
+            ? (simulationSpoilageOverride >= 70 ? 20.9 : 11.4)
+            : (activeStorage?.current_temp !== undefined ? activeStorage.current_temp : 11.4);
+
+          const displayHum = simulationSpoilageOverride !== null
+            ? (simulationSpoilageOverride >= 70 ? 73.0 : 90.0)
+            : (activeStorage?.current_humidity !== undefined ? activeStorage.current_humidity : 90.0);
+
+          const displayVoc = simulationSpoilageOverride !== null
+            ? (simulationSpoilageOverride >= 70 ? 0.88 : (activeStorage?.voc !== undefined ? activeStorage.voc : 0.18))
+            : (activeStorage?.voc !== undefined ? activeStorage.voc : 0.18);
+
+          const displayCo2 = simulationSpoilageOverride !== null
+            ? (simulationSpoilageOverride >= 70 ? 1250 : (activeStorage?.co2 || 415))
+            : (activeStorage?.co2 || 415);
+
+          const isSpoiledChamber = (simulationSpoilageOverride !== null && simulationSpoilageOverride >= 70) ||
+            (cvResult?.visual_spoilage_score >= 60 || cvResult?.risk_level === 'Critical' || cvResult?.mould_detected || displayVoc > 0.60);
+
+          const isWarningChamber = !isSpoiledChamber && (
+            (simulationSpoilageOverride !== null && simulationSpoilageOverride >= 45) ||
+            cvResult?.visual_spoilage_score >= 45 || cvResult?.risk_level === 'High' || displayVoc > 0.35 || Math.abs(displayTemp - Number(activeStorage?.target_temp || 11.0)) > 3.0
+          );
+
+          return (
+            <div className="lg:col-span-6 flex flex-col p-4 sm:p-5 bg-[#f8faf9] dark:bg-slate-800/80 rounded-2xl border border-[#d1ded5] dark:border-slate-700 shadow-2xs space-y-3.5">
+              
+              {/* Header Bar: Node Identification, Live Stream Status & Telemetry Controls */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-[#e1eae4] dark:border-slate-700/80 text-xs gap-2.5">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 rounded-xl bg-sky-100 dark:bg-sky-950/80 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800 flex-shrink-0 shadow-2xs">
+                    <Activity className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-extrabold text-slate-900 dark:text-white text-xs sm:text-sm">
+                        Unit 2: IoT Chamber Sensors
+                      </span>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-sky-100 dark:bg-sky-950 text-sky-800 dark:text-sky-300 border border-sky-200 dark:border-sky-800 font-mono">
+                        {activeStorage?.node_id || "ESP32-NODE-01"}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
+                      Continuous micro-climate monitoring synchronized with vision analysis
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1.5 flex-wrap self-end sm:self-auto">
+                  <span className="inline-flex items-center gap-1.5 text-[10px] font-bold px-2 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700 shadow-2xs">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    <span>Live Stream</span>
                   </span>
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-sky-100 dark:bg-sky-950 text-sky-800 dark:text-sky-300 border border-sky-200 dark:border-sky-800 font-mono">
-                    {activeStorage?.node_id || "ESP32-NODE-01"}
+                  <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono font-medium px-2 py-1 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700">
+                    {lastSensorSyncTime ? `${lastSensorSyncTime}` : 'Syncing...'}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={fetchLiveSensors}
+                    title="Refresh live sensor telemetry from chamber node"
+                    className="p-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:text-emerald-600 dark:hover:text-emerald-400 hover:border-emerald-300 dark:hover:border-emerald-700 transition-all cursor-pointer shadow-2xs active:scale-95"
+                  >
+                    <RefreshCw className={`h-3 w-3 ${isSyncingSensors ? 'animate-spin text-emerald-500' : ''}`} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsSensorModalOpen(true)}
+                    className="px-2.5 py-1 rounded-lg bg-sky-600 hover:bg-sky-700 text-white text-[10px] font-bold flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer shadow-xs"
+                    title="Update or simulate chamber sensor readings"
+                  >
+                    <Sliders className="h-3 w-3" />
+                    <span>Update Telemetry</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Environmental Micro-Climate Banner */}
+              <div className={`p-3 rounded-xl border shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 transition-all ${
+                isSpoiledChamber || isWarningChamber
+                  ? 'bg-amber-50 dark:bg-amber-950/40 border-amber-300 dark:border-amber-800'
+                  : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800'
+              }`}>
+                <div className="space-y-0.5">
+                  <span className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400 block tracking-wider">
+                    Chamber Micro-Climate Status
+                  </span>
+                  {isSpoiledChamber || isWarningChamber ? (
+                    <span className="text-xs font-black text-amber-700 dark:text-amber-400 flex items-center gap-1.5">
+                      <AlertTriangle className="h-3.5 w-3.5 text-amber-500 animate-pulse flex-shrink-0" />
+                      <span>{isSpoiledChamber ? "Critical Gas & Thermal Spoilage Triggered" : "Thermal or Gas Stress Detected • Accelerated Decay Phase"}</span>
+                    </span>
+                  ) : (
+                    <span className="text-xs font-black text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5">
+                      <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse flex-shrink-0" />
+                      <span>Optimal Cold Chain Storage • Safe Atmospheric Envelope</span>
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-2 self-start sm:self-auto">
+                  <span className="text-[11px] font-bold text-slate-600 dark:text-slate-300 font-mono px-2 py-0.5 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+                    Target: {activeStorage?.target_temp || 11.0}°C • {activeStorage?.target_humidity || 89}% RH
                   </span>
                 </div>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
-                  Continuous micro-climate monitoring synchronized with vision analysis
+              </div>
+
+              {/* 4-Parameter IoT Telemetry Matrix (2x2 Grid) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                
+                {/* 1. Chamber Temperature */}
+                <div className="p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xs space-y-2 relative overflow-hidden transition-all hover:border-rose-300 dark:hover:border-rose-900 flex flex-col justify-between">
+                  <div className="flex items-center justify-between text-xs">
+                    <div className="flex items-center gap-1.5 font-bold text-slate-700 dark:text-slate-200">
+                      <div className="p-1 rounded-lg bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900">
+                        <Thermometer className="h-3.5 w-3.5" />
+                      </div>
+                      <span>Temperature</span>
+                    </div>
+                    <span className={`text-[10px] font-black px-2 py-0.5 rounded-full border ${
+                      isSpoiledChamber || isWarningChamber
+                        ? 'bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800'
+                        : 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
+                    }`}>
+                      {isSpoiledChamber ? 'High Respiration' : (isWarningChamber ? 'Drift Alert' : 'Optimal')}
+                    </span>
+                  </div>
+
+                  <div className="flex items-baseline justify-between pt-0.5">
+                    <div className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">
+                      {displayTemp}°C
+                    </div>
+                    <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 font-mono">
+                      Set: {activeStorage?.target_temp || 11.0}°C ({((displayTemp) - (activeStorage?.target_temp || 11.0)) >= 0 ? `+${(((displayTemp) - (activeStorage?.target_temp || 11.0))).toFixed(1)}` : (((displayTemp) - (activeStorage?.target_temp || 11.0))).toFixed(1)}°C)
+                    </span>
+                  </div>
+
+                  <div className="space-y-1">
+                    <div className="w-full bg-slate-100 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                      <div 
+                        className={`h-full rounded-full transition-all duration-300 ${
+                          isSpoiledChamber || isWarningChamber ? 'bg-rose-500' : 'bg-emerald-500'
+                        }`}
+                        style={{ width: `${Math.min(100, Math.max(5, (displayTemp / 35.0) * 100))}%` }}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between text-[9px] text-slate-400 font-medium">
+                      <span>0°C Min</span>
+                      <span className="text-slate-600 dark:text-slate-300 font-bold">Target: {activeStorage?.target_temp || 11.0}°C</span>
+                      <span>35°C Max</span>
+                    </div>
+                  </div>
+
+                  <div className="pt-1 border-t border-slate-100 dark:border-slate-800/80 text-[10px] text-slate-500 dark:text-slate-400 flex items-center justify-between">
+                    <span>Sensor: DHT22 Digital</span>
+                    <span className={isSpoiledChamber ? "text-rose-600 font-semibold" : "text-emerald-600 dark:text-emerald-400 font-semibold"}>
+                      {isSpoiledChamber ? "Heat Respiration Peak" : "Cold Chain Stable"}
+                    </span>
+                  </div>
+                </div>
+
+                {/* 2. Relative Humidity */}
+                <div className="p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xs space-y-2 relative overflow-hidden transition-all hover:border-sky-300 dark:hover:border-sky-900 flex flex-col justify-between">
+                  <div className="flex items-center justify-between text-xs">
+                    <div className="flex items-center gap-1.5 font-bold text-slate-700 dark:text-slate-200">
+                      <div className="p-1 rounded-lg bg-sky-50 dark:bg-sky-950/60 text-sky-600 dark:text-sky-400 border border-sky-200 dark:border-sky-900">
+                        <Droplets className="h-3.5 w-3.5" />
+                      </div>
+                      <span>Rel. Humidity</span>
+                    </div>
+                    <span className={`text-[10px] font-black px-2 py-0.5 rounded-full border ${
+                      displayHum < 75 || displayHum > 96
+                        ? 'bg-amber-50 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border-amber-200 dark:border-amber-800'
+                        : 'bg-sky-50 dark:bg-sky-950/60 text-sky-800 dark:text-sky-300 border border-sky-200 dark:border-sky-800'
+                    }`}>
+                      {displayHum < 75 ? 'Dry' : (displayHum > 96 ? 'Condensing' : 'Hydrated')}
+                    </span>
+                  </div>
+
+                  <div className="flex items-baseline justify-between pt-0.5">
+                    <div className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">
+                      {displayHum}%
+                    </div>
+                    <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 font-mono">
+                      Target: {activeStorage?.target_humidity || 89}% RH
+                    </span>
+                  </div>
+
+                  <div className="space-y-1">
+                    <div className="w-full bg-slate-100 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                      <div 
+                        className={`h-full rounded-full transition-all duration-300 ${
+                          displayHum < 75 ? 'bg-amber-500' : 'bg-sky-500'
+                        }`}
+                        style={{ width: `${Math.min(100, Math.max(10, displayHum))}%` }}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between text-[9px] text-slate-400 font-medium">
+                      <span>30% Dry</span>
+                      <span className="text-sky-700 dark:text-sky-400 font-bold">Crisper Safe Zone</span>
+                      <span>100% Sat</span>
+                    </div>
+                  </div>
+
+                  <div className="pt-1 border-t border-slate-100 dark:border-slate-800/80 text-[10px] text-slate-500 dark:text-slate-400 flex items-center justify-between">
+                    <span>Sensor: Capacitive Array</span>
+                    <span className={displayHum < 75 ? "text-amber-600 font-semibold" : "text-sky-600 dark:text-sky-400 font-semibold"}>
+                      {displayHum < 75 ? "Moisture Escape" : "Turgor Preserved"}
+                    </span>
+                  </div>
+                </div>
+
+                {/* 3. VOC & Ethylene */}
+                <div className="p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xs space-y-2 relative overflow-hidden transition-all hover:border-amber-300 dark:hover:border-amber-900 flex flex-col justify-between">
+                  <div className="flex items-center justify-between text-xs">
+                    <div className="flex items-center gap-1.5 font-bold text-slate-700 dark:text-slate-200">
+                      <div className="p-1 rounded-lg bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-900">
+                        <Wind className="h-3.5 w-3.5" />
+                      </div>
+                      <span>VOC &amp; Ethylene</span>
+                    </div>
+                    <span className={`text-[10px] font-black px-2 py-0.5 rounded-full border ${
+                      displayVoc > 0.60
+                        ? 'bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800'
+                        : (displayVoc > 0.35 ? 'bg-amber-50 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border-amber-200 dark:border-amber-800' : 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800')
+                    }`}>
+                      {displayVoc > 0.60 ? 'High Decay' : (displayVoc > 0.35 ? 'Ripening Gas' : 'Fresh Range')}
+                    </span>
+                  </div>
+
+                  <div className="flex items-baseline justify-between pt-0.5">
+                    <div className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">
+                      {displayVoc} <span className="text-xs font-semibold text-slate-500">ppm</span>
+                    </div>
+                    <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 font-mono">
+                      Safe: &lt;0.40 ppm
+                    </span>
+                  </div>
+
+                  <div className="space-y-1">
+                    <div className="w-full bg-slate-100 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                      <div 
+                        className={`h-full rounded-full transition-all duration-300 ${
+                          displayVoc > 0.60 ? 'bg-rose-500' : (displayVoc > 0.35 ? 'bg-amber-500' : 'bg-emerald-500')
+                        }`}
+                        style={{ width: `${Math.min(100, Math.max(5, (displayVoc / 2.0) * 100))}%` }}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between text-[9px] text-slate-400 font-medium">
+                      <span>0.00 Clean</span>
+                      <span className="text-amber-700 dark:text-amber-400 font-bold">C₂H₄ Respiration</span>
+                      <span>2.00 Decay</span>
+                    </div>
+                  </div>
+
+                  <div className="pt-1 border-t border-slate-100 dark:border-slate-800/80 text-[10px] text-slate-500 dark:text-slate-400 flex items-center justify-between">
+                    <span>Sensor: MQ-135 Gas Cell</span>
+                    <span className={displayVoc > 0.60 ? "text-rose-600 font-semibold" : "text-amber-600 dark:text-amber-400 font-semibold"}>
+                      {displayVoc > 0.60 ? "Heavy Decomposition Gas" : "Sub-Senescence"}
+                    </span>
+                  </div>
+                </div>
+
+                {/* 4. CO2 Respiration */}
+                <div className="p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xs space-y-2 relative overflow-hidden transition-all hover:border-emerald-300 dark:hover:border-emerald-900 flex flex-col justify-between">
+                  <div className="flex items-center justify-between text-xs">
+                    <div className="flex items-center gap-1.5 font-bold text-slate-700 dark:text-slate-200">
+                      <div className="p-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900">
+                        <Gauge className="h-3.5 w-3.5" />
+                      </div>
+                      <span>CO₂ Respiration</span>
+                    </div>
+                    <span className={`text-[10px] font-black px-2 py-0.5 rounded-full border ${
+                      displayCo2 > 1000
+                        ? 'bg-amber-50 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border-amber-200 dark:border-amber-800'
+                        : 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
+                    }`}>
+                      {displayCo2 > 1000 ? 'Vent Required' : 'Aerobic Optimal'}
+                    </span>
+                  </div>
+
+                  <div className="flex items-baseline justify-between pt-0.5">
+                    <div className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">
+                      {displayCo2} <span className="text-xs font-semibold text-slate-500">ppm</span>
+                    </div>
+                    <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 font-mono">
+                      Ceiling: &lt;1000 ppm
+                    </span>
+                  </div>
+
+                  <div className="space-y-1">
+                    <div className="w-full bg-slate-100 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                      <div 
+                        className={`h-full rounded-full transition-all duration-300 ${
+                          displayCo2 > 1000 ? 'bg-amber-500' : 'bg-emerald-500'
+                        }`}
+                        style={{ width: `${Math.min(100, Math.max(10, ((displayCo2 - 350) / 1200) * 100))}%` }}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between text-[9px] text-slate-400 font-medium">
+                      <span>350 Ambient</span>
+                      <span className="text-emerald-700 dark:text-emerald-400 font-bold">NDIR Optical Array</span>
+                      <span>1500 Peak</span>
+                    </div>
+                  </div>
+
+                  <div className="pt-1 border-t border-slate-100 dark:border-slate-800/80 text-[10px] text-slate-500 dark:text-slate-400 flex items-center justify-between">
+                    <span>Sensor: NDIR Optical</span>
+                    <span className={displayCo2 > 1000 ? "text-amber-600 font-semibold" : "text-emerald-600 dark:text-emerald-400 font-semibold"}>
+                      {displayCo2 > 1000 ? "High Metabolic Output" : "Aerobic Dormancy"}
+                    </span>
+                  </div>
+                </div>
+
+              </div>
+
+              {/* Chamber Atmosphere & Aeration Status Card */}
+              <div className="p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xs space-y-2 text-xs">
+                <div className="flex items-center justify-between pb-1.5 border-b border-slate-100 dark:border-slate-800">
+                  <span className="font-extrabold text-slate-900 dark:text-white flex items-center gap-1.5">
+                    <Zap className="h-3.5 w-3.5 text-amber-500" /> Chamber Atmosphere &amp; Aeration Status
+                  </span>
+                  <span className="text-[10px] font-bold text-slate-400 font-mono">
+                    Sensor Bus: I2C (0x3C) • DHT22/MQ-135 Array
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed">
+                  {isSpoiledChamber || isWarningChamber
+                    ? `Elevated thermal respiration observed at ${displayTemp}°C (${(displayTemp - Number(activeStorage?.target_temp || 11.0)).toFixed(1)}°C above setpoint). VOC ripening gas accumulation detected at ${displayVoc} ppm.`
+                    : `Optimal cold chain stability maintained at ${displayTemp}°C (target: ${activeStorage?.target_temp || 11.0}°C). Relative humidity at ${displayHum}% preserves cellular turgor pressure without surface condensation.`}
                 </p>
               </div>
             </div>
-
-            <div className="flex items-center gap-1.5 flex-wrap self-end sm:self-auto">
-              <span className="inline-flex items-center gap-1.5 text-[10px] font-bold px-2 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700 shadow-2xs">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                <span>Live Stream</span>
-              </span>
-              <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono font-medium px-2 py-1 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700">
-                {lastSensorSyncTime ? `${lastSensorSyncTime}` : 'Syncing...'}
-              </span>
-              <button
-                type="button"
-                onClick={fetchLiveSensors}
-                title="Refresh live sensor telemetry from chamber node"
-                className="p-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:text-emerald-600 dark:hover:text-emerald-400 hover:border-emerald-300 dark:hover:border-emerald-700 transition-all cursor-pointer shadow-2xs active:scale-95"
-              >
-                <RefreshCw className={`h-3 w-3 ${isSyncingSensors ? 'animate-spin text-emerald-500' : ''}`} />
-              </button>
-              <button
-                type="button"
-                onClick={() => setIsSensorModalOpen(true)}
-                className="px-2.5 py-1 rounded-lg bg-sky-600 hover:bg-sky-700 text-white text-[10px] font-bold flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer shadow-xs"
-                title="Update or simulate chamber sensor readings"
-              >
-                <Sliders className="h-3 w-3" />
-                <span>Update Telemetry</span>
-              </button>
-            </div>
-          </div>
-
-          {/* Environmental Micro-Climate Banner */}
-          <div className={`p-3 rounded-xl border shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 transition-all ${
-            activeStorage?.status === 'warning' || (Math.abs((activeStorage?.current_temp || 11) - (activeStorage?.target_temp || 11)) > 3.5) || ((activeStorage?.voc || 0) > 0.6)
-              ? 'bg-amber-50 dark:bg-amber-950/40 border-amber-300 dark:border-amber-800'
-              : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800'
-          }`}>
-            <div className="space-y-0.5">
-              <span className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400 block tracking-wider">
-                Chamber Micro-Climate Status
-              </span>
-              {activeStorage?.status === 'warning' || (Math.abs((activeStorage?.current_temp || 11) - (activeStorage?.target_temp || 11)) > 3.5) || ((activeStorage?.voc || 0) > 0.6) ? (
-                <span className="text-xs font-black text-amber-700 dark:text-amber-400 flex items-center gap-1.5">
-                  <AlertTriangle className="h-3.5 w-3.5 text-amber-500 animate-pulse flex-shrink-0" />
-                  <span>Thermal or Gas Stress Detected • Accelerated Decay Phase</span>
-                </span>
-              ) : (
-                <span className="text-xs font-black text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5">
-                  <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse flex-shrink-0" />
-                  <span>Optimal Cold Chain Storage • Safe Atmospheric Envelope</span>
-                </span>
-              )}
-            </div>
-            <div className="flex items-center gap-2 self-start sm:self-auto">
-              <span className="text-[11px] font-bold text-slate-600 dark:text-slate-300 font-mono px-2 py-0.5 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
-                Target: {activeStorage?.target_temp || 11.0}°C • {activeStorage?.target_humidity || 89}% RH
-              </span>
-            </div>
-          </div>
-
-          {/* 4-Parameter IoT Telemetry Matrix (2x2 Grid) */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-            
-            {/* 1. Chamber Temperature */}
-            <div className="p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xs space-y-2 relative overflow-hidden transition-all hover:border-rose-300 dark:hover:border-rose-900 flex flex-col justify-between">
-              <div className="flex items-center justify-between text-xs">
-                <div className="flex items-center gap-1.5 font-bold text-slate-700 dark:text-slate-200">
-                  <div className="p-1 rounded-lg bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900">
-                    <Thermometer className="h-3.5 w-3.5" />
-                  </div>
-                  <span>Temperature</span>
-                </div>
-                <span className={`text-[10px] font-black px-2 py-0.5 rounded-full border ${
-                  Math.abs((activeStorage?.current_temp || 11.0) - (activeStorage?.target_temp || 11.0)) > 3.5
-                    ? 'bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800'
-                    : 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
-                }`}>
-                  {Math.abs((activeStorage?.current_temp || 11.0) - (activeStorage?.target_temp || 11.0)) > 3.5 ? 'Drift Alert' : 'Optimal'}
-                </span>
-              </div>
-
-              <div className="flex items-baseline justify-between pt-0.5">
-                <div className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">
-                  {activeStorage?.current_temp || 11.4}°C
-                </div>
-                <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 font-mono">
-                  Set: {activeStorage?.target_temp || 11.0}°C ({((activeStorage?.current_temp || 11.0) - (activeStorage?.target_temp || 11.0)) >= 0 ? `+${(((activeStorage?.current_temp || 11.0) - (activeStorage?.target_temp || 11.0))).toFixed(1)}` : (((activeStorage?.current_temp || 11.0) - (activeStorage?.target_temp || 11.0))).toFixed(1)}°C)
-                </span>
-              </div>
-
-              <div className="space-y-1">
-                <div className="w-full bg-slate-100 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden">
-                  <div 
-                    className={`h-full rounded-full transition-all duration-300 ${
-                      Math.abs((activeStorage?.current_temp || 11.0) - (activeStorage?.target_temp || 11.0)) > 3.5 ? 'bg-rose-500' : 'bg-emerald-500'
-                    }`}
-                    style={{ width: `${Math.min(100, Math.max(5, ((activeStorage?.current_temp || 11.0) / 35.0) * 100))}%` }}
-                  />
-                </div>
-                <div className="flex items-center justify-between text-[9px] text-slate-400 font-medium">
-                  <span>0°C Min</span>
-                  <span className="text-slate-600 dark:text-slate-300 font-bold">Target: {activeStorage?.target_temp || 11.0}°C</span>
-                  <span>35°C Max</span>
-                </div>
-              </div>
-
-              <div className="pt-1 border-t border-slate-100 dark:border-slate-800/80 text-[10px] text-slate-500 dark:text-slate-400 flex items-center justify-between">
-                <span>Sensor: DHT22 Digital</span>
-                <span className="text-emerald-600 dark:text-emerald-400 font-semibold">Cold Chain Stable</span>
-              </div>
-            </div>
-
-            {/* 2. Relative Humidity */}
-            <div className="p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xs space-y-2 relative overflow-hidden transition-all hover:border-sky-300 dark:hover:border-sky-900 flex flex-col justify-between">
-              <div className="flex items-center justify-between text-xs">
-                <div className="flex items-center gap-1.5 font-bold text-slate-700 dark:text-slate-200">
-                  <div className="p-1 rounded-lg bg-sky-50 dark:bg-sky-950/60 text-sky-600 dark:text-sky-400 border border-sky-200 dark:border-sky-900">
-                    <Droplets className="h-3.5 w-3.5" />
-                  </div>
-                  <span>Rel. Humidity</span>
-                </div>
-                <span className={`text-[10px] font-black px-2 py-0.5 rounded-full border ${
-                  (activeStorage?.current_humidity || 90.0) < 70 || (activeStorage?.current_humidity || 90.0) > 96
-                    ? 'bg-amber-50 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border-amber-200 dark:border-amber-800'
-                    : 'bg-sky-50 dark:bg-sky-950/60 text-sky-800 dark:text-sky-300 border border-sky-200 dark:border-sky-800'
-                }`}>
-                  {(activeStorage?.current_humidity || 90.0) < 70 ? 'Dry' : ((activeStorage?.current_humidity || 90.0) > 96 ? 'Condensing' : 'Hydrated')}
-                </span>
-              </div>
-
-              <div className="flex items-baseline justify-between pt-0.5">
-                <div className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">
-                  {activeStorage?.current_humidity || 90.2}%
-                </div>
-                <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 font-mono">
-                  Target: {activeStorage?.target_humidity || 89}% RH
-                </span>
-              </div>
-
-              <div className="space-y-1">
-                <div className="w-full bg-slate-100 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden">
-                  <div 
-                    className="h-full bg-sky-500 rounded-full transition-all duration-300"
-                    style={{ width: `${Math.min(100, Math.max(10, activeStorage?.current_humidity || 90.0))}%` }}
-                  />
-                </div>
-                <div className="flex items-center justify-between text-[9px] text-slate-400 font-medium">
-                  <span>30% Dry</span>
-                  <span className="text-sky-700 dark:text-sky-400 font-bold">Crisper Safe Zone</span>
-                  <span>100% Sat</span>
-                </div>
-              </div>
-
-              <div className="pt-1 border-t border-slate-100 dark:border-slate-800/80 text-[10px] text-slate-500 dark:text-slate-400 flex items-center justify-between">
-                <span>Sensor: Capacitive Array</span>
-                <span className="text-sky-600 dark:text-sky-400 font-semibold">Turgor Preserved</span>
-              </div>
-            </div>
-
-            {/* 3. VOC & Ethylene */}
-            <div className="p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xs space-y-2 relative overflow-hidden transition-all hover:border-amber-300 dark:hover:border-amber-900 flex flex-col justify-between">
-              <div className="flex items-center justify-between text-xs">
-                <div className="flex items-center gap-1.5 font-bold text-slate-700 dark:text-slate-200">
-                  <div className="p-1 rounded-lg bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-900">
-                    <Wind className="h-3.5 w-3.5" />
-                  </div>
-                  <span>VOC & Ethylene</span>
-                </div>
-                <span className={`text-[10px] font-black px-2 py-0.5 rounded-full border ${
-                  (activeStorage?.voc || 0.32) > 0.60
-                    ? 'bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800'
-                    : ((activeStorage?.voc || 0.32) > 0.35 ? 'bg-amber-50 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border-amber-200 dark:border-amber-800' : 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800')
-                }`}>
-                  {(activeStorage?.voc || 0.32) > 0.60 ? 'High Decay' : ((activeStorage?.voc || 0.32) > 0.35 ? 'Ripening Gas' : 'Fresh Range')}
-                </span>
-              </div>
-
-              <div className="flex items-baseline justify-between pt-0.5">
-                <div className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">
-                  {activeStorage?.voc || 0.32} <span className="text-xs font-semibold text-slate-500">ppm</span>
-                </div>
-                <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 font-mono">
-                  Safe: &lt;0.40 ppm
-                </span>
-              </div>
-
-              <div className="space-y-1">
-                <div className="w-full bg-slate-100 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden">
-                  <div 
-                    className={`h-full rounded-full transition-all duration-300 ${
-                      (activeStorage?.voc || 0.32) > 0.60 ? 'bg-rose-500' : ((activeStorage?.voc || 0.32) > 0.35 ? 'bg-amber-500' : 'bg-emerald-500')
-                    }`}
-                    style={{ width: `${Math.min(100, Math.max(5, ((activeStorage?.voc || 0.32) / 2.0) * 100))}%` }}
-                  />
-                </div>
-                <div className="flex items-center justify-between text-[9px] text-slate-400 font-medium">
-                  <span>0.00 Clean</span>
-                  <span className="text-amber-700 dark:text-amber-400 font-bold">C₂H₄ Respiration</span>
-                  <span>2.00 Decay</span>
-                </div>
-              </div>
-
-              <div className="pt-1 border-t border-slate-100 dark:border-slate-800/80 text-[10px] text-slate-500 dark:text-slate-400 flex items-center justify-between">
-                <span>Sensor: MQ-135 Gas Cell</span>
-                <span className="text-amber-600 dark:text-amber-400 font-semibold">Sub-Senescence</span>
-              </div>
-            </div>
-
-            {/* 4. CO2 Respiration */}
-            <div className="p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xs space-y-2 relative overflow-hidden transition-all hover:border-emerald-300 dark:hover:border-emerald-900 flex flex-col justify-between">
-              <div className="flex items-center justify-between text-xs">
-                <div className="flex items-center gap-1.5 font-bold text-slate-700 dark:text-slate-200">
-                  <div className="p-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900">
-                    <Gauge className="h-3.5 w-3.5" />
-                  </div>
-                  <span>CO₂ Respiration</span>
-                </div>
-                <span className={`text-[10px] font-black px-2 py-0.5 rounded-full border ${
-                  (activeStorage?.co2 || 415) > 1000
-                    ? 'bg-amber-50 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border-amber-200 dark:border-amber-800'
-                    : 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
-                }`}>
-                  {(activeStorage?.co2 || 415) > 1000 ? 'Vent Required' : 'Aerobic Optimal'}
-                </span>
-              </div>
-
-              <div className="flex items-baseline justify-between pt-0.5">
-                <div className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">
-                  {activeStorage?.co2 || 415} <span className="text-xs font-semibold text-slate-500">ppm</span>
-                </div>
-                <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 font-mono">
-                  Ceiling: &lt;1000 ppm
-                </span>
-              </div>
-
-              <div className="space-y-1">
-                <div className="w-full bg-slate-100 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden">
-                  <div 
-                    className={`h-full rounded-full transition-all duration-300 ${
-                      (activeStorage?.co2 || 415) > 1000 ? 'bg-amber-500' : 'bg-emerald-500'
-                    }`}
-                    style={{ width: `${Math.min(100, Math.max(10, (((activeStorage?.co2 || 415) - 350) / 1200) * 100))}%` }}
-                  />
-                </div>
-                <div className="flex items-center justify-between text-[9px] text-slate-400 font-medium">
-                  <span>350 Ambient</span>
-                  <span className="text-emerald-700 dark:text-emerald-400 font-bold">NDIR Optical Array</span>
-                  <span>1500 Peak</span>
-                </div>
-              </div>
-
-              <div className="pt-1 border-t border-slate-100 dark:border-slate-800/80 text-[10px] text-slate-500 dark:text-slate-400 flex items-center justify-between">
-                <span>Sensor: NDIR Optical</span>
-                <span className="text-emerald-600 dark:text-emerald-400 font-semibold">Aerobic Dormancy</span>
-              </div>
-            </div>
-
-          </div>
-
-          {/* Chamber Atmosphere & Aeration Status Card */}
-          <div className="p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xs space-y-2 text-xs">
-            <div className="flex items-center justify-between pb-1.5 border-b border-slate-100 dark:border-slate-800">
-              <span className="font-extrabold text-slate-900 dark:text-white flex items-center gap-1.5">
-                <Zap className="h-3.5 w-3.5 text-amber-500" /> Chamber Atmosphere & Aeration Status
-              </span>
-              <span className="text-[10px] font-bold text-slate-400 font-mono">
-                Sensor Bus: I2C (0x3C) • DHT22/MQ-135 Array
-              </span>
-            </div>
-            <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed">
-              {activeStorage?.status === 'warning' || (Math.abs((activeStorage?.current_temp || 11.0) - (activeStorage?.target_temp || 11.0)) > 3.5)
-                ? `Elevated thermal respiration observed at ${activeStorage?.current_temp || 11.4}°C (${((activeStorage?.current_temp || 11.0) - (activeStorage?.target_temp || 11.0)).toFixed(1)}°C above setpoint). VOC ripening gas accumulation detected at ${activeStorage?.voc || 0.32} ppm.`
-                : `Optimal cold chain stability maintained at ${activeStorage?.current_temp || 11.4}°C (target: ${activeStorage?.target_temp || 11.0}°C). Relative humidity at ${activeStorage?.current_humidity || 90.2}% preserves cellular turgor pressure without surface condensation.`}
-            </p>
-          </div>
-        </div>
+          );
+        })()}
 
       </div>
       {/* ─────────────────────────────────────────────────────────────
@@ -2978,6 +3123,36 @@ const activeStorage = storages.find(s => s?.id === selectedStorageId) || storage
                       </div>
         );
       })()}
+        </>
+      ) : (
+        /* Empty / Initial State Prompt: Prompt to click a storage unit */
+        <div className="p-8 sm:p-12 rounded-2xl bg-[#f8faf9] dark:bg-slate-800/60 border-2 border-dashed border-emerald-300 dark:border-emerald-800/80 text-center space-y-4 shadow-2xs animate-fade-in">
+          <div className="inline-flex p-3.5 rounded-2xl bg-emerald-50 dark:bg-emerald-950/70 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 shadow-2xs">
+            <Boxes className="h-8 w-8" />
+          </div>
+          <div className="max-w-md mx-auto space-y-1.5">
+            <h3 className="text-base sm:text-lg font-black text-slate-900 dark:text-white">
+              Select a Storage Chamber to Inspect
+            </h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed font-medium">
+              Click on <strong>Storage 1</strong> or any configured storage chamber card above to open its real-time optical camera scanner, 5-parameter IoT sensor telemetry, and dual-unit fusion analysis.
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
+            {storages.map(storage => (
+              <button
+                key={storage.id}
+                type="button"
+                onClick={() => handleSelectStorage(storage)}
+                className="px-4 py-2 rounded-xl text-xs font-bold bg-emerald-700 hover:bg-emerald-800 active:scale-95 text-white shadow-md shadow-emerald-700/20 transition-all flex items-center gap-1.5 cursor-pointer"
+              >
+                <Boxes className="h-3.5 w-3.5" />
+                <span>Inspect {storage.name}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
 
       {/* ESP32-CAM Hardware Node Modal */}

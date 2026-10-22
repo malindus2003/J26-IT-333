@@ -84,6 +84,17 @@ int packetSequenceNumber = 0;
 bool wifiAvailable = false;
 
 // ============================================================================
+// AI VISION INSPECTION SYNC STATE (Derived from Image Uploads)
+// ============================================================================
+String latestAiProduce = "Apple";
+String latestAiReason  = "Produce Quality: Safe";
+float  latestAiScore   = 18.0;
+float  latestAiRsl     = 72.0;
+bool   latestAiSpoiled = false;
+bool   latestAiWarning = false;
+bool   hasAiVisionData = false;
+
+// ============================================================================
 // 5. ALERT FEEDBACK CONTROLLER (RGB LED & BUZZER)
 // ============================================================================
 
@@ -152,52 +163,60 @@ float calculateCO2PPM(float rs, float r0) {
   return constrain(ppm + 400.0, 400.0, 3200.0);
 }
 
-void updateOLEDDisplay(float temp, float hum, float co2, const String& spoilageStatus, bool isSpoiled, bool isWarning) {
+void updateOLEDDisplay(float temp, float hum, float co2, const String& produce, float score, float rsl, const String& spoilageStatus, bool isSpoiled, bool isWarning) {
   if (!oledFound) return;
 
   display.clearDisplay();
 
-  // 1. Header Banner
+  // 1. Header Banner showing AI-identified Produce from Web UI Image Upload
   display.setTextSize(1);
   display.setTextColor(SSD1306_WHITE);
   display.setCursor(0, 0);
-  display.print("FRUIT & VEG STORAGE");
+  if (hasAiVisionData && produce.length() > 0 && produce != "Unknown") {
+    display.printf("AI: %s", produce.c_str());
+  } else {
+    display.print("FOOD QUALITY AI");
+  }
   display.drawLine(0, 9, 127, 9, SSD1306_WHITE);
 
-  // 2. Metrics Rows (Cleanly separated)
+  // 2. Web UI Vision Metrics: Spoilage Score & Remaining Shelf Life (RSL)
   display.setCursor(0, 13);
-  display.printf("T : %.1f C", temp);
-
+  display.printf("Spoil: %.0f%%", score);
   display.setCursor(68, 13);
-  display.printf("RH: %.0f %%", hum);
+  display.printf("RSL: %.0fh", rsl);
 
+  // 3. IoT Chamber Sensor Telemetry
   display.setCursor(0, 24);
-  display.printf("CO2: %.0f ppm", co2);
+  display.printf("T:%.1fC H:%.0f%% C:%d", temp, hum, (int)co2);
 
-  // 3. Spoilage Status Badge
+  // 4. Spoilage Status Badge (Inverted Black-on-White if Spoiled)
   if (isSpoiled) {
-    display.fillRect(0, 37, 128, 26, SSD1306_WHITE);
+    display.fillRect(0, 36, 128, 28, SSD1306_WHITE);
     display.setTextColor(SSD1306_BLACK, SSD1306_WHITE);
     display.setTextSize(1);
-    display.setCursor(8, 41);
+    display.setCursor(6, 40);
     display.print("!! SPOILED / RISK !!");
-    display.setCursor(10, 52);
-    display.print(spoilageStatus);
+    display.setCursor(6, 52);
+    String truncated = spoilageStatus;
+    if (truncated.length() > 20) truncated = truncated.substring(0, 20);
+    display.print(truncated);
   } else if (isWarning) {
-    display.drawRect(0, 37, 128, 26, SSD1306_WHITE);
+    display.drawRect(0, 36, 128, 28, SSD1306_WHITE);
     display.setTextColor(SSD1306_WHITE);
     display.setTextSize(1);
-    display.setCursor(8, 42);
+    display.setCursor(6, 40);
     display.print("[ WARN: DRIFT/RESPIRE ]");
-    display.setCursor(12, 52);
-    display.print(spoilageStatus);
+    display.setCursor(8, 52);
+    String truncated = spoilageStatus;
+    if (truncated.length() > 19) truncated = truncated.substring(0, 19);
+    display.print(truncated);
   } else {
-    display.drawRect(0, 37, 128, 26, SSD1306_WHITE);
+    display.drawRect(0, 36, 128, 28, SSD1306_WHITE);
     display.setTextColor(SSD1306_WHITE);
     display.setTextSize(1);
-    display.setCursor(12, 42);
+    display.setCursor(10, 40);
     display.print("[ FRESH / OPTIMAL ]");
-    display.setCursor(16, 52);
+    display.setCursor(8, 52);
     display.print("Produce Quality: Safe");
   }
 
@@ -249,6 +268,38 @@ bool dispatchHTTPTelemetry(const String& jsonPayload) {
 
   if (httpResponseCode > 0) {
     Serial.printf("[HTTP TX #%d] Status: %d OK\n", packetSequenceNumber, httpResponseCode);
+
+    // Parse OLED Display payload from image uploads returned by server
+    String responseBody = http.getString();
+    DynamicJsonDocument respDoc(2048);
+    DeserializationError err = deserializeJson(respDoc, responseBody);
+    if (!err && respDoc.containsKey("oled_command")) {
+      JsonObject oled = respDoc["oled_command"];
+      latestAiProduce = oled["produce"].as<String>();
+      latestAiSpoiled = oled["is_spoiled"].as<bool>();
+      latestAiWarning = oled["is_warning"].as<bool>();
+      latestAiReason  = oled["reason"].as<String>();
+      if (oled.containsKey("score")) latestAiScore = oled["score"].as<float>();
+      if (oled.containsKey("rsl"))   latestAiRsl   = oled["rsl"].as<float>();
+      hasAiVisionData = true;
+
+      Serial.printf("[OLED SYNC] AI Produce: %s | Status: %s | Score: %.0f%% | RSL: %.0fh\n",
+                    latestAiProduce.c_str(),
+                    latestAiSpoiled ? "SPOILED" : (latestAiWarning ? "WARN" : "FRESH"),
+                    latestAiScore, latestAiRsl);
+
+      float currTemp = dht.readTemperature();
+      if (isnan(currTemp)) currTemp = 28.5;
+      float currHum = dht.readHumidity();
+      if (isnan(currHum)) currHum = 75.0;
+      float vMQ = readSmoothedVoltage(PIN_MQ135_ADC);
+      float rsMQ = calculateSensorResistance(vMQ, RL_MQ135);
+      float currCo2 = calculateCO2PPM(rsMQ, R0_MQ135);
+
+      updateOLEDDisplay(currTemp, currHum, currCo2, latestAiProduce, latestAiScore, latestAiRsl, latestAiReason, latestAiSpoiled, latestAiWarning);
+      triggerAlertFeedback(latestAiSpoiled, latestAiWarning);
+    }
+
     http.end();
     return true;
   } else {
@@ -314,6 +365,42 @@ void setup() {
 // 8. MAIN EXECUTION LOOP
 // ============================================================================
 void loop() {
+  // Check USB Serial for incoming [OLED] commands from bridge or host
+  if (Serial.available()) {
+    String line = Serial.readStringUntil('\n');
+    line.trim();
+    if (line.startsWith("[OLED]")) {
+      String jsonPart = line.substring(6);
+      DynamicJsonDocument serialDoc(1024);
+      DeserializationError err = deserializeJson(serialDoc, jsonPart);
+      if (!err) {
+        latestAiProduce = serialDoc["produce"].as<String>();
+        latestAiSpoiled = serialDoc["is_spoiled"].as<bool>();
+        latestAiWarning = serialDoc["is_warning"].as<bool>();
+        latestAiReason  = serialDoc["reason"].as<String>();
+        if (serialDoc.containsKey("score")) latestAiScore = serialDoc["score"].as<float>();
+        if (serialDoc.containsKey("rsl"))   latestAiRsl   = serialDoc["rsl"].as<float>();
+        hasAiVisionData = true;
+
+        float currTemp = dht.readTemperature();
+        if (isnan(currTemp)) currTemp = 28.5;
+        float currHum = dht.readHumidity();
+        if (isnan(currHum)) currHum = 75.0;
+        float vMQ = readSmoothedVoltage(PIN_MQ135_ADC);
+        float rsMQ = calculateSensorResistance(vMQ, RL_MQ135);
+        float currCo2 = calculateCO2PPM(rsMQ, R0_MQ135);
+
+        updateOLEDDisplay(currTemp, currHum, currCo2, latestAiProduce, latestAiScore, latestAiRsl, latestAiReason, latestAiSpoiled, latestAiWarning);
+        triggerAlertFeedback(latestAiSpoiled, latestAiWarning);
+
+        Serial.printf("[OLED SERIAL RX] Updated: %s (%s, Score: %.0f%%)\n", 
+                      latestAiProduce.c_str(), 
+                      latestAiSpoiled ? "SPOILED" : "FRESH",
+                      latestAiScore);
+      }
+    }
+  }
+
   unsigned long currentMillis = millis();
 
   if (currentMillis - lastTransmitTime >= TRANSMIT_INTERVAL_MS) {
@@ -353,11 +440,18 @@ void loop() {
       spoilageReason = "Warm Storage/Respire";
     }
 
-    // 4. Update the OLED Screen
-    updateOLEDDisplay(temperature, humidity, co2_ppm, spoilageReason, isSpoiled, isWarning);
+    // 4. Update the OLED Screen (prioritizing Image Upload AI Verdict)
+    String effectiveProduce = hasAiVisionData ? latestAiProduce : "Storage 1";
+    String effectiveReason  = hasAiVisionData ? latestAiReason : spoilageReason;
+    float  effectiveScore   = hasAiVisionData ? latestAiScore : (isSpoiled ? 78.0 : (isWarning ? 48.0 : 18.0));
+    float  effectiveRsl     = hasAiVisionData ? latestAiRsl : (isSpoiled ? 0.0 : (isWarning ? 24.0 : 72.0));
+    bool effectiveSpoiled   = hasAiVisionData ? latestAiSpoiled : isSpoiled;
+    bool effectiveWarning   = hasAiVisionData ? latestAiWarning : isWarning;
+
+    updateOLEDDisplay(temperature, humidity, co2_ppm, effectiveProduce, effectiveScore, effectiveRsl, effectiveReason, effectiveSpoiled, effectiveWarning);
 
     // 5. Trigger Visual (RGB LED) and Acoustic (Buzzer) Alerts
-    triggerAlertFeedback(isSpoiled, isWarning);
+    triggerAlertFeedback(effectiveSpoiled, effectiveWarning);
 
     // 6. Construct JSON Payload
     float voc_ppm = 0.15 + ((co2_ppm - 400.0) / 3000.0) * 0.40;

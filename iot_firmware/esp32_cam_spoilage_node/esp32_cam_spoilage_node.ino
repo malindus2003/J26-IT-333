@@ -76,7 +76,7 @@ unsigned long lastPushTime = 0;
 // ==========================================
 void turnOnFlash() {
   digitalWrite(FLASH_LED_PIN, HIGH);
-  delay(120); // Brief warm-up for exposure balance
+  delay(250); // Allow sensor matrix & AGC to adapt to the bright flash
 }
 
 void turnOffFlash() {
@@ -92,6 +92,13 @@ static esp_err_t capture_handler(httpd_req_t *req) {
   digitalWrite(STATUS_LED_PIN, LOW); // LED ON
   turnOnFlash();
 
+  // Flush stale frame from DMA buffer that was exposed in the dark
+  camera_fb_t * fb_stale = esp_camera_fb_get();
+  if (fb_stale) {
+    esp_camera_fb_return(fb_stale);
+  }
+
+  // Capture the actual illuminated frame
   camera_fb_t * fb = esp_camera_fb_get();
   turnOffFlash();
 
@@ -197,6 +204,14 @@ void startCameraServer() {
 // ==========================================
 void postSnapshotToBackend() {
   turnOnFlash();
+
+  // Flush stale frame from DMA buffer
+  camera_fb_t * fb_stale = esp_camera_fb_get();
+  if (fb_stale) {
+    esp_camera_fb_return(fb_stale);
+  }
+
+  // Capture illuminated frame
   camera_fb_t * fb = esp_camera_fb_get();
   turnOffFlash();
 
@@ -292,14 +307,18 @@ void setup() {
     }
   }
 
-  // Adjust camera sensor tuning for optimal color fidelity
+  // Adjust camera sensor tuning for optimal color fidelity & low-light adaptation
   sensor_t * s = esp_camera_sensor_get();
   if (s != NULL) {
     s->set_brightness(s, 1);    // -2 to 2
     s->set_contrast(s, 1);      // -2 to 2
     s->set_saturation(s, 1);    // -2 to 2
     s->set_whitebal(s, 1);      // Auto White Balance
-    s->set_awb_gain(s, 1);
+    s->set_awb_gain(s, 1);      // Auto White Balance Gain
+    s->set_exposure_ctrl(s, 1); // Auto Exposure Control (AEC)
+    s->set_aec2(s, 1);          // Auto Exposure DSP
+    s->set_gain_ctrl(s, 1);     // Auto Gain Control (AGC)
+    s->set_gainceiling(s, GAINCEILING_8X); // Boost low-light gain ceiling
   }
 
   // Connect to Wi-Fi

@@ -166,8 +166,16 @@ def run_serial_bridge(port: str, baud: int, backend_url: str):
                     resp = requests.post(backend_url, json=payload, timeout=3.0)
                     now_str = datetime.datetime.now().strftime("%H:%M:%S")
                     if resp.status_code == 200:
-                        status = resp.json().get("data", {}).get("status", "optimal").upper()
+                        res_json = resp.json()
+                        status = res_json.get("data", {}).get("status", "optimal").upper()
                         print(f"[{now_str}] Ingested to Backend -> Status: [{status}] (HTTP 200 OK)")
+
+                        # Transmit latest AI Vision OLED payload to physical ESP32
+                        oled_cmd = res_json.get("oled_command")
+                        if oled_cmd:
+                            oled_str = json.dumps(oled_cmd)
+                            ser.write(f"[OLED]{oled_str}\n".encode('utf-8'))
+                            print(f"[{now_str}] -> Forwarded to physical OLED: {oled_cmd.get('produce')} [{oled_cmd.get('status')}]")
                     else:
                         print(f"[{now_str}] Backend Error: HTTP {resp.status_code}")
                 except json.JSONDecodeError:

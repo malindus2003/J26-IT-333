@@ -216,6 +216,20 @@ async def analyze_produce_image(
     }
     _save_to_inspection_history(history_entry)
 
+    try:
+        from .inventory import update_inventory_from_inspection
+        recs = response_data.get("action_recommendations")
+        rec = recs[0] if recs else None
+        update_inventory_from_inspection(
+            response_data["identification"]["species"],
+            response_data["spoilage"]["probability"],
+            response_data["shelf_life"]["remaining_hours"],
+            response_data["spoilage"]["risk_level"],
+            rec
+        )
+    except Exception:
+        pass
+
     return response_data
 
 
@@ -236,7 +250,7 @@ async def capture_produce_from_esp32(payload: ESP32CapturePayload):
             clean_url,
             headers={"User-Agent": "GreenPulse-ESP32-Capture-Client/2.3"}
         )
-        with urllib.request.urlopen(req, timeout=7.0) as resp:
+        with urllib.request.urlopen(req, timeout=20.0) as resp:
             image_bytes = resp.read()
             if not image_bytes or len(image_bytes) < 100:
                 raise HTTPException(status_code=502, detail="Empty frame received from ESP32-CAM module")
@@ -254,7 +268,7 @@ async def capture_produce_from_esp32(payload: ESP32CapturePayload):
         )
 
     results = vision_engine.analyze_image(image_bytes, category=payload.category)
-    b64_str = base64.b64encode(image_bytes).decode("utf-8")
+    b64_str = results.get("enhanced_image_base64") or base64.b64encode(image_bytes).decode("utf-8")
     data_url = f"data:image/jpeg;base64,{b64_str}"
 
     response_data = _build_produce_response(results, payload.category, source=f"ESP32-CAM ({payload.device_id})")

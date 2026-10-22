@@ -7,6 +7,38 @@ from ..services.firebase_service import firebase_service
 
 router = APIRouter(prefix="/api/sensors", tags=["Sensors & IoT"])
 
+@router.get("/oled-command")
+def get_physical_oled_command():
+    """
+    Returns the real-time OLED screen payload derived from Computer Vision image analysis.
+    Physical ESP32 microcontrollers and the hardware bridge poll or receive this to update
+    their connected 0.96" SSD1306 OLED screens immediately upon image upload.
+    """
+    from ..services.oled_service import oled_service
+    return {
+        "status": "success",
+        "oled_command": oled_service.get_state()
+    }
+
+@router.post("/oled-update")
+def update_oled_display_state(payload: Dict[str, Any]):
+    """
+    Allows the Web UI to explicitly push active produce/inspection state to the physical OLED.
+    """
+    from ..services.oled_service import oled_service
+    result = oled_service.update_from_vision_result(
+        produce_name=payload.get("produce", "Produce"),
+        visual_score=payload.get("visual_score", 20.0),
+        risk_level=payload.get("risk_level", "Low"),
+        mould_detected=payload.get("mould_detected", False),
+        rsl_hours=payload.get("rsl_hours", 72.0),
+        source=payload.get("source", "Web UI Direct Sync")
+    )
+    return {
+        "status": "success",
+        "oled_command": result
+    }
+
 @router.get("/firebase/status")
 def get_firebase_status():
     """Retrieve the live Firebase Realtime Database connection state."""
@@ -98,10 +130,26 @@ def ingest_esp32_telemetry(payload: SensorReading):
         "status": zone_match["status"]
     })
 
+    from ..services.oled_service import oled_service
+    oled_cmd = oled_service.get_state()
+
+    # Ultra-compact payload tailored for ESP32 DynamicJsonDocument memory limits
+    compact_oled = {
+        "produce": oled_cmd.get("produce", "Storage 1"),
+        "status": oled_cmd.get("status", "FRESH"),
+        "score": round(float(oled_cmd.get("visual_score", 0.0)), 1),
+        "rsl": round(float(oled_cmd.get("rsl_hours", 72.0)), 1),
+        "is_spoiled": bool(oled_cmd.get("is_spoiled", False)),
+        "is_warning": bool(oled_cmd.get("is_warning", False)),
+        "reason": str(oled_cmd.get("reason", "Produce Quality: Safe"))[:24],
+        "ui_temp": round(float(zone_match.get("target_temp", 11.0)), 1),
+        "ui_hum": round(float(zone_match.get("target_humidity", 89.0)), 1)
+    }
+
     return {
         "status": "success",
-        "message": f"Telemetry ingested for {zone_match['name']}",
+        "data": {"status": zone_match.get("status", "optimal"), "name": zone_match.get("name")},
         "firebase_synced": firebase_pushed,
-        "data": zone_match,
+        "oled_command": compact_oled,
         "received_at": datetime.now().isoformat()
     }

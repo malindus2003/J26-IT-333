@@ -188,6 +188,40 @@ export default function App() {
 
   const handleVisionInspectionComplete = (features) => {
     setCurrentVisionFeatures(features);
+    if (!features) return;
+    const produceName = features.identified_produce || features.produce || features.name;
+    if (!produceName || produceName.toLowerCase().includes("unknown")) return;
+
+    const prob = typeof features.spoilage_probability === "number" ? features.spoilage_probability : (features.spoilage_score || 15.0);
+    const rsl = typeof features.remaining_shelf_life_hours === "number" ? features.remaining_shelf_life_hours : 72.0;
+    const risk = features.risk_level || (prob >= 75 ? "Critical" : (prob >= 50 ? "High" : "Low"));
+
+    setInventoryItems(prev => {
+      const idx = prev.findIndex(item => 
+        item.name.toLowerCase().includes(produceName.toLowerCase()) || 
+        produceName.toLowerCase().includes(item.name.toLowerCase())
+      );
+      if (idx >= 0) {
+        const updated = [...prev];
+        updated[idx] = {
+          ...updated[idx],
+          spoilage_prob: prob,
+          remaining_shelf_life_hours: rsl,
+          risk_level: risk,
+          status: risk === "Critical" ? "Critical (Quarantine Required)" : (risk === "High" ? "Near Spoilage (~75%) - Prioritize FIFO" : "Fresh Inspection Verified"),
+          recommendation: features.action_recommendation || (risk === "Critical" ? "Quarantine immediately to prevent cross-contamination." : "Optimal quality.")
+        };
+        return updated;
+      }
+      return prev;
+    });
+
+    // Re-sync with backend inventory
+    axios.get("http://localhost:8000/api/inventory/items")
+      .then(res => {
+        if (res.data?.items?.length > 0) setInventoryItems(res.data.items);
+      })
+      .catch(() => {});
   };
 
   const handleLoginSuccess = (user) => {
