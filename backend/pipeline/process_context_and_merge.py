@@ -11,7 +11,7 @@ Description:
 
 import sys
 import os
-import holidays
+import holidays  # type: ignore
 import pandas as pd
 import numpy as np
 
@@ -176,7 +176,7 @@ def main():
     # Print summary of holidays detected
     print("\n--- Detected Sri Lankan Holidays in the Date Range ---")
     holidays_found = context_df[context_df['is_holiday'] == 1][['date', 'holiday_name', 'day_name', 'is_poya']]
-    print(holidays_found.to_string(index=False))
+    print(holidays_found.to_string(index=False))  # type: ignore
 
 if __name__ == '__main__':
     main()

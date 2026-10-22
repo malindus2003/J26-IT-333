@@ -53,7 +53,7 @@ grid_df['total_sales'] = grid_df['total_sales'].fillna(0)
 grid_df = grid_df.drop(columns=['total_quantity'])
 
 # Add unit price
-grid_df['unit_price'] = grid_df['item'].map(item_price_map)
+grid_df['unit_price'] = grid_df['item'].map(item_price_map)  # type: ignore
 
 # Add restaurant operating status flag
 grid_df['is_closed'] = grid_df['date'].apply(lambda d: 1 if d in closed_dates else 0)
@@ -105,4 +105,4 @@ grid_df.to_csv(output_file, index=False)
 print(f"[✓] Successfully saved completed grid to: {output_file}")
 print(f"    Final shape: {grid_df.shape}")
 print(f"\n--- Preview of Category Breakdown ---")
-print(grid_df.groupby('item_category')['quantity_demanded'].sum().sort_values(ascending=False))
+print(grid_df.groupby('item_category')['quantity_demanded'].sum().sort_values(ascending=False))  # type: ignore

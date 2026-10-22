@@ -453,7 +453,12 @@ def load_csv_menu():
                     if not clean or clean.lower() == 'nan':
                         continue
                         
-                    price = float(row[price_col]) if price_col and pd.notnull(row[price_col]) else 1500.0
+                    price = 1500.0
+                    if price_col:
+                        try:
+                            price = float(row[price_col])  # type: ignore
+                        except Exception:
+                            price = 1500.0
                     cat, st_id, st_name, img, bom = classify_item(clean)
                     
                     items.append({
@@ -513,6 +518,7 @@ INITIAL_ORDERS = [
         "station_id": "station-1",
         "station_name": "Hot Kitchen",
         "created_at": (datetime.now() - timedelta(minutes=6)).strftime("%H:%M:%S"),
+        "created_date": datetime.now().strftime("%Y-%m-%d"),
         "elapsed_mins": 6,
         "target_prep_mins": 8,
         "ingredients_deducted": [
@@ -537,6 +543,7 @@ INITIAL_ORDERS = [
         "station_id": "station-2",
         "station_name": "Grill",
         "created_at": (datetime.now() - timedelta(minutes=10)).strftime("%H:%M:%S"),
+        "created_date": datetime.now().strftime("%Y-%m-%d"),
         "elapsed_mins": 10,
         "target_prep_mins": 14,
         "ingredients_deducted": [
@@ -559,6 +566,7 @@ INITIAL_ORDERS = [
         "station_id": "station-1",
         "station_name": "Hot Kitchen",
         "created_at": (datetime.now() - timedelta(minutes=18)).strftime("%H:%M:%S"),
+        "created_date": datetime.now().strftime("%Y-%m-%d"),
         "elapsed_mins": 18,
         "target_prep_mins": 6,
         "ingredients_deducted": [
@@ -581,6 +589,7 @@ INITIAL_ORDERS = [
         "station_id": "station-2",
         "station_name": "Grill",
         "created_at": (datetime.now() - timedelta(minutes=35)).strftime("%H:%M:%S"),
+        "created_date": datetime.now().strftime("%Y-%m-%d"),
         "elapsed_mins": 35,
         "target_prep_mins": 15,
         "ingredients_deducted": [
@@ -590,7 +599,7 @@ INITIAL_ORDERS = [
     }
 ]
 
-orders_db = list(INITIAL_ORDERS)
+orders_db = [dict(o) for o in INITIAL_ORDERS]
 
 # --- REQUEST SCHEMAS ---
 class OrderItemPayload(BaseModel):
@@ -662,7 +671,7 @@ def get_menu_catalog():
         try:
             fb_items = firebase_service.get_menu_items()
             if fb_items and isinstance(fb_items, dict):
-                existing_ids = {m["id"] for m in MENU_ITEMS}
+                existing_ids = {m["id"] for m in ALL_MENU_ITEMS}
                 for item_id, item_val in fb_items.items():
                     if item_id not in existing_ids and isinstance(item_val, dict):
                         bom = item_val.get("recipe_bom")
@@ -678,7 +687,7 @@ def get_menu_catalog():
                         elif not bom:
                             bom = []
 
-                        MENU_ITEMS.append({
+                        dish_entry = {
                             "id": item_id,
                             "name": item_val.get("name", "Dish"),
                             "category": item_val.get("category", "Main Course"),
@@ -691,7 +700,10 @@ def get_menu_catalog():
                             "description": item_val.get("description") or "",
                             "recipe_bom": bom,
                             "branch_id": item_val.get("branch_id") or "branch-hikkaduwa"
-                        })
+                        }
+                        MENU_ITEMS.append(dish_entry)
+                        if ALL_MENU_ITEMS is not MENU_ITEMS:
+                            ALL_MENU_ITEMS.append(dish_entry)
                         existing_ids.add(item_id)
         except Exception:
             pass
@@ -737,6 +749,7 @@ def get_menu_catalog():
         })
     return {"menu": enriched_menu, "total_dishes": len(enriched_menu)}
 
+
 @router.post("/menu")
 def add_menu_item(payload: CreateMenuItemPayload):
     """
@@ -748,8 +761,8 @@ def add_menu_item(payload: CreateMenuItemPayload):
     if payload.price_lkr <= 0:
         raise HTTPException(status_code=400, detail="Price must be greater than zero")
 
-    existing_ids = {m["id"] for m in MENU_ITEMS}
-    new_index = len(MENU_ITEMS) + 1
+    existing_ids = {m["id"] for m in ALL_MENU_ITEMS}
+    new_index = len(ALL_MENU_ITEMS) + 1
     new_id = f"menu-{new_index:02d}"
     while new_id in existing_ids:
         new_index += 1
@@ -828,8 +841,10 @@ def add_menu_item(payload: CreateMenuItemPayload):
         "created_at": datetime.now().isoformat()
     }
 
-    # Prepend to MENU_ITEMS so it immediately shows at the top of the POS menu
+    # Prepend to MENU_ITEMS and ALL_MENU_ITEMS so it immediately shows at the top of the POS menu
     MENU_ITEMS.insert(0, new_dish)
+    if ALL_MENU_ITEMS is not MENU_ITEMS and new_dish not in ALL_MENU_ITEMS:
+        ALL_MENU_ITEMS.insert(0, new_dish)
 
     # Persist directly to Firebase Realtime Database at /menu_items/{new_id}
     firebase_saved = False
@@ -842,7 +857,6 @@ def add_menu_item(payload: CreateMenuItemPayload):
         "firebase_synced": firebase_saved,
         "item": new_dish
     }
-
 
 @router.get("")
 def list_orders(status: Optional[str] = None, exclude_dismissed: bool = False):
@@ -962,6 +976,7 @@ def place_new_order(payload: CreateOrderPayload):
         "station_id": primary_station_id,
         "station_name": primary_station_name,
         "created_at": datetime.now().strftime("%H:%M:%S"),
+        "created_date": datetime.now().strftime("%Y-%m-%d"),
         "elapsed_mins": 0,
         "target_prep_mins": max_prep_time,
         "ingredients_deducted": deducted_log,
@@ -1208,4 +1223,3 @@ def delete_order_reservation(res_id: str):
         except Exception as e:
             print(f"[!] Error deleting reservation in orders: {e}")
     return {"status": "success", "deleted": deleted, "message": f"Reservation {res_id} removed"}
-

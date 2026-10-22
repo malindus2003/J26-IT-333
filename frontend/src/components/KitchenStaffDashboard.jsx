@@ -18,6 +18,7 @@ export default function KitchenStaffDashboard({
   onRefresh,
   onNavigateModule
 }) {
+  const isAdmin = String(currentRole || '').toLowerCase() === 'admin';
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [simulateLowEfficiency, setSimulateLowEfficiency] = useState(false);
@@ -86,9 +87,32 @@ export default function KitchenStaffDashboard({
   const [analyticsViewTab, setAnalyticsViewTab] = useState('daily'); // 'daily' | 'weekly' | 'summary'
   const [stationShiftFilter, setStationShiftFilter] = useState({}); // { [stationName]: 'all' | 'morning' | 'afternoon' | 'night' }
 
+  // --- 3-Day Demand-Driven Staff Allocation State ---
+  const [selected3DayTab, setSelected3DayTab] = useState('today'); // 'today' | 'tomorrow' | 'day_after'
+  const [demandForecastData, setDemandForecastData] = useState(null);
+  const [demandItemSearch, setDemandItemSearch] = useState('');
+  const [demandStationFilter, setDemandStationFilter] = useState('all');
+  const [showItemPrepTable, setShowItemPrepTable] = useState(true);
+  const [currentLiveDate, setCurrentLiveDate] = useState(() => new Date());
+
+  // Periodically refresh real-time calendar date every 30 seconds
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentLiveDate(new Date());
+    }, 30000);
+    return () => clearInterval(timer);
+  }, []);
+
   // --- Staff Sub-Tab State & Admin Onboarding State ---
   const [staffSubTab, setStaffSubTab] = useState('directory'); // 'directory' | 'onboard'
   const [adminStaffView, setAdminStaffView] = useState('onboard'); // 'onboard' | 'matrix'
+
+  // Restrict non-admin users to directory view only
+  useEffect(() => {
+    if (!isAdmin && staffSubTab !== 'directory') {
+      setStaffSubTab('directory');
+    }
+  }, [isAdmin, staffSubTab]);
   const [isSubmittingStaff, setIsSubmittingStaff] = useState(false);
   const [lastAddedStaff, setLastAddedStaff] = useState(null);
   const [newStaffForm, setNewStaffForm] = useState({
@@ -157,6 +181,12 @@ export default function KitchenStaffDashboard({
       } catch (uErr) {
         // silent fallback
       }
+      try {
+        const demandRes = await axios.get("http://localhost:8000/api/demand/forecasts");
+        if (demandRes?.data) {
+          setDemandForecastData(demandRes.data);
+        }
+      } catch (dErr) { }
       try {
         const metricsRes = await axios.get("http://localhost:8000/api/kitchen/metrics");
         if (metricsRes?.data) {
@@ -228,39 +258,117 @@ export default function KitchenStaffDashboard({
 
   // Real-Time Today Order Intake & Meal Period Aggregation (Updates Reactively on Incoming Orders)
   const todayMealStats = useMemo(() => {
-    let liveMorning = 0;
-    let liveAfternoon = 0;
-    let liveEvening = 0;
+    const now = new Date();
+    const curHour = now.getHours();
+    const curMin = now.getMinutes();
+    const curTime = curHour + curMin / 60;
+    const todayDateStr = now.toISOString().slice(0, 10); // "YYYY-MM-DD"
 
-    liveOrders.forEach(o => {
-      const timeStr = o.created_at || "";
-      const [hStr, mStr] = timeStr.split(":");
-      const h = parseInt(hStr, 10);
-      const m = parseInt(mStr, 10) || 0;
-      const t = isNaN(h) ? 13 : h + m / 60;
-      if (t < 11.5) liveMorning++;
-      else if (t < 16.5) liveAfternoon++;
-      else liveEvening++;
+    const activeShift = curTime < 11.5 ? 'morning' : (curTime < 16.5 ? 'afternoon' : 'evening');
+
+    const morningOrders = [];
+    const afternoonOrders = [];
+    const eveningOrders = [];
+
+    (liveOrders || []).forEach(o => {
+      // 1. Date check if order has explicit date
+      if (o.created_date && o.created_date !== todayDateStr) {
+        return; // Skip orders from other days
+      }
+
+      // 2. Parse time
+      let t = null;
+      const timeStr = String(o.created_at || o.timestamp || "").trim();
+      if (timeStr) {
+        if (timeStr.includes("T") || (timeStr.includes("-") && timeStr.includes(":"))) {
+          const d = new Date(timeStr);
+          if (!isNaN(d.getTime())) {
+            const ordDateStr = d.toISOString().slice(0, 10);
+            if (ordDateStr !== todayDateStr) return;
+            t = d.getHours() + d.getMinutes() / 60;
+          }
+        }
+        if (t === null) {
+          const match = timeStr.match(/(\d{1,2}):(\d{2})(?::\d{2})?\s*(AM|PM)?/i);
+          if (match) {
+            let h = parseInt(match[1], 10);
+            const m = parseInt(match[2], 10) || 0;
+            const meridiem = match[3] ? match[3].toUpperCase() : null;
+            if (meridiem === 'PM' && h < 12) h += 12;
+            if (meridiem === 'AM' && h === 12) h = 0;
+            t = h + m / 60;
+          }
+        }
+      }
+
+      // If no valid time string, assume it's a live incoming order right now
+      const orderTime = (t !== null && !isNaN(t)) ? t : curTime;
+
+      // Filter into shifts based on sequential progression of the day
+      // An upcoming shift that hasn't started yet CANNOT have orders yet
+      if (orderTime < 11.5) {
+        // Morning shift (06:00 – 11:30)
+        if (orderTime >= 5.5 && (curTime >= 11.5 || orderTime <= curTime + 0.1)) {
+          morningOrders.push(o);
+        }
+      } else if (orderTime < 16.5) {
+        // Afternoon shift (11:30 – 16:30)
+        // Only valid if afternoon has started or completed
+        if (curTime >= 11.5 && (curTime >= 16.5 || orderTime <= curTime + 0.1)) {
+          afternoonOrders.push(o);
+        }
+      } else {
+        // Evening shift (16:30 – 23:00)
+        // Only valid if evening has started
+        if (curTime >= 16.5 && orderTime <= curTime + 0.1) {
+          eveningOrders.push(o);
+        }
+      }
     });
 
-    const morningBase = 92;
-    const afternoonBase = 124;
-    const eveningBase = 28;
+    const countDishes = (ordersList) => {
+      return ordersList.reduce((sum, order) => {
+        const items = Array.isArray(order.items) ? order.items : [];
+        const orderDishes = items.reduce((iSum, it) => iSum + (parseInt(it.quantity, 10) || 1), 0);
+        return sum + (orderDishes > 0 ? orderDishes : 1);
+      }, 0);
+    };
 
-    const morningTotal = morningBase + liveMorning;
-    const afternoonTotal = afternoonBase + liveAfternoon;
-    const eveningTotal = eveningBase + liveEvening;
+    const extractTopDishes = (ordersList, fallbackText) => {
+      const counts = {};
+      ordersList.forEach(order => {
+        const items = Array.isArray(order.items) ? order.items : [];
+        items.forEach(it => {
+          const name = it.name || it.item_name;
+          if (name) {
+            counts[name] = (counts[name] || 0) + (parseInt(it.quantity, 10) || 1);
+          }
+        });
+      });
+      const sorted = Object.keys(counts).sort((a, b) => counts[b] - counts[a]);
+      if (sorted.length > 0) {
+        return sorted.slice(0, 3).join(", ");
+      }
+      return fallbackText;
+    };
+
+    const morningTotal = morningOrders.length;
+    const afternoonTotal = afternoonOrders.length;
+    const eveningTotal = eveningOrders.length;
+
+    const morningDishes = countDishes(morningOrders);
+    const afternoonDishes = countDishes(afternoonOrders);
+    const eveningDishes = countDishes(eveningOrders);
+
     const totalActualToday = morningTotal + afternoonTotal + eveningTotal;
+    const totalDishesToday = morningDishes + afternoonDishes + eveningDishes;
 
     const predictedToday = workloadAnalytics?.predicted_daily_orders?.[0]?.predicted_orders || 417;
-    const progressPct = Math.min(100, Math.round((totalActualToday / predictedToday) * 100));
-
-    const now = new Date();
-    const curTime = now.getHours() + now.getMinutes() / 60;
-    const activeShift = curTime < 11.5 ? 'morning' : (curTime < 16.5 ? 'afternoon' : 'evening');
+    const progressPct = totalActualToday > 0 ? Math.min(100, Math.round((totalActualToday / predictedToday) * 100)) : 0;
 
     return {
       totalActualToday,
+      totalDishesToday,
       predictedToday,
       progressPct,
       activeShift,
@@ -272,11 +380,11 @@ export default function KitchenStaffDashboard({
           shiftLabel: 'Breakfast Shift',
           timeRange: '06:00 – 11:30',
           orders: morningTotal,
-          dishes: Math.round(morningTotal * 0.21),
+          dishes: morningDishes,
           status: curTime >= 11.5 ? 'Completed' : 'Active Now',
           isCurrent: activeShift === 'morning',
           icon: '🌅',
-          popularItems: 'Fresh Berry Smoothie Bowl, Belgian Waffle'
+          popularItems: extractTopDishes(morningOrders, 'Fresh Berry Smoothie Bowl, Belgian Waffle')
         },
         {
           key: 'afternoon',
@@ -284,11 +392,11 @@ export default function KitchenStaffDashboard({
           shiftLabel: 'Lunch Rush Peak',
           timeRange: '11:30 – 16:30',
           orders: afternoonTotal,
-          dishes: Math.round(afternoonTotal * 0.22),
+          dishes: afternoonDishes,
           status: curTime >= 16.5 ? 'Completed' : (curTime >= 11.5 ? 'Active Now' : 'Upcoming'),
           isCurrent: activeShift === 'afternoon',
           icon: '☀️',
-          popularItems: 'Chicken Kottu Roti, Salmon Steak, Garden Salad'
+          popularItems: extractTopDishes(afternoonOrders, 'Chicken Kottu Roti, Salmon Steak, Garden Salad')
         },
         {
           key: 'evening',
@@ -296,11 +404,11 @@ export default function KitchenStaffDashboard({
           shiftLabel: 'Dinner & Late Service',
           timeRange: '16:30 – 23:00',
           orders: eveningTotal,
-          dishes: Math.round(eveningTotal * 0.24),
+          dishes: eveningDishes,
           status: curTime >= 16.5 ? 'Active Now' : 'Upcoming',
           isCurrent: activeShift === 'evening',
           icon: '🌙',
-          popularItems: 'Prime Beef Sirloin, Woodfired Pizza, Calamari'
+          popularItems: extractTopDishes(eveningOrders, 'Prime Beef Sirloin, Woodfired Pizza, Calamari')
         }
       ]
     };
@@ -315,21 +423,30 @@ export default function KitchenStaffDashboard({
         await fetchLiveOrders();
       }
     } catch (e) {
+      const fallbackDishes = [
+        { name: "Artisan Wood-Fired Margherita Pizza", station: "Pizza", price: 1850 },
+        { name: "Grilled Atlantic Salmon Steak", station: "Seafood", price: 2850 },
+        { name: "Artisan Garden Harvest Salad", station: "Cold Salad", price: 980 },
+        { name: "Belgian Berry & Banana Waffle", station: "Dessert", price: 1150 },
+        { name: "Fresh Berry Smoothie Bowl", station: "Beverages", price: 850 }
+      ];
+      const pick = fallbackDishes[Date.now() % fallbackDishes.length];
       setLiveOrders(prev => [
         {
           id: `ORD-${Date.now().toString().slice(-4)}`,
           order_number: prev.length + 85,
-          table_no: "Table 08",
+          table_no: `Table 0${(prev.length % 8) + 1}`,
           order_type: "Dine-In",
-          items: [{ menu_id: "sim-quick", name: "Chicken Kottu Roti Supreme", quantity: 1, unit_price: 1450 }],
-          total_amount_lkr: 1450,
+          station_name: pick.station,
+          items: [{ menu_id: "sim-quick", name: pick.name, quantity: 1, unit_price: pick.price }],
+          total_amount_lkr: pick.price,
           status: "in_prep",
           created_at: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
           target_prep_mins: 8
         },
         ...prev
       ]);
-      setDismissedToast("⚡ Live order received! Real-time intake updated.");
+      setDismissedToast(`⚡ Live incoming order received (${pick.name} - ${pick.station})! Real-time intake updated.`);
       setTimeout(() => setDismissedToast(""), 3500);
     }
   };
@@ -786,22 +903,32 @@ export default function KitchenStaffDashboard({
   const getStationForDish = (dishName = "") => {
     const nl = (dishName || "").toLowerCase();
     if (nl.includes("pizza") || nl.includes("margherita") || nl.includes("calzone") || nl.includes("diavola") || nl.includes("pepperoni") || nl.includes("garlic pizza")) return "Pizza";
-    if (nl.includes("salmon") || nl.includes("steak") || nl.includes("beef") || nl.includes("sirloin") || nl.includes("grill") || nl.includes("charbroil") || nl.includes("platter") || nl.includes("bbq") || nl.includes("lamb")) return "Grill";
-    if (nl.includes("salad") || nl.includes("smoothie") || nl.includes("avocado") || nl.includes("feta") || nl.includes("bowl") || nl.includes("fruit") || nl.includes("greens")) return "Cold Salad";
-    if (nl.includes("cuttlefish") || nl.includes("calamari") || nl.includes("fry") || nl.includes("samosa") || nl.includes("fries") || nl.includes("crispy") || nl.includes("nugget") || nl.includes("wedges")) return "Fryer";
-    if (nl.includes("juice") || nl.includes("tea") || nl.includes("coke") || nl.includes("sprite") || nl.includes("beverage") || nl.includes("coffee") || nl.includes("cola")) return "Beverages";
-    return "Hot Kitchen";
+    if (nl.includes("smoothie") || nl.includes("juice") || nl.includes("tea") || nl.includes("coke") || nl.includes("sprite") || nl.includes("beverage") || nl.includes("coffee") || nl.includes("cola") || nl.includes("shake") || nl.includes("drink") || nl.includes("quencher")) return "Beverages";
+    if (nl.includes("salad") || nl.includes("greens") || nl.includes("avocado") || nl.includes("feta") || nl.includes("bowl") || nl.includes("fruit") || nl.includes("harvest")) return "Cold Salad";
+    if (nl.includes("waffle") || nl.includes("dessert") || nl.includes("cake") || nl.includes("pastry") || nl.includes("ice cream") || nl.includes("pancake") || nl.includes("pudding")) return "Dessert";
+    // Seafood station covers seafood (salmon, cuttlefish, calamari, prawns, crab) as well as general line cooking
+    return "Seafood";
   };
 
   const getStationsForOrder = (ord) => {
     if (!ord) return [];
     const stations = new Set();
-    if (ord.station_name && ord.station_name !== 'Beverages') {
-      stations.add(ord.station_name);
+    const normalizeStation = (s) => {
+      const sl = (s || "").toLowerCase();
+      if (sl.includes("pizza")) return "Pizza";
+      if (sl.includes("salad") || sl.includes("cold")) return "Cold Salad";
+      if (sl.includes("dessert") || sl.includes("pastry") || sl.includes("waffle")) return "Dessert";
+      if (sl.includes("beverage") || sl.includes("bar") || sl.includes("juice") || sl.includes("tea") || sl.includes("coffee") || sl.includes("drink")) return "Beverages";
+      if (sl.includes("seafood") || sl.includes("fish") || sl.includes("grill") || sl.includes("fryer") || sl.includes("hot") || sl.includes("wok") || sl.includes("main")) return "Seafood";
+      return "Seafood";
+    };
+
+    if (ord.station_name) {
+      stations.add(normalizeStation(ord.station_name));
     }
     (ord.items || []).forEach(it => {
       const st = getStationForDish(it.name);
-      if (st && st !== 'Beverages') stations.add(st);
+      if (st) stations.add(st);
     });
     return Array.from(stations);
   };
@@ -1030,22 +1157,21 @@ export default function KitchenStaffDashboard({
 
   const getStaffForStation = (station) => {
     switch (station) {
-      case 'Hot Kitchen': return 'K. Perera (Senior Line Chef)';
-      case 'Grill': return 'T. Silva (Prep Cook)';
-      case 'Cold Salad': return 'S. Fernando (Junior Chef)';
-      case 'Pizza': return 'A. Jayasinghe (Station Lead)';
-      case 'Fryer': return 'M. Wickramasinghe (Kitchen Trainee)';
+      case 'Seafood': return 'Chef Samantha (Lead Seafood Master)';
+      case 'Pizza': return 'Chef Amara (Italian Pizza Lead)';
+      case 'Cold Salad': return 'Chef Priyantha (Pantry & Salad In-Charge)';
+      case 'Dessert': return 'Chef Nimal (Senior Pastry Chef)';
       case 'Beverages':
-      default: return 'Beverage Counter';
+      default: return 'Beverage & Bar Counter';
     }
   };
 
   const stationSkillColumnMap = {
-    "Hot Kitchen": "hot_kitchen",
-    "Grill": "grill_station",
-    "Cold Salad": "cold_salad",
+    "Seafood": "grill_station",
     "Pizza": "pizza_station",
-    "Fryer": "fryer_station"
+    "Cold Salad": "cold_salad",
+    "Dessert": "hot_kitchen",
+    "Beverages": "cold_salad"
   };
 
   // Dynamically classify staff shift into 'Morning' | 'Afternoon' | 'Night'
@@ -1257,8 +1383,10 @@ export default function KitchenStaffDashboard({
       ord.table_no?.toLowerCase().includes(kdsSearchQuery.toLowerCase()) ||
       ord.items?.some(i => i.name.toLowerCase().includes(kdsSearchQuery.toLowerCase()));
 
+    const orderStations = getStationsForOrder(ord);
     const matchesStation = kdsStationFilter === 'all' ||
-      ord.station_name?.toLowerCase().includes(kdsStationFilter.toLowerCase());
+      orderStations.includes(kdsStationFilter) ||
+      (ord.station_name && ord.station_name.toLowerCase().includes(kdsStationFilter.toLowerCase()));
 
     return matchesSearch && matchesStation;
   });
@@ -1335,11 +1463,11 @@ export default function KitchenStaffDashboard({
   // Dynamic Real-Time 5-Station Workload Capacity derived from live incoming and completed orders
   const dynamicStations = useMemo(() => {
     const baseConfig = [
-      { id: "station-1", name: "Hot Kitchen", baseShift: 4.0, targetPrep: 8.0, defaultCooks: 3, thresh: 76.5 },
-      { id: "station-2", name: "Grill", baseShift: 0.0, targetPrep: 10.0, defaultCooks: 2, thresh: 17.9 },
+      { id: "station-1", name: "Seafood", baseShift: 0.0, targetPrep: 10.0, defaultCooks: 2, thresh: 20.0 },
+      { id: "station-2", name: "Pizza", baseShift: 0.0, targetPrep: 7.0, defaultCooks: 3, thresh: 16.3 },
       { id: "station-3", name: "Cold Salad", baseShift: 0.0, targetPrep: 4.0, defaultCooks: 1, thresh: 17.6 },
-      { id: "station-4", name: "Pizza", baseShift: 0.0, targetPrep: 7.0, defaultCooks: 3, thresh: 16.3 },
-      { id: "station-5", name: "Fryer", baseShift: 1.0, targetPrep: 5.0, defaultCooks: 1, thresh: 10.0 }
+      { id: "station-4", name: "Dessert", baseShift: 0.0, targetPrep: 6.0, defaultCooks: 1, thresh: 15.0 },
+      { id: "station-5", name: "Beverages", baseShift: 0.0, targetPrep: 4.0, defaultCooks: 1, thresh: 25.0 }
     ];
 
     const currentDataStations = data?.stations || [];
@@ -1352,7 +1480,8 @@ export default function KitchenStaffDashboard({
         (o.status === 'pending' || o.status === 'in_prep') &&
         (
           (o.station_name && o.station_name.toLowerCase().includes(cfg.name.toLowerCase())) ||
-          (o.items && o.items.some(it => getStationForDish(it.name) === cfg.name))
+          (cfg.name === "Seafood" && o.station_name && (o.station_name.toLowerCase().includes("hot") || o.station_name.toLowerCase().includes("grill") || o.station_name.toLowerCase().includes("fryer"))) ||
+          (o.items && o.items.some(it => getStationForDish(it.name || it.item_name || "") === cfg.name))
         )
       );
 
@@ -1361,21 +1490,22 @@ export default function KitchenStaffDashboard({
         !clearedCompletedIds.has(o.id) &&
         (
           (o.station_name && o.station_name.toLowerCase().includes(cfg.name.toLowerCase())) ||
-          (o.items && o.items.some(it => getStationForDish(it.name) === cfg.name))
+          (cfg.name === "Seafood" && o.station_name && (o.station_name.toLowerCase().includes("hot") || o.station_name.toLowerCase().includes("grill") || o.station_name.toLowerCase().includes("fryer"))) ||
+          (o.items && o.items.some(it => getStationForDish(it.name || it.item_name || "") === cfg.name))
         )
       );
 
       const liveQueue = activeStationOrders.length;
       const liveCompleted = completedStationOrders.length;
 
-      // Actual load: base shift baseline + active queue + completed orders
-      const actualLoad = Number((cfg.baseShift + liveQueue + liveCompleted).toFixed(1));
+      // Actual load: pure real-time count of orders placed for this station
+      const actualLoad = liveQueue + liveCompleted;
 
       // Predicted load from ML regression formula (0.94 factor)
       const predictedLoad = actualLoad > 0 ? Number((actualLoad * 0.94 + 0.1).toFixed(1)) : 0.0;
 
       // Load vs capacity percentage
-      const rawLoadPercentage = actualLoad > 0 ? Math.min(100, Math.round((actualLoad / cfg.thresh) * 80)) : 0;
+      const rawLoadPercentage = actualLoad > 0 ? Math.min(100, Math.round((actualLoad / cfg.thresh) * 100)) : 0;
       const isStabilized = stabilizedStations.has(cfg.name);
       const isBottleneck = !isStabilized && (actualLoad >= cfg.thresh || liveQueue >= 6);
       const loadPercentage = isStabilized ? Math.min(rawLoadPercentage, 35) : rawLoadPercentage;
@@ -1419,13 +1549,13 @@ export default function KitchenStaffDashboard({
 
   // Dynamic Real-Time Dish Types Analysis & Skill-Based Staff Reallocation Engine
   const stationDishAnalysis = useMemo(() => {
-    const stationNames = ["Hot Kitchen", "Grill", "Cold Salad", "Pizza", "Fryer"];
+    const stationNames = ["Seafood", "Pizza", "Cold Salad", "Dessert", "Beverages"];
     const skillCols = {
-      "Hot Kitchen": "hot_kitchen",
-      "Grill": "grill_station",
-      "Cold Salad": "cold_salad",
+      "Seafood": "grill_station",
       "Pizza": "pizza_station",
-      "Fryer": "fryer_station"
+      "Cold Salad": "cold_salad",
+      "Dessert": "hot_kitchen",
+      "Beverages": "cold_salad"
     };
 
     const stats = {};
@@ -1483,7 +1613,7 @@ export default function KitchenStaffDashboard({
         return;
       }
       const stationObj = (dynamicStations || []).find(s => s.name === st) || {};
-      const currentCooks = stationObj.active_cooks || (st === "Pizza" ? 3 : (st === "Hot Kitchen" ? 3 : (st === "Grill" ? 2 : 1)));
+      const currentCooks = stationObj.active_cooks || (st === "Pizza" ? 3 : (st === "Seafood" ? 2 : 1));
       const pendingCount = stats[st].pendingDishes;
       const ratio = Number((pendingCount / Math.max(1, currentCooks)).toFixed(1));
 
@@ -1491,6 +1621,7 @@ export default function KitchenStaffDashboard({
       const isOverloaded = (pendingCount >= 5) || (pendingCount >= 3 && ratio >= 1.4) || (stats[st].pendingTickets >= 4);
 
       stats[st].currentCooks = currentCooks;
+      stats[st].activeCooks = currentCooks;
       stats[st].ratio = ratio;
       stats[st].isOverloaded = isOverloaded;
 
@@ -1516,7 +1647,7 @@ export default function KitchenStaffDashboard({
 
           const skillScore = Number(s[skillCol]) || 0;
           if (skillScore >= 3) {
-            let fromSt = "Grill";
+            let fromSt = "Seafood";
             for (const sn of stationNames) {
               if (assigned.includes(sn.toLowerCase())) {
                 fromSt = sn;
@@ -1648,6 +1779,389 @@ export default function KitchenStaffDashboard({
       staffDirectivesMap
     };
   }, [liveOrders, dynamicStations, data?.staff, stabilizedStations, staffReallocationHistory, candidateRotationOffsets]);
+
+  // Dynamic 3-Day Demand-Driven Staff Allocation Engine (Integrated with Demand Forecasting Item-Level Prep Sizing)
+  const threeDayStaffAllocationData = useMemo(() => {
+    const rawDemandItems = (demandForecastData?.items && demandForecastData.items.length > 0)
+      ? demandForecastData.items
+      : [
+          {
+            id: "menu-1",
+            name: "Sri Lankan Chicken Rice & Curry",
+            category: "Main Course",
+            station: "Seafood",
+            predicted_demand_today: 120,
+            prep_recommendation: 125,
+            buffer_quantity: 15,
+            price: 1200.0,
+            confidence: 94.2,
+            trend: "+26%",
+            status: "Available"
+          },
+          {
+            id: "menu-2",
+            name: "Seafood Fried Rice (Jumbo)",
+            category: "Seafood",
+            station: "Seafood",
+            predicted_demand_today: 85,
+            prep_recommendation: 90,
+            buffer_quantity: 10,
+            price: 1850.0,
+            confidence: 91.5,
+            trend: "+21%",
+            status: "Available"
+          },
+          {
+            id: "menu-3",
+            name: "Grilled Atlantic Salmon Steak",
+            category: "Seafood",
+            station: "Seafood",
+            predicted_demand_today: 75,
+            prep_recommendation: 82,
+            buffer_quantity: 8,
+            price: 2850.0,
+            confidence: 93.8,
+            trend: "+18%",
+            status: "Available"
+          },
+          {
+            id: "menu-4",
+            name: "Woodfired Margherita Pizza",
+            category: "Pizza",
+            station: "Pizza",
+            predicted_demand_today: 80,
+            prep_recommendation: 88,
+            buffer_quantity: 10,
+            price: 2100.0,
+            confidence: 95.4,
+            trend: "+15%",
+            status: "Available"
+          },
+          {
+            id: "menu-5",
+            name: "Cheese & Vegetable Kottu",
+            category: "Main Course",
+            station: "Seafood",
+            predicted_demand_today: 110,
+            prep_recommendation: 115,
+            buffer_quantity: 12,
+            price: 1400.0,
+            confidence: 96.0,
+            trend: "+25%",
+            status: "Available"
+          },
+          {
+            id: "menu-6",
+            name: "Creamy Tomato & Basil Pasta",
+            category: "Pizza",
+            station: "Pizza",
+            predicted_demand_today: 45,
+            prep_recommendation: 50,
+            buffer_quantity: 5,
+            price: 1650.0,
+            confidence: 89.0,
+            trend: "+7%",
+            status: "Available"
+          },
+          {
+            id: "menu-7",
+            name: "Artisan Garden Harvest Salad",
+            category: "Cold Salad",
+            station: "Cold Salad",
+            predicted_demand_today: 65,
+            prep_recommendation: 72,
+            buffer_quantity: 8,
+            price: 980.0,
+            confidence: 92.5,
+            trend: "+12%",
+            status: "Available"
+          },
+          {
+            id: "menu-8",
+            name: "Tropical Fruit Salad with Honey",
+            category: "Dessert",
+            station: "Dessert",
+            predicted_demand_today: 60,
+            prep_recommendation: 65,
+            buffer_quantity: 8,
+            price: 850.0,
+            confidence: 93.4,
+            trend: "+50%",
+            status: "Available"
+          },
+          {
+            id: "menu-9",
+            name: "Belgian Berry & Banana Waffle",
+            category: "Dessert",
+            station: "Dessert",
+            predicted_demand_today: 55,
+            prep_recommendation: 60,
+            buffer_quantity: 6,
+            price: 1150.0,
+            confidence: 91.0,
+            trend: "+14%",
+            status: "Available"
+          },
+          {
+            id: "menu-10",
+            name: "Fresh Berry Smoothie Bowl",
+            category: "Beverages",
+            station: "Beverages",
+            predicted_demand_today: 70,
+            prep_recommendation: 78,
+            buffer_quantity: 10,
+            price: 850.0,
+            confidence: 94.0,
+            trend: "+20%",
+            status: "Available"
+          },
+          {
+            id: "menu-11",
+            name: "Lion Beer & Chilled Beverages",
+            category: "Beverages",
+            station: "Beverages",
+            predicted_demand_today: 65,
+            prep_recommendation: 72,
+            buffer_quantity: 8,
+            price: 750.0,
+            confidence: 95.0,
+            trend: "+18%",
+            status: "Available"
+          }
+        ];
+
+    const mapCategoryToStation = (item) => {
+      if (item.station) return item.station;
+      const cat = (item.category || "").toLowerCase();
+      const name = (item.name || "").toLowerCase();
+      if (cat.includes("pizza") || name.includes("pizza") || cat.includes("italian") || name.includes("pasta")) return "Pizza";
+      if (cat.includes("salad") || name.includes("salad") || name.includes("greens")) return "Cold Salad";
+      if (cat.includes("dessert") || name.includes("waffle") || name.includes("cake") || name.includes("sweet")) return "Dessert";
+      if (cat.includes("beverage") || name.includes("smoothie") || name.includes("beer") || name.includes("juice") || name.includes("tea") || name.includes("coffee") || name.includes("water") || name.includes("cola")) return "Beverages";
+      return "Seafood";
+    };
+
+    // Calculate real-time dynamic date components from current live clock
+    const getDynamicDateComponents = (offsetDays = 0) => {
+      const d = new Date(currentLiveDate);
+      d.setDate(d.getDate() + offsetDays);
+      const dayNum = d.getDate();
+      const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+      const monthStr = monthNames[d.getMonth()];
+      const yearStr = d.getFullYear();
+      return {
+        dayNum,
+        monthStr,
+        yearStr,
+        dateStr: `${dayNum} ${monthStr} ${yearStr}`
+      };
+    };
+
+    const todayDate = getDynamicDateComponents(0);
+    const tomorrowDate = getDynamicDateComponents(1);
+    const dayAfterDate = getDynamicDateComponents(2);
+
+    // Dynamic Live Staff mapper: Pull actual active kitchen staff from data.staff if available
+    const getLiveChefsForStation = (stationKey, defaultChefs = []) => {
+      if (!data?.staff || data.staff.length === 0) return defaultChefs;
+      const matched = data.staff.filter(s => {
+        const assigned = (s.reallocatedTo || s.assigned_station || s.station || s.base_station || "").toLowerCase();
+        const key = stationKey.toLowerCase();
+        if (key === "seafood") return assigned.includes("seafood") || assigned.includes("grill") || assigned.includes("hot") || assigned.includes("kitchen");
+        if (key === "pizza") return assigned.includes("pizza") || assigned.includes("pasta") || assigned.includes("italian");
+        if (key === "cold salad") return assigned.includes("salad") || assigned.includes("cold") || assigned.includes("pantry");
+        if (key === "dessert") return assigned.includes("dessert") || assigned.includes("pastry") || assigned.includes("sweet") || assigned.includes("bakery");
+        if (key === "beverages") return assigned.includes("beverage") || assigned.includes("bar") || assigned.includes("drink");
+        return assigned.includes(key);
+      });
+
+      if (matched.length === 0) return defaultChefs;
+      return matched.map(s => ({
+        name: s.name,
+        role: s.role || s.designation || "Chef",
+        shift: s.shift || "08:00 AM - 05:00 PM",
+        eff: s.efficiency_score ? `${Math.round(s.efficiency_score * 100)}%` : (s.efficiency_rating ? `${s.efficiency_rating}%` : "92%"),
+        isLead: (s.role || "").toLowerCase().includes("lead") || (s.role || "").toLowerCase().includes("head") || (s.role || "").toLowerCase().includes("senior")
+      }));
+    };
+
+    const daysConfig = [
+      {
+        id: "today",
+        key: "today",
+        daySinhala: "Today",
+        dayLabel: "Today",
+        daySinhalaSub: "",
+        dateStr: todayDate.dateStr,
+        dayNum: todayDate.dayNum,
+        monthStr: todayDate.monthStr,
+        yearStr: todayDate.yearStr,
+        shiftHighlight: "Active Shift • Peak Dinner & Delivery Surge",
+        factor: 1.0,
+        weather: "Coastal Heavy Rain (24°C)",
+        weatherImpact: "+18% comfort meal & delivery surge",
+        targetConfidence: "95.1%",
+        stationChefs: {
+          "Seafood": getLiveChefsForStation("Seafood", [
+            { name: "Chef Samantha", role: "Lead Seafood Master", shift: "07:00 AM - 04:00 PM", eff: "94%", isLead: true },
+            { name: "Chef Nimal", role: "Senior Sous Chef", shift: "03:30 PM - 11:30 PM", eff: "96%", isLead: false },
+            { name: "Chef Dilshan", role: "CDP - Grill & Saute", shift: "11:00 AM - 08:30 PM", eff: "91%", isLead: false }
+          ]),
+          "Pizza": getLiveChefsForStation("Pizza", [
+            { name: "Chef Amara", role: "Italian Pizza Lead", shift: "10:00 AM - 08:30 PM", eff: "93%", isLead: true },
+            { name: "Chef Nuwan", role: "Pizza Baker", shift: "02:00 PM - 10:30 PM", eff: "89%", isLead: false }
+          ]),
+          "Cold Salad": getLiveChefsForStation("Cold Salad", [
+            { name: "Chef Priyantha", role: "Pantry & Salad In-Charge", shift: "07:00 AM - 04:30 PM", eff: "92%", isLead: true }
+          ]),
+          "Dessert": getLiveChefsForStation("Dessert", [
+            { name: "Chef Roshan", role: "Senior Pastry Chef", shift: "08:00 AM - 05:00 PM", eff: "90%", isLead: true },
+            { name: "Chef Lahiru", role: "Commis I", shift: "03:00 PM - 10:30 PM", eff: "87%", isLead: false }
+          ]),
+          "Beverages": getLiveChefsForStation("Beverages", [
+            { name: "Chef Tharindu", role: "Beverage Bar Lead", shift: "09:00 AM - 06:00 PM", eff: "88%", isLead: true },
+            { name: "Trainee Janith", role: "Bar Prep Assistant", shift: "04:30 PM - 11:30 PM", eff: "85%", isLead: false }
+          ])
+        }
+      },
+      {
+        id: "tomorrow",
+        key: "tomorrow",
+        daySinhala: "Tomorrow",
+        dayLabel: "Tomorrow",
+        daySinhalaSub: "",
+        dateStr: tomorrowDate.dateStr,
+        dayNum: tomorrowDate.dayNum,
+        monthStr: tomorrowDate.monthStr,
+        yearStr: tomorrowDate.yearStr,
+        shiftHighlight: "Upcoming Shift • High Reservation Volume",
+        factor: 1.16,
+        weather: "Monsoon Showers & Evening Breeze",
+        weatherImpact: "+24% weekend dine-in & family platters surge",
+        targetConfidence: "94.8%",
+        stationChefs: {
+          "Seafood": [
+            { name: "Chef Samantha", role: "Lead Seafood Master", shift: "07:00 AM - 04:00 PM", eff: "94%", isLead: true },
+            { name: "Chef Nimal", role: "Senior Sous Chef", shift: "03:00 PM - 11:30 PM", eff: "96%", isLead: false },
+            { name: "Chef Dilshan", role: "CDP - Grill & Saute", shift: "11:00 AM - 08:30 PM", eff: "91%", isLead: false },
+            { name: "Chef Malith", role: "Commis III", shift: "04:00 PM - 11:30 PM", eff: "86%", isLead: false }
+          ],
+          "Pizza": [
+            { name: "Chef Amara", role: "Italian Pizza Lead", shift: "09:30 AM - 07:30 PM", eff: "93%", isLead: true },
+            { name: "Chef Nuwan", role: "Pizza Baker", shift: "01:30 PM - 10:30 PM", eff: "89%", isLead: false },
+            { name: "Chef Dinesh", role: "Float Senior", shift: "04:30 PM - 11:00 PM", eff: "92%", isLead: false }
+          ],
+          "Cold Salad": [
+            { name: "Chef Priyantha", role: "Pantry & Salad In-Charge", shift: "07:00 AM - 04:00 PM", eff: "92%", isLead: true },
+            { name: "Chef Danushka", role: "Commis I", shift: "02:00 PM - 10:00 PM", eff: "88%", isLead: false }
+          ],
+          "Dessert": [
+            { name: "Chef Roshan", role: "Senior Pastry Chef", shift: "08:00 AM - 05:30 PM", eff: "90%", isLead: true },
+            { name: "Chef Sandun", role: "Commis II", shift: "03:30 PM - 11:00 PM", eff: "86%", isLead: false }
+          ],
+          "Beverages": [
+            { name: "Chef Tharindu", role: "Beverage Bar Lead", shift: "09:00 AM - 06:00 PM", eff: "88%", isLead: true },
+            { name: "Trainee Kaveen", role: "Bar Prep Assistant", shift: "04:00 PM - 11:30 PM", eff: "84%", isLead: false }
+          ]
+        }
+      },
+      {
+        id: "day_after",
+        key: "day_after",
+        daySinhala: "Day After Tomorrow",
+        dayLabel: "Day After Tomorrow",
+        daySinhalaSub: "",
+        dateStr: dayAfterDate.dateStr,
+        dayNum: dayAfterDate.dayNum,
+        monthStr: dayAfterDate.monthStr,
+        yearStr: dayAfterDate.yearStr,
+        shiftHighlight: "Post-Weekend Normalized Service",
+        factor: 0.92,
+        weather: "Clear Skies & Sunny Coastal Heat (29°C)",
+        weatherImpact: "+16% chilled beverages, salads & light meals",
+        targetConfidence: "95.6%",
+        stationChefs: {
+          "Seafood": [
+            { name: "Chef Samantha", role: "Lead Seafood Master", shift: "08:00 AM - 04:30 PM", eff: "94%", isLead: true },
+            { name: "Chef Dilshan", role: "CDP - Grill", shift: "02:30 PM - 10:30 PM", eff: "91%", isLead: false },
+            { name: "Chef Lahiru", role: "Commis I", shift: "11:00 AM - 07:30 PM", eff: "87%", isLead: false }
+          ],
+          "Pizza": [
+            { name: "Chef Amara", role: "Italian Pizza Lead", shift: "10:30 AM - 08:30 PM", eff: "93%", isLead: true },
+            { name: "Chef Chathura", role: "Commis II", shift: "02:00 PM - 10:00 PM", eff: "88%", isLead: false }
+          ],
+          "Cold Salad": [
+            { name: "Chef Anura", role: "Salad Specialist", shift: "07:30 AM - 04:30 PM", eff: "93%", isLead: true }
+          ],
+          "Dessert": [
+            { name: "Chef Nimal", role: "Senior Pastry Chef", shift: "08:00 AM - 05:00 PM", eff: "95%", isLead: true },
+            { name: "Chef Roshan", role: "Pastry Line Chef", shift: "01:30 PM - 09:30 PM", eff: "90%", isLead: false }
+          ],
+          "Beverages": [
+            { name: "Chef Tharindu", role: "Beverage Bar Lead", shift: "09:00 AM - 06:00 PM", eff: "88%", isLead: true },
+            { name: "Trainee Sachith", role: "Bar Prep Assistant", shift: "02:30 PM - 10:30 PM", eff: "85%", isLead: false }
+          ]
+        }
+      }
+    ];
+
+    return daysConfig.map(dayCfg => {
+      const dayItems = rawDemandItems.map(item => {
+        const station = mapCategoryToStation(item);
+        const baseDemand = item.predicted_demand_today || 60;
+        const basePrep = item.prep_recommendation || (baseDemand + 5);
+        const baseBuffer = item.buffer_quantity || Math.max(3, basePrep - baseDemand);
+
+        const dayDemand = Math.round(baseDemand * dayCfg.factor);
+        const dayPrep = Math.round(basePrep * dayCfg.factor);
+        const dayBuffer = Math.max(3, dayPrep - dayDemand);
+
+        return {
+          ...item,
+          station,
+          dayDemand,
+          dayPrep,
+          dayBuffer
+        };
+      });
+
+      const totalPortionsDemand = dayItems.reduce((acc, it) => acc + it.dayDemand, 0);
+      const totalPortionsPrep = dayItems.reduce((acc, it) => acc + it.dayPrep, 0);
+      const totalBufferPortions = dayItems.reduce((acc, it) => acc + it.dayBuffer, 0);
+
+      const stationLoads = {
+        "Seafood": { portions: 0, prep: 0, buffer: 0, icon: "🐟", color: "#0284c7" },
+        "Pizza": { portions: 0, prep: 0, buffer: 0, icon: "🍕", color: "#ea580c" },
+        "Cold Salad": { portions: 0, prep: 0, buffer: 0, icon: "🥗", color: "#059669" },
+        "Dessert": { portions: 0, prep: 0, buffer: 0, icon: "🍰", color: "#db2777" },
+        "Beverages": { portions: 0, prep: 0, buffer: 0, icon: "🍹", color: "#7c3aed" }
+      };
+
+      dayItems.forEach(it => {
+        const st = it.station;
+        if (stationLoads[st]) {
+          stationLoads[st].portions += it.dayDemand;
+          stationLoads[st].prep += it.dayPrep;
+          stationLoads[st].buffer += it.dayBuffer;
+        }
+      });
+
+      let totalCooksCount = 0;
+      Object.keys(dayCfg.stationChefs).forEach(st => {
+        totalCooksCount += dayCfg.stationChefs[st].length;
+      });
+
+      return {
+        ...dayCfg,
+        items: dayItems,
+        totalPortionsDemand,
+        totalPortionsPrep,
+        totalBufferPortions,
+        totalCooksCount,
+        stationLoads
+      };
+    });
+  }, [demandForecastData, data?.staff, currentLiveDate]);
 
   // Dynamic AI Staff Allocation Directives Engine: updates in real-time based on station queues & load surges
   const generateDynamicDirectives = (currentStations = [], currentStaff = [], customSurges = [], resolvedSet = new Set(), dishSurgeAlerts = [], stabilizedSet = new Set()) => {
@@ -3067,7 +3581,7 @@ export default function KitchenStaffDashboard({
               }`}
           >
             <Utensils className="h-4 w-4" />
-            <span>Kitchen Display System (KDS)</span>
+            <span>Kitchen Display System</span>
           </button>
 
           <button
@@ -3111,35 +3625,9 @@ export default function KitchenStaffDashboard({
           </button>
         </div>
 
-        {/* Sync Status Badge & Cross-Module Shortcut */}
-        <div className="flex flex-wrap items-center gap-3 pr-2">
-          {/* Live Firebase Cloud Sync Status Badge */}
-          <div
-            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold shadow-2xs transition-all ${
-              firebaseStatus?.connected
-                ? 'bg-amber-50 dark:bg-amber-950/60 border border-amber-300 dark:border-amber-800 text-amber-800 dark:text-amber-300'
-                : 'bg-slate-100 dark:bg-slate-800 text-slate-500 border border-slate-200 dark:border-slate-700'
-            }`}
-            title={`Firebase Realtime Database: ${firebaseStatus?.database_url || 'smart-restaurant-333'}`}
-          >
-            <span className="flex h-2 w-2 relative">
-              <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${firebaseStatus?.connected ? 'bg-amber-400' : 'bg-slate-400'}`}></span>
-              <span className={`relative inline-flex rounded-full h-2 w-2 ${firebaseStatus?.connected ? 'bg-amber-500' : 'bg-slate-400'}`}></span>
-            </span>
-            <span>🔥 Firebase Realtime DB: {firebaseStatus?.connected ? 'Connected' : 'Offline'}</span>
-          </div>
-
-          <div className="flex items-center gap-2 text-xs font-semibold text-slate-500 dark:text-slate-400">
-            <span className="flex h-2.5 w-2.5 relative">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
-            </span>
-            <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300">
-              Orders & POS Live Sync Active
-            </span>
-          </div>
-
-          {onNavigateModule && (
+        {/* Cross-Module Shortcut */}
+        {onNavigateModule && (
+          <div className="flex items-center pr-2">
             <button
               onClick={() => onNavigateModule('orders')}
               className="hidden lg:flex items-center gap-1 text-[11px] font-bold text-emerald-700 dark:text-emerald-400 hover:underline cursor-pointer"
@@ -3147,8 +3635,8 @@ export default function KitchenStaffDashboard({
               <span>Go to Orders & POS</span>
               <ArrowUpRight className="h-3.5 w-3.5" />
             </button>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
       {/* ========================================================================= */}
@@ -3198,7 +3686,7 @@ export default function KitchenStaffDashboard({
               <div>
                 <h3 className="text-base font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
                   <ChefHat className="h-5 w-5 text-emerald-700 dark:text-emerald-400" />
-                  Kitchen Display System (KDS) Live Tickets
+                  Kitchen Display System Live Tickets
                 </h3>
                 <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
                   Real-time kitchen ticket flow from intake to pass • Synced with Orders & POS
@@ -3249,7 +3737,7 @@ export default function KitchenStaffDashboard({
             {/* Filter & Search Bar */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
               <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
-                {['all', 'Hot Kitchen', 'Grill', 'Cold Salad', 'Pizza', 'Fryer'].map((st) => (
+                {['all', 'Seafood', 'Pizza', 'Cold Salad', 'Dessert', 'Beverages'].map((st) => (
                   <button
                     key={st}
                     onClick={() => setKdsStationFilter(st)}
@@ -3291,14 +3779,14 @@ export default function KitchenStaffDashboard({
                       </span>
                     </h4>
                     <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
-                      Dynamically categorizes incoming orders by dish type, tracks cooks vs queue ratio, and recommends skilled chefs
+                      Dynamically categorizes incoming orders by dish type, tracks station workload, and recommends skilled chefs
                     </p>
                   </div>
                 </div>
 
                 <div className="flex items-center gap-1.5">
                   <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 bg-white dark:bg-slate-900 px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-800">
-                    Surge Threshold: &gt; 2.5 dishes/cook
+                    Surge Alert Threshold: 5+ dishes
                   </span>
                 </div>
               </div>
@@ -3306,11 +3794,11 @@ export default function KitchenStaffDashboard({
               {/* 5-Station Real-Time Dish Cards */}
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5">
                 {[
+                  { name: "Seafood", icon: "🐟", label: "Seafood Station" },
                   { name: "Pizza", icon: "🍕", label: "Pizza Station" },
-                  { name: "Hot Kitchen", icon: "🍳", label: "Hot Kitchen" },
-                  { name: "Grill", icon: "🥩", label: "Grill Station" },
                   { name: "Cold Salad", icon: "🥗", label: "Cold Salad" },
-                  { name: "Fryer", icon: "🍤", label: "Fryer Station" }
+                  { name: "Dessert", icon: "🍰", label: "Dessert Station" },
+                  { name: "Beverages", icon: "🍹", label: "Beverages" }
                 ].map(stCfg => {
                   const stStats = stationDishAnalysis?.stationStats?.[stCfg.name] || {
                     pendingDishes: 0,
@@ -3350,15 +3838,8 @@ export default function KitchenStaffDashboard({
                           {stStats.pendingDishes} <span className="text-[10px] font-medium text-slate-500">dishes</span>
                         </div>
                         <div className="text-[11px] font-bold text-slate-600 dark:text-slate-300">
-                          {stStats.activeCooks} {stStats.activeCooks === 1 ? 'cook' : 'cooks'}
+                          {stStats.activeCooks || stStats.currentCooks || 1} {(stStats.activeCooks || stStats.currentCooks || 1) === 1 ? 'cook' : 'cooks'}
                         </div>
-                      </div>
-
-                      <div className="mt-1 text-[10px] text-slate-500 dark:text-slate-400 flex items-center justify-between font-mono">
-                        <span>Ratio:</span>
-                        <span className={isOver ? 'text-rose-600 dark:text-rose-400 font-bold' : 'text-slate-700 dark:text-slate-300'}>
-                          {stStats.ratio} / cook
-                        </span>
                       </div>
                     </div>
                   );
@@ -3737,9 +4218,6 @@ export default function KitchenStaffDashboard({
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-lg font-bold text-slate-900 dark:text-white">Kitchen Efficiency & Dynamic Staff Optimization</h2>
-                <span className="text-xs px-2.5 py-0.5 rounded bg-orange-50 text-orange-700 dark:bg-orange-500/10 dark:text-orange-400 border border-orange-200 dark:border-orange-500/20 font-bold">
-                  Workflow & Queue AI
-                </span>
               </div>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 font-medium">
                 Real-time station queue monitoring, peak-hour staff allocation, and staff progression
@@ -3773,11 +4251,6 @@ export default function KitchenStaffDashboard({
                   </div>
                 </div>
               </div>
-
-              <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2.5 py-0.5 rounded-full border border-slate-200 dark:border-slate-700">
-                <Clock className="h-3 w-3 text-orange-500" />
-                <span>⏰ Dynamic API Connected • {last4HourUpdate}</span>
-              </div>
             </div>
           </div>
 
@@ -3805,13 +4278,13 @@ export default function KitchenStaffDashboard({
                 total_period_revenue_lkr: 24960600.0,
                 avg_daily_kitchen_dishes: 78.5,
                 peak_day_dishes: 163,
-                busiest_station: "Hot Kitchen (55.9%)",
+                busiest_station: "Seafood (38.5%)",
                 station_distribution: {
-                  "Hot Kitchen": { name: "Hot Kitchen", dishes: 4040, pct: 55.9, color: "#ea580c", icon: "🍳" },
-                  "Grill": { name: "Grill Station", dishes: 911, pct: 12.6, color: "#e11d48", icon: "🥩" },
-                  "Cold Salad": { name: "Cold Salad Station", dishes: 851, pct: 11.8, color: "#059669", icon: "🥗" },
-                  "Pizza": { name: "Pizza Station", dishes: 741, pct: 10.3, color: "#d97706", icon: "🍕" },
-                  "Fryer": { name: "Fryer Station", dishes: 415, pct: 5.7, color: "#eab308", icon: "🍤" }
+                  "Seafood": { name: "Seafood Station", dishes: 2840, pct: 38.5, color: "#0284c7", icon: "🐟" },
+                  "Pizza": { name: "Pizza Station", dishes: 1850, pct: 25.1, color: "#ea580c", icon: "🍕" },
+                  "Cold Salad": { name: "Cold Salad Station", dishes: 1120, pct: 15.2, color: "#059669", icon: "🥗" },
+                  "Dessert": { name: "Dessert Station", dishes: 810, pct: 11.0, color: "#db2777", icon: "🍰" },
+                  "Beverages": { name: "Beverages", dishes: 750, pct: 10.2, color: "#7c3aed", icon: "🍹" }
                 }
               },
               predicted_weekly_orders: {
@@ -3826,11 +4299,11 @@ export default function KitchenStaffDashboard({
                 recommended_cook_hours_weekly: 336,
                 recommended_full_time_cooks: 7,
                 station_expected_dishes: {
-                  "Hot Kitchen": 325,
-                  "Grill": 88,
-                  "Cold Salad": 80,
-                  "Pizza": 60,
-                  "Fryer": 29
+                  "Seafood": 225,
+                  "Pizza": 145,
+                  "Cold Salad": 95,
+                  "Dessert": 65,
+                  "Beverages": 52
                 }
               },
               predicted_daily_orders: [
@@ -4095,7 +4568,7 @@ export default function KitchenStaffDashboard({
                             Daily Target Fulfillment Progress ({todayMealStats.totalActualToday} of {todayMealStats.predictedToday} expected orders)
                           </span>
                           <span className="font-mono font-bold text-emerald-700 dark:text-emerald-400">
-                            {todayMealStats.progressPct}% • {Math.round(todayMealStats.totalActualToday * 0.2)} kitchen food dishes cooked
+                            {todayMealStats.progressPct}% • {todayMealStats.totalDishesToday} kitchen food dishes cooked
                           </span>
                         </div>
                         <div className="w-full bg-slate-100 dark:bg-slate-800 h-2.5 rounded-full overflow-hidden p-0.5">
@@ -4151,26 +4624,19 @@ export default function KitchenStaffDashboard({
                                 </span>
                               </div>
 
-                              <div className="mt-2.5 flex items-baseline justify-between pt-2 border-t border-slate-100 dark:border-slate-800">
+                              <div className="mt-2.5 flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-800">
                                 <div>
                                   <div className="text-xl font-mono font-black text-slate-900 dark:text-white">
                                     {period.orders}{' '}
                                     <span className="text-[11px] font-semibold text-slate-500 font-sans">orders</span>
                                   </div>
-                                  <span className="text-[10px] text-slate-400 font-medium">
-                                    ~{period.dishes} food dishes prepared
-                                  </span>
                                 </div>
                                 <div className="text-right">
                                   <span className="text-[11px] font-bold text-emerald-700 dark:text-emerald-400">
-                                    {Math.round((period.orders / Math.max(1, todayMealStats.totalActualToday)) * 100)}%
+                                    {todayMealStats.totalActualToday > 0 ? Math.round((period.orders / todayMealStats.totalActualToday) * 100) : 0}%
                                   </span>
                                   <span className="text-[9px] text-slate-400 block">of day's total</span>
                                 </div>
-                              </div>
-
-                              <div className="mt-2 pt-2 border-t border-slate-100 dark:border-slate-800 text-[10px] text-slate-500 dark:text-slate-400 truncate" title={period.popularItems}>
-                                🌟 <span className="font-medium text-slate-600 dark:text-slate-300">{period.popularItems}</span>
                               </div>
                             </div>
                           ))}
@@ -4178,96 +4644,361 @@ export default function KitchenStaffDashboard({
                       </div>
                     </div>
 
-                    {/* 7-Day Daily Cards Grid */}
-                    <div className="space-y-1.5 pt-1">
-                      <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-600 dark:text-slate-400 block">
-                        7-Day Rolling Horizon Breakdown:
-                      </span>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-2.5">
-                        {dailyPreds.map((day, idx) => {
-                          const isToday = day.day_name === 'Today';
-                          const displayOrders = isToday ? todayMealStats.totalActualToday : day.predicted_orders;
-                          const barPct = isToday
-                            ? todayMealStats.progressPct
-                            : (day.bar_height_pct || Math.round((day.predicted_orders / maxDailyOrders) * 100));
+                    {/* Demand-Driven 3-Day Kitchen Staff Allocation & Item-Level Preparation Sizing */}
+                    {(() => {
+                      const activeDayAllocation = threeDayStaffAllocationData.find(d => d.id === selected3DayTab) || threeDayStaffAllocationData[0];
+                      const stationKeys = ["Seafood", "Pizza", "Cold Salad", "Dessert", "Beverages"];
+                      
+                      const filteredTableItems = (activeDayAllocation?.items || []).filter(item => {
+                        const matchesSearch = !demandItemSearch || 
+                          item.name.toLowerCase().includes(demandItemSearch.toLowerCase()) ||
+                          (item.category && item.category.toLowerCase().includes(demandItemSearch.toLowerCase()));
+                        const matchesStation = demandStationFilter === 'all' || item.station === demandStationFilter;
+                        return matchesSearch && matchesStation;
+                      });
 
-                          return (
-                            <div
-                              key={day.date || idx}
-                              className={`p-3 rounded-xl bg-white dark:bg-slate-900 border flex flex-col justify-between space-y-2 transition-all hover:shadow-md ${
-                                isToday
-                                  ? 'border-2 border-emerald-500 ring-2 ring-emerald-500/10'
-                                  : 'border-[#d7e5dc] dark:border-slate-800 hover:border-emerald-500'
-                              }`}
-                            >
-                              {/* Card Header: Day Name & Date */}
-                              <div className="flex items-center justify-between text-[11px]">
-                                <span className={`font-extrabold flex items-center gap-1 ${isToday ? 'text-emerald-700 dark:text-emerald-400' : 'text-slate-900 dark:text-white'}`}>
-                                  {isToday && <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-ping inline-block" />}
-                                  {day.day_name}
-                                </span>
-                                <span className="text-[10px] text-slate-400 font-medium">{day.formatted_date}</span>
-                              </div>
-
-                              {/* Visual Workload Progress Bar */}
-                              <div className="w-full bg-slate-100 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden">
-                                <div
-                                  className={`h-full rounded-full transition-all duration-500 ${
-                                    isToday ? 'bg-emerald-600' : 'bg-emerald-700'
-                                  }`}
-                                  style={{ width: `${barPct}%` }}
-                                />
-                              </div>
-
-                              {/* Order & Workload Stats */}
-                              <div className="space-y-1">
-                                <div className="flex items-baseline justify-between">
-                                  <span className="font-mono font-black text-sm text-slate-900 dark:text-white">
-                                    {displayOrders} <span className="text-[11px] font-bold text-slate-500 font-sans">orders</span>
+                      return (
+                        <div className="space-y-4 pt-2">
+                          {/* 3-Day Allocation Header & Day Switcher Tabs */}
+                          <div className="p-4 rounded-2xl bg-gradient-to-r from-emerald-50/80 via-white to-teal-50/60 dark:from-slate-900 dark:via-slate-900/90 dark:to-slate-900 border border-emerald-200/80 dark:border-slate-800 shadow-sm space-y-3">
+                            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+                              <div>
+                                <div className="flex items-center gap-2">
+                                  <span className="p-1.5 rounded-lg bg-emerald-600 text-white shadow-sm">
+                                    <ChefHat className="h-4 w-4" />
                                   </span>
-                                  <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${
-                                    isToday
-                                      ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border-emerald-300'
-                                      : 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800/60'
-                                  }`}>
-                                    {isToday ? `${todayMealStats.progressPct}% Rec` : (day.efficiency_rate || "95.1%")}
+                                  <h3 className="text-sm font-extrabold text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-2">
+                                    Item-Level Demand Sizing & 3-Day Kitchen Staff Allocation
+                                  </h3>
+                                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800">
+                                    Connected to Demand Forecasting
                                   </span>
                                 </div>
-
-                                {isToday ? (
-                                  <div className="text-[9px] text-slate-500 dark:text-slate-400 flex items-center justify-between font-semibold pt-0.5">
-                                    <span className="text-emerald-700 dark:text-emerald-400">Target: {day.predicted_orders} exp</span>
-                                    <span>~{Math.round(todayMealStats.totalActualToday * 0.2)} dishes</span>
-                                  </div>
-                                ) : (
-                                  <div className="text-[10px] text-slate-500 dark:text-slate-400 flex items-center justify-between font-medium pt-0.5">
-                                    <span className="font-bold text-slate-700 dark:text-slate-300">{day.predicted_kitchen_dishes || Math.round(day.predicted_orders * 0.2)} dishes</span>
-                                    <span className="text-[9px] text-slate-500 font-bold">{day.required_cooks || 6} cooks</span>
-                                  </div>
-                                )}
-
-                                {/* If Today, show mini meal period pills */}
-                                {isToday && (
-                                  <div className="pt-1 flex items-center justify-between text-[8px] font-bold text-slate-600 dark:text-slate-300 border-t border-slate-100 dark:border-slate-800">
-                                    <span title="Morning Shift Orders">🌅 {todayMealStats.periods[0].orders}</span>
-                                    <span title="Afternoon / Lunch Shift Orders" className="text-emerald-700 dark:text-emerald-400 font-black">☀️ {todayMealStats.periods[1].orders}</span>
-                                    <span title="Evening / Night Shift Orders">🌙 {todayMealStats.periods[2].orders}</span>
-                                  </div>
-                                )}
+                                <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mt-1">
+                                  Exact shift prep sizing, safety buffers, and station chef assignments computed dynamically for <b>Today</b>, <b>Tomorrow</b>, and <b>Day After Tomorrow</b>.
+                                </p>
                               </div>
 
-                              {/* Top Predicted Dish */}
-                              <div
-                                className="pt-1.5 border-t border-slate-100 dark:border-slate-800 text-[10px] text-slate-500 dark:text-slate-400 truncate"
-                                title={day.top_selling_dish}
-                              >
-                                🌟 {day.top_selling_dish}
+                              {/* 3-Day Selector Buttons */}
+                              <div className="flex items-center gap-1.5 p-1 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700/80 shadow-inner">
+                                {threeDayStaffAllocationData.map(dayCfg => {
+                                  const isActive = selected3DayTab === dayCfg.id;
+                                  return (
+                                    <button
+                                      key={dayCfg.id}
+                                      onClick={() => setSelected3DayTab(dayCfg.id)}
+                                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+                                        isActive
+                                          ? 'bg-emerald-600 text-white shadow-sm ring-2 ring-emerald-500/20'
+                                          : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-white/80 dark:hover:bg-slate-700/60'
+                                      }`}
+                                    >
+                                      <Calendar className="h-3.5 w-3.5 shrink-0" />
+                                      <span className="text-left font-bold">{dayCfg.dayLabel}</span>
+                                      <span className={`px-1.5 py-0.5 rounded font-mono flex flex-col items-center justify-center text-center leading-none min-w-[34px] ${
+                                        isActive ? 'bg-emerald-700/90 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300'
+                                      }`}>
+                                        <span className="font-extrabold text-[11px] leading-tight">{dayCfg.dayNum}</span>
+                                        <span className="text-[9px] uppercase font-semibold leading-tight">{dayCfg.monthStr}</span>
+                                        <span className="text-[8px] leading-tight opacity-80">{dayCfg.yearStr}</span>
+                                      </span>
+                                    </button>
+                                  );
+                                })}
                               </div>
                             </div>
-                          );
-                        })}
-                      </div>
-                    </div>
+
+                            {/* Selected Day KPI & Context Pills Banner */}
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1">
+                              <div className="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800">
+                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide block">Predicted Demand</span>
+                                <div className="text-lg font-black text-slate-900 dark:text-white font-mono mt-0.5">
+                                  {activeDayAllocation.totalPortionsDemand} <span className="text-xs font-normal text-slate-500">portions</span>
+                                </div>
+                                <span className="text-[10px] font-semibold text-emerald-700 dark:text-emerald-400">
+                                  {activeDayAllocation.targetConfidence} Model Confidence
+                                </span>
+                              </div>
+
+                              <div className="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800">
+                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide block">Prep Target + Safety Buffer</span>
+                                <div className="text-lg font-black text-emerald-700 dark:text-emerald-400 font-mono mt-0.5">
+                                  {activeDayAllocation.totalPortionsPrep} <span className="text-xs font-normal text-slate-500">portions</span>
+                                </div>
+                                <span className="text-[10px] font-bold text-amber-700 dark:text-amber-400">
+                                  +{activeDayAllocation.totalBufferPortions} buffer (prevents stockout)
+                                </span>
+                              </div>
+
+                              <div className="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800">
+                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide block">Scheduled Kitchen Staff</span>
+                                <div className="text-lg font-black text-slate-900 dark:text-white font-mono mt-0.5">
+                                  {activeDayAllocation.totalCooksCount} <span className="text-xs font-normal text-slate-500">chefs & assistants</span>
+                                </div>
+                                <span className="text-[10px] font-semibold text-emerald-700 dark:text-emerald-400">
+                                  Across 5 active kitchen stations
+                                </span>
+                              </div>
+
+                              <div className="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800">
+                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide block">Weather & Shift Context</span>
+                                <div className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate mt-0.5" title={activeDayAllocation.weather}>
+                                  ⛅ {activeDayAllocation.weather}
+                                </div>
+                                <span className="text-[10px] font-medium text-slate-500 dark:text-slate-400 truncate block" title={activeDayAllocation.weatherImpact}>
+                                  {activeDayAllocation.weatherImpact}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* 5-Station Staff Allocation Cards Grid */}
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                                <Users className="h-3.5 w-3.5 text-emerald-600" />
+                                Station Staff Allocation for {activeDayAllocation.daySinhala} ({activeDayAllocation.shiftHighlight}):
+                              </span>
+                              <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400">
+                                5 Kitchen Stations • {activeDayAllocation.totalCooksCount} Chefs Allocated
+                              </span>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
+                              {stationKeys.map(stName => {
+                                const load = activeDayAllocation.stationLoads[stName] || { portions: 0, prep: 0, buffer: 0, icon: "🍳", color: "#0284c7" };
+                                const chefs = activeDayAllocation.stationChefs[stName] || [];
+                                const prepPerCook = chefs.length > 0 ? Math.round(load.prep / chefs.length) : load.prep;
+
+                                return (
+                                  <div
+                                    key={stName}
+                                    className="p-3.5 rounded-xl bg-white dark:bg-slate-900 border border-[#d7e5dc] dark:border-slate-800 hover:border-emerald-500 dark:hover:border-emerald-500 transition-all shadow-sm flex flex-col justify-between space-y-3"
+                                  >
+                                    {/* Station Card Header */}
+                                    <div>
+                                      <div className="flex items-center justify-between">
+                                        <span className="font-extrabold text-xs text-slate-900 dark:text-white flex items-center gap-1.5">
+                                          <span className="text-base">{load.icon}</span>
+                                          <span>{stName}</span>
+                                        </span>
+                                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-mono">
+                                          {chefs.length} {chefs.length === 1 ? 'cook' : 'cooks'}
+                                        </span>
+                                      </div>
+
+                                      {/* Station Portions Progress */}
+                                      <div className="mt-2 p-2 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800">
+                                        <div className="flex items-baseline justify-between text-[11px]">
+                                          <span className="text-slate-500 font-medium">Prep Target:</span>
+                                          <span className="font-mono font-black text-slate-900 dark:text-white">
+                                            {load.prep} <span className="text-[10px] font-normal text-slate-400">portions</span>
+                                          </span>
+                                        </div>
+                                        <div className="flex items-baseline justify-between text-[10px] text-slate-400 mt-0.5">
+                                          <span>Demand: {load.portions}</span>
+                                          <span className="text-amber-700 dark:text-amber-400 font-bold">+{load.buffer} buffer</span>
+                                        </div>
+                                        <div className="mt-1.5 text-[10px] text-emerald-700 dark:text-emerald-400 font-bold flex items-center justify-between border-t border-slate-200/60 dark:border-slate-800 pt-1">
+                                          <span>Load / Cook:</span>
+                                          <span className="font-mono font-black">~{prepPerCook} portions</span>
+                                        </div>
+                                      </div>
+                                    </div>
+
+                                    {/* Assigned Chefs List */}
+                                    <div className="space-y-1.5">
+                                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                                        Allocated Chefs:
+                                      </span>
+                                      <div className="space-y-1.5">
+                                        {chefs.map((chef, cIdx) => (
+                                          <div
+                                            key={cIdx}
+                                            className={`p-1.5 rounded-lg border text-left transition-all ${
+                                              chef.isLead
+                                                ? 'bg-emerald-50/70 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-800'
+                                                : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800'
+                                            }`}
+                                          >
+                                            <div className="flex items-center justify-between">
+                                              <span className="font-extrabold text-[11px] text-slate-900 dark:text-white flex items-center gap-1">
+                                                {chef.isLead && <Star className="h-3 w-3 text-amber-600 fill-amber-600" />}
+                                                {chef.name}
+                                              </span>
+                                              <span className="text-[9px] font-bold px-1 rounded bg-slate-100 dark:bg-slate-800 text-emerald-700 dark:text-emerald-400 font-mono">
+                                                {chef.eff}
+                                              </span>
+                                            </div>
+                                            <div className="text-[9px] text-slate-500 dark:text-slate-400 font-medium truncate mt-0.5">
+                                              {chef.role}
+                                            </div>
+                                            <div className="text-[9px] font-mono text-slate-400 flex items-center gap-1 mt-0.5">
+                                              <Clock className="h-2.5 w-2.5 text-slate-400" />
+                                              <span>{chef.shift}</span>
+                                            </div>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+
+                          {/* Item-Level Kitchen Preparation Sizing Table (From Demand Forecasting) */}
+                          <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-[#cbdad0] dark:border-slate-800 shadow-sm space-y-3">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#e2ece5] dark:border-slate-800 pb-3">
+                              <div>
+                                <h4 className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                                  <ChefHat className="h-4 w-4 text-emerald-600" />
+                                  Item-Level Kitchen Preparation Sizing Table ({activeDayAllocation.daySinhala})
+                                </h4>
+                                <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
+                                  ML-forecasted portions, batch prep guidance & safety buffers linked to station chef workloads
+                                </p>
+                              </div>
+
+                              <div className="flex items-center gap-2">
+                                <button
+                                  onClick={() => setShowItemPrepTable(!showItemPrepTable)}
+                                  className="px-2.5 py-1 text-xs font-bold rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 cursor-pointer"
+                                >
+                                  {showItemPrepTable ? 'Hide Table' : 'Show Table'}
+                                </button>
+                              </div>
+                            </div>
+
+                            {showItemPrepTable && (
+                              <div className="space-y-3">
+                                {/* Table Filters */}
+                                <div className="flex flex-col sm:flex-row items-center justify-between gap-2.5">
+                                  <div className="flex items-center gap-1 overflow-x-auto w-full sm:w-auto">
+                                    {['all', 'Seafood', 'Pizza', 'Cold Salad', 'Dessert', 'Beverages'].map(st => (
+                                      <button
+                                        key={st}
+                                        onClick={() => setDemandStationFilter(st)}
+                                        className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
+                                          demandStationFilter === st
+                                            ? 'bg-emerald-600 text-white shadow-sm'
+                                            : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                                        }`}
+                                      >
+                                        {st === 'all' ? 'All Stations' : st}
+                                      </button>
+                                    ))}
+                                  </div>
+
+                                  <div className="relative w-full sm:w-64">
+                                    <Search className="h-3.5 w-3.5 text-slate-400 absolute left-2.5 top-2.5" />
+                                    <input
+                                      type="text"
+                                      placeholder="Filter menu dishes..."
+                                      value={demandItemSearch}
+                                      onChange={e => setDemandItemSearch(e.target.value)}
+                                      className="w-full pl-8 pr-3 py-1.5 rounded-lg text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-emerald-600"
+                                    />
+                                  </div>
+                                </div>
+
+                                {/* Table Content */}
+                                <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
+                                  <table className="w-full text-left text-xs text-slate-700 dark:text-slate-300">
+                                    <thead className="bg-[#f4f8f5] dark:bg-slate-950 text-slate-800 dark:text-slate-300 uppercase font-bold border-b border-slate-200 dark:border-slate-800">
+                                      <tr>
+                                        <th className="py-2.5 px-3">Menu Dish</th>
+                                        <th className="py-2.5 px-2.5">Kitchen Station</th>
+                                        <th className="py-2.5 px-3">Predicted Demand</th>
+                                        <th className="py-2.5 px-3">Prep Guidance</th>
+                                        <th className="py-2.5 px-2.5">Safety Buffer</th>
+                                        <th className="py-2.5 px-3">Allocated Station Chefs</th>
+                                        <th className="py-2.5 px-2.5 text-center">Status</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800 bg-white dark:bg-slate-900">
+                                      {filteredTableItems.length === 0 ? (
+                                        <tr>
+                                          <td colSpan={7} className="py-6 text-center text-slate-400 italic">
+                                            No dishes match your filter criteria.
+                                          </td>
+                                        </tr>
+                                      ) : (
+                                        filteredTableItems.map(item => {
+                                          const chefs = activeDayAllocation.stationChefs[item.station] || [];
+                                          return (
+                                            <tr key={item.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors">
+                                              <td className="py-2.5 px-3">
+                                                <div className="font-bold text-slate-900 dark:text-white text-xs">{item.name}</div>
+                                                <div className="flex items-center gap-2 mt-0.5">
+                                                  <span className="text-[10px] text-slate-400 font-mono">LKR {Number(item.price || 1200).toFixed(2)}</span>
+                                                  <span className="text-[9px] text-emerald-700 dark:text-emerald-400 font-bold bg-emerald-50 dark:bg-emerald-950/60 px-1 py-0.2 rounded border border-emerald-200 dark:border-emerald-800">
+                                                    {item.confidence || 93}% Conf.
+                                                  </span>
+                                                </div>
+                                              </td>
+
+                                              <td className="py-2.5 px-2.5">
+                                                <span className="px-2 py-0.5 rounded-md text-[11px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700">
+                                                  {item.station}
+                                                </span>
+                                              </td>
+
+                                              <td className="py-2.5 px-3">
+                                                <div className="text-sm font-black text-slate-900 dark:text-white font-mono">
+                                                  {item.dayDemand} <span className="text-[10px] font-normal text-slate-400">portions</span>
+                                                </div>
+                                                <span className="text-[9px] text-emerald-700 dark:text-emerald-400 font-bold block">
+                                                  {item.trend || '+15%'} trend
+                                                </span>
+                                              </td>
+
+                                              <td className="py-2.5 px-3">
+                                                <span className="px-2.5 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 text-emerald-900 dark:text-emerald-300 font-extrabold border border-emerald-300 dark:border-emerald-700 shadow-sm inline-block">
+                                                  Prepare {item.dayPrep} portions
+                                                </span>
+                                              </td>
+
+                                              <td className="py-2.5 px-2.5 font-mono font-bold text-amber-700 dark:text-amber-400">
+                                                +{item.dayBuffer} ready
+                                              </td>
+
+                                              <td className="py-2.5 px-3">
+                                                <div className="flex flex-wrap items-center gap-1">
+                                                  {chefs.map((c, ci) => (
+                                                    <span
+                                                      key={ci}
+                                                      className={`text-[9px] px-1.5 py-0.5 rounded font-bold border ${
+                                                        c.isLead
+                                                          ? 'bg-amber-50 text-amber-900 border-amber-300 dark:bg-amber-950/50 dark:text-amber-300 dark:border-amber-700'
+                                                          : 'bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700'
+                                                      }`}
+                                                      title={`${c.name} (${c.role}) • ${c.shift}`}
+                                                    >
+                                                      {c.isLead ? '★ ' : ''}{c.name}
+                                                    </span>
+                                                  ))}
+                                                </div>
+                                              </td>
+
+                                              <td className="py-2.5 px-2.5 text-center">
+                                                <span className="px-2 py-0.5 rounded-full text-[9px] font-black bg-emerald-100 text-emerald-900 border border-emerald-300 dark:bg-emerald-500/20 dark:text-emerald-300 dark:border-emerald-700">
+                                                  Available
+                                                </span>
+                                              </td>
+                                            </tr>
+                                          );
+                                        })
+                                      )}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </div>
                 )}
 
@@ -4492,14 +5223,6 @@ export default function KitchenStaffDashboard({
                 <span className="text-[10px] font-black px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800 flex items-center gap-1">
                   <span className="h-2 w-2 rounded-full bg-emerald-500 animate-ping"></span> Live Kitchen Engine
                 </span>
-                <button
-                  onClick={handleSimulateSurge}
-                  className="px-3 py-1 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-bold text-xs shadow-xs transition-all flex items-center gap-1 cursor-pointer whitespace-nowrap"
-                  title="Simulate sudden order queue spike"
-                >
-                  <TrendingUp className="h-3.5 w-3.5" />
-                  <span>Simulate Order Queue Surge</span>
-                </button>
               </div>
             </div>
 
@@ -4608,191 +5331,8 @@ export default function KitchenStaffDashboard({
 
 
 
-      {/* Research ML Model Performance & Evaluation Card */}
       {(activeKitchenTab === 'optimization' || activeKitchenTab === 'all') && (
         <>
-          {(() => {
-            const mlEval = data?.ml_model_evaluation || {
-              model_name: "Random Forest Regressor (Multi-Output)",
-              mae: 1.42,
-              rmse: 2.18,
-              r2_score: 0.941,
-              mape: "5.9%",
-              cross_val_accuracy: "94.1%",
-              dataset_days_trained: 92,
-              features_used: ["Hour", "DayOfWeek", "IsWeekend", "HistoricalQueue", "StationType"]
-            };
-
-            const r2Pct = (Number(mlEval.r2_score || 0.941) * 100).toFixed(1);
-
-            return (
-              <div className="glass-panel p-6 rounded-2xl space-y-5 border border-indigo-200/80 dark:border-indigo-500/30 bg-gradient-to-br from-indigo-50/40 via-white to-purple-50/30 dark:from-slate-900/90 dark:via-indigo-950/20 dark:to-slate-900/90 shadow-sm">
-                {/* Header */}
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-indigo-100 dark:border-indigo-900/50 pb-4">
-                  <div className="flex items-center gap-3">
-                    <div className="p-3 rounded-2xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-purple-600 text-white shadow-md shadow-indigo-500/25">
-                      <Cpu className="h-6 w-6" />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <h3 className="text-base font-bold text-slate-900 dark:text-white">
-                          Research ML Model Performance & Evaluation
-                        </h3>
-                        <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 flex items-center gap-1">
-                          <Sparkles className="h-3 w-3 text-indigo-500" />
-                          {mlEval.model_name || "Random Forest Regressor (Multi-Output)"}
-                        </span>
-                      </div>
-                      <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mt-0.5">
-                        Supervised Multi-Output regression pipeline forecasting station loads across Hot Kitchen, Grill, Cold Salad, Pizza & Fryer
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <div className="px-3 py-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800/60 text-emerald-800 dark:text-emerald-300 text-xs font-bold flex items-center gap-1.5 shadow-2xs">
-                      <Database className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
-                      <span>Trained on {mlEval.dataset_days_trained || 92} Days of Historical Kitchen Workload Data</span>
-                    </div>
-                    <div className="px-3 py-1.5 rounded-xl bg-purple-50 dark:bg-purple-950/50 border border-purple-200 dark:border-purple-800/60 text-purple-800 dark:text-purple-300 text-xs font-bold flex items-center gap-1.5 shadow-2xs">
-                      <ShieldCheck className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" />
-                      <span>CV Accuracy: {mlEval.cross_val_accuracy || "94.1%"}</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Metrics Cards Grid */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                  {/* Metric 1: MAE */}
-                  <div className="p-4 rounded-xl bg-white/90 dark:bg-slate-900/80 border border-indigo-100 dark:border-slate-800 shadow-2xs space-y-2 relative overflow-hidden">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                        MAE (Mean Absolute Error)
-                      </span>
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300">
-                        Low Bias
-                      </span>
-                    </div>
-                    <div className="flex items-baseline gap-1.5">
-                      <span className="text-2xl font-black text-slate-900 dark:text-white">
-                        {mlEval.mae ?? 1.42}
-                      </span>
-                      <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-                        orders
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-snug">
-                      Average deviation between model forecast and real-time kitchen order tickets.
-                    </p>
-                    <div className="w-full bg-slate-100 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden mt-1">
-                      <div className="bg-emerald-500 h-full rounded-full" style={{ width: '92%' }}></div>
-                    </div>
-                  </div>
-
-                  {/* Metric 2: RMSE */}
-                  <div className="p-4 rounded-xl bg-white/90 dark:bg-slate-900/80 border border-indigo-100 dark:border-slate-800 shadow-2xs space-y-2 relative overflow-hidden">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                        RMSE (Root Mean Squared Error)
-                      </span>
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-300">
-                        Peak Safe
-                      </span>
-                    </div>
-                    <div className="flex items-baseline gap-1.5">
-                      <span className="text-2xl font-black text-slate-900 dark:text-white">
-                        {mlEval.rmse ?? 2.18}
-                      </span>
-                      <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-                        orders
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-snug">
-                      Penalizes peak rush-hour outliers to avoid catastrophic kitchen queue backlogs.
-                    </p>
-                    <div className="w-full bg-slate-100 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden mt-1">
-                      <div className="bg-sky-500 h-full rounded-full" style={{ width: '88%' }}></div>
-                    </div>
-                  </div>
-
-                  {/* Metric 3: R² Score */}
-                  <div className="p-4 rounded-xl bg-white/90 dark:bg-slate-900/80 border border-indigo-100 dark:border-slate-800 shadow-2xs space-y-2 relative overflow-hidden">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                        R² Score (Goodness of Fit)
-                      </span>
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-300">
-                        High Fit
-                      </span>
-                    </div>
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-2xl font-black text-indigo-600 dark:text-indigo-400">
-                        {mlEval.r2_score ?? 0.941}
-                      </span>
-                      <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
-                        ({r2Pct}%)
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-snug">
-                      Proportion of variance explained by temporal patterns & queue factors.
-                    </p>
-                    <div className="w-full bg-slate-100 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden mt-1">
-                      <div className="bg-indigo-600 h-full rounded-full" style={{ width: `${Math.min(100, r2Pct)}%` }}></div>
-                    </div>
-                  </div>
-
-                  {/* Metric 4: MAPE */}
-                  <div className="p-4 rounded-xl bg-white/90 dark:bg-slate-900/80 border border-indigo-100 dark:border-slate-800 shadow-2xs space-y-2 relative overflow-hidden">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                        MAPE (Mean Absolute % Error)
-                      </span>
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300">
-                        &lt; 10% Benchmark
-                      </span>
-                    </div>
-                    <div className="flex items-baseline gap-1.5">
-                      <span className="text-2xl font-black text-purple-600 dark:text-purple-400">
-                        {mlEval.mape ?? "5.9%"}
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-snug">
-                      Tight percentage error ensuring reliable prep-line staffing decisions across shifts.
-                    </p>
-                    <div className="w-full bg-slate-100 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden mt-1">
-                      <div className="bg-purple-500 h-full rounded-full" style={{ width: '94.1%' }}></div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Feature Inputs & Dataset Scope Bar */}
-                <div className="p-3.5 rounded-xl bg-indigo-50/70 dark:bg-slate-800/60 border border-indigo-100 dark:border-slate-700/60 flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1">
-                      <Layers className="h-3.5 w-3.5 text-indigo-500" />
-                      Model Feature Inputs:
-                    </span>
-                    {(mlEval.features_used || ["Hour", "DayOfWeek", "IsWeekend", "HistoricalQueue", "StationType"]).map((feat, fIdx) => (
-                      <span
-                        key={fIdx}
-                        className="px-2 py-0.5 rounded-md bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border border-indigo-100 dark:border-slate-700 font-mono text-[11px] font-semibold"
-                      >
-                        {feat}
-                      </span>
-                    ))}
-                  </div>
-
-                  <div className="flex items-center gap-2 text-slate-600 dark:text-slate-400 font-medium">
-                    <Award className="h-3.5 w-3.5 text-amber-500" />
-                    <span>
-                      Validated on <strong>{mlEval.dataset_days_trained || 92} days</strong> of historical kitchen workload data across <strong>5 stations</strong> (Hot Kitchen, Grill, Cold Salad, Pizza, Fryer)
-                    </span>
-                  </div>
-                </div>
-              </div>
-            );
-          })()}
-
           {/* Kitchen Station Workload & Queue Monitors */}
           <div className="glass-panel p-6 rounded-2xl space-y-5">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-4">
@@ -4820,19 +5360,19 @@ export default function KitchenStaffDashboard({
               const targetCooks = stationsList.reduce((acc, s) => acc + (s.recommended_cooks || 0), 0);
 
               const totalLoadForProportion = stationsList.reduce((acc, s) => acc + (Number(s.actual_load) || 0), 0);
-              let hotKitchenPct = 20, grillPct = 20, coldSaladPct = 20, pizzaPct = 20, fryerPct = 20;
+              let seafoodPct = 0, pizzaPct = 0, coldSaladPct = 0, dessertPct = 0, beveragesPct = 0;
               if (totalLoadForProportion > 0) {
-                const rawHot = ((Number(stationsList.find(s => s.name === "Hot Kitchen")?.actual_load) || 0) / totalLoadForProportion) * 100;
-                const rawGrill = ((Number(stationsList.find(s => s.name === "Grill")?.actual_load) || 0) / totalLoadForProportion) * 100;
-                const rawSalad = ((Number(stationsList.find(s => s.name === "Cold Salad")?.actual_load) || 0) / totalLoadForProportion) * 100;
+                const rawSeafood = ((Number(stationsList.find(s => s.name === "Seafood")?.actual_load) || 0) / totalLoadForProportion) * 100;
                 const rawPizza = ((Number(stationsList.find(s => s.name === "Pizza")?.actual_load) || 0) / totalLoadForProportion) * 100;
-                const rawFryer = ((Number(stationsList.find(s => s.name === "Fryer")?.actual_load) || 0) / totalLoadForProportion) * 100;
+                const rawSalad = ((Number(stationsList.find(s => s.name === "Cold Salad")?.actual_load) || 0) / totalLoadForProportion) * 100;
+                const rawDessert = ((Number(stationsList.find(s => s.name === "Dessert")?.actual_load) || 0) / totalLoadForProportion) * 100;
+                const rawBev = ((Number(stationsList.find(s => s.name === "Beverages")?.actual_load) || 0) / totalLoadForProportion) * 100;
 
-                hotKitchenPct = Math.round(rawHot);
-                grillPct = Math.round(rawGrill);
-                coldSaladPct = Math.round(rawSalad);
+                seafoodPct = Math.round(rawSeafood);
                 pizzaPct = Math.round(rawPizza);
-                fryerPct = Math.max(0, 100 - (hotKitchenPct + grillPct + coldSaladPct + pizzaPct));
+                coldSaladPct = Math.round(rawSalad);
+                dessertPct = Math.round(rawDessert);
+                beveragesPct = Math.max(0, 100 - (seafoodPct + pizzaPct + coldSaladPct + dessertPct));
               }
 
               return (
@@ -4933,15 +5473,15 @@ export default function KitchenStaffDashboard({
                     <div className="flex items-center justify-between text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1.5">
                       <span>5-Station Workload Share Proportion:</span>
                       <span className="text-slate-500 dark:text-slate-400 font-mono text-[10px]">
-                        Hot Kitchen ({hotKitchenPct}%) • Grill ({grillPct}%) • Cold Salad ({coldSaladPct}%) • Pizza ({pizzaPct}%) • Fryer ({fryerPct}%)
+                        Seafood ({seafoodPct}%) • Pizza ({pizzaPct}%) • Cold Salad ({coldSaladPct}%) • Dessert ({dessertPct}%) • Beverages ({beveragesPct}%)
                       </span>
                     </div>
                     <div className="h-2.5 w-full bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden flex shadow-inner">
-                      <div style={{ width: `${hotKitchenPct}%` }} className="bg-orange-500 h-full transition-all duration-500" title={`Hot Kitchen: ${hotKitchenPct}%`} />
-                      <div style={{ width: `${grillPct}%` }} className="bg-amber-500 h-full transition-all duration-500" title={`Grill: ${grillPct}%`} />
+                      <div style={{ width: `${seafoodPct}%` }} className="bg-sky-500 h-full transition-all duration-500" title={`Seafood: ${seafoodPct}%`} />
+                      <div style={{ width: `${pizzaPct}%` }} className="bg-orange-500 h-full transition-all duration-500" title={`Pizza: ${pizzaPct}%`} />
                       <div style={{ width: `${coldSaladPct}%` }} className="bg-emerald-500 h-full transition-all duration-500" title={`Cold Salad: ${coldSaladPct}%`} />
-                      <div style={{ width: `${pizzaPct}%` }} className="bg-rose-500 h-full transition-all duration-500" title={`Pizza: ${pizzaPct}%`} />
-                      <div style={{ width: `${fryerPct}%` }} className="bg-purple-500 h-full transition-all duration-500" title={`Fryer: ${fryerPct}%`} />
+                      <div style={{ width: `${dessertPct}%` }} className="bg-pink-500 h-full transition-all duration-500" title={`Dessert: ${dessertPct}%`} />
+                      <div style={{ width: `${beveragesPct}%` }} className="bg-purple-500 h-full transition-all duration-500" title={`Beverages: ${beveragesPct}%`} />
                     </div>
                   </div>
                 </div>
@@ -5533,48 +6073,46 @@ export default function KitchenStaffDashboard({
                 </span>
               </button>
 
-              <button
-                type="button"
-                onClick={() => {
-                  setStaffSubTab('onboard');
-                  setAdminStaffView('onboard');
-                }}
-                className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
-                  staffSubTab === 'onboard' && adminStaffView === 'onboard'
-                    ? 'bg-emerald-700 text-white shadow-md shadow-emerald-700/20'
-                    : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
-                }`}
-              >
-                <UserPlus className="h-4 w-4" />
-                <span>Add New Staff Member</span>
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-orange-600 text-white">
-                  Admin
-                </span>
-              </button>
+              {isAdmin && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStaffSubTab('onboard');
+                    setAdminStaffView('onboard');
+                  }}
+                  className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+                    staffSubTab === 'onboard' && adminStaffView === 'onboard'
+                      ? 'bg-emerald-700 text-white shadow-md shadow-emerald-700/20'
+                      : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                  }`}
+                >
+                  <UserPlus className="h-4 w-4" />
+                  <span>Add New Staff Member</span>
+                </button>
+              )}
 
-              <button
-                type="button"
-                onClick={() => {
-                  setStaffSubTab('onboard');
-                  setAdminStaffView('matrix');
-                }}
-                className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
-                  staffSubTab === 'onboard' && adminStaffView === 'matrix'
-                    ? 'bg-emerald-700 text-white shadow-md shadow-emerald-700/20'
-                    : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
-                }`}
-              >
-                <Database className="h-4 w-4" />
-                <span>Staff Skill & Station Allocation Matrix</span>
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-orange-600 text-white">
-                  Admin Only
-                </span>
-              </button>
+              {isAdmin && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStaffSubTab('onboard');
+                    setAdminStaffView('matrix');
+                  }}
+                  className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+                    staffSubTab === 'onboard' && adminStaffView === 'matrix'
+                      ? 'bg-emerald-700 text-white shadow-md shadow-emerald-700/20'
+                      : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                  }`}
+                >
+                  <Database className="h-4 w-4" />
+                  <span>Staff Skill & Station Allocation Matrix</span>
+                </button>
+              )}
             </div>
 
             <div className="flex items-center gap-2 pr-2 text-xs font-semibold text-slate-500 dark:text-slate-400">
               <ShieldCheck className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-              <span>Admin Personnel Management & Competency Hub</span>
+              <span>{isAdmin ? 'Admin Personnel Management & Competency Hub' : 'Kitchen Personnel & Competency Hub'}</span>
             </div>
           </div>
 
@@ -5593,31 +6131,6 @@ export default function KitchenStaffDashboard({
                     <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 font-medium">
                       Personalized training recommendations and succession planning for kitchen personnel
                     </p>
-                  </div>
-
-                  <div className="flex flex-wrap items-center gap-2.5">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setStaffSubTab('onboard');
-                        setAdminStaffView('onboard');
-                      }}
-                      className="px-4 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs shadow-md shadow-emerald-700/20 transition-all flex items-center gap-2 cursor-pointer shrink-0"
-                    >
-                      <UserPlus className="h-4 w-4" />
-                      <span>+ Onboard New Staff</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setStaffSubTab('onboard');
-                        setAdminStaffView('matrix');
-                      }}
-                      className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold text-xs border border-slate-200 dark:border-slate-700 transition-all flex items-center gap-2 cursor-pointer shrink-0"
-                    >
-                      <Database className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-                      <span>Workforce Matrix (Admin)</span>
-                    </button>
                   </div>
                 </div>
 
@@ -5833,37 +6346,39 @@ export default function KitchenStaffDashboard({
           </div>
 
           {/* Section 2: Staff Skill & Station Allocation Matrix (Admin Restricted Notice) */}
-          <div className="p-5 rounded-3xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-2xs">
-            <div className="flex items-center gap-3.5 text-slate-600 dark:text-slate-300">
-              <div className="p-3 rounded-2xl bg-orange-100 dark:bg-orange-950/70 text-orange-700 dark:text-orange-400 shrink-0">
-                <Lock className="h-5 w-5" />
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <h4 className="font-extrabold text-sm text-slate-900 dark:text-white">
-                    Staff Skill & Station Allocation Matrix
-                  </h4>
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-orange-100 text-orange-800 dark:bg-orange-950 dark:text-orange-300 border border-orange-200 dark:border-orange-800">
-                    Admin Only
-                  </span>
+          {isAdmin && (
+            <div className="p-5 rounded-3xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-2xs">
+              <div className="flex items-center gap-3.5 text-slate-600 dark:text-slate-300">
+                <div className="p-3 rounded-2xl bg-orange-100 dark:bg-orange-950/70 text-orange-700 dark:text-orange-400 shrink-0">
+                  <Lock className="h-5 w-5" />
                 </div>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                  Workforce skill ratings across all 5 bays, shift rosters, and staff profile editing/deletion are strictly restricted to the Admin Portal.
-                </p>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h4 className="font-extrabold text-sm text-slate-900 dark:text-white">
+                      Staff Skill & Station Allocation Matrix
+                    </h4>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-orange-100 text-orange-800 dark:bg-orange-950 dark:text-orange-300 border border-orange-200 dark:border-orange-800">
+                      Admin Only
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                    Workforce skill ratings across all 5 bays, shift rosters, and staff profile editing/deletion are strictly restricted to the Admin Portal.
+                  </p>
+                </div>
               </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setStaffSubTab('onboard');
+                  setAdminStaffView('matrix');
+                }}
+                className="px-4 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs shadow-md shadow-emerald-700/20 transition-all flex items-center gap-2 cursor-pointer shrink-0"
+              >
+                <Database className="h-4 w-4" />
+                <span>Access Admin Matrix →</span>
+              </button>
             </div>
-            <button
-              type="button"
-              onClick={() => {
-                setStaffSubTab('onboard');
-                setAdminStaffView('matrix');
-              }}
-              className="px-4 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs shadow-md shadow-emerald-700/20 transition-all flex items-center gap-2 cursor-pointer shrink-0"
-            >
-              <Database className="h-4 w-4" />
-              <span>Access Admin Matrix →</span>
-            </button>
-          </div>
+          )}
 
           {/* Section 3: Automated AI Recommendation System — Staff Upskilling & Competency Pathways */}
           <div className="glass-panel p-6 sm:p-8 rounded-3xl border border-slate-200 dark:border-slate-800 bg-white/90 dark:bg-slate-900/90 shadow-lg space-y-6 animate-fade-in">
@@ -6428,7 +6943,7 @@ export default function KitchenStaffDashboard({
           {/* ========================================================================= */}
           {/* SUB-TAB 2: ADD NEW STAFF MEMBER (ADMIN ONBOARDING VIEW)                    */}
           {/* ========================================================================= */}
-          {staffSubTab === 'onboard' && (
+          {isAdmin && staffSubTab === 'onboard' && (
             <div className="space-y-6 animate-fade-in">
               {/* Header Banner */}
               <div className="glass-panel p-6 rounded-3xl border border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 shadow-xs">
@@ -6546,12 +7061,6 @@ export default function KitchenStaffDashboard({
                       <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                         Complete workforce roster with station skill ratings, shift allocations, and efficiency benchmarks
                       </p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-orange-100 text-orange-800 dark:bg-orange-950 dark:text-orange-300 border border-orange-200 dark:border-orange-800 flex items-center gap-1.5">
-                        <Lock className="h-3 w-3" />
-                        Admin Only • View, Edit & Delete
-                      </span>
                     </div>
                   </div>
 
@@ -7911,7 +8420,7 @@ export default function KitchenStaffDashboard({
       {/* ========================================================================= */}
       {/* ADMIN EDIT STAFF PROFILE MODAL                                             */}
       {/* ========================================================================= */}
-      {editingStaff && (
+      {isAdmin && editingStaff && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-xs animate-fade-in">
           <div className="bg-white dark:bg-slate-900 w-full max-w-2xl rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl p-6 sm:p-7 space-y-5 max-h-[90vh] overflow-y-auto">
             {/* Modal Header */}
@@ -8134,7 +8643,7 @@ export default function KitchenStaffDashboard({
       {/* ========================================================================= */}
       {/* ADMIN DELETE STAFF MEMBER CONFIRMATION MODAL                               */}
       {/* ========================================================================= */}
-      {deletingStaff && (
+      {isAdmin && deletingStaff && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-xs animate-fade-in">
           <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-3xl border border-rose-200 dark:border-rose-900/80 shadow-2xl p-6 space-y-4">
             <div className="flex items-center gap-3 text-rose-600 dark:text-rose-400">

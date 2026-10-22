@@ -175,8 +175,8 @@ def process_folder(folder_path=".",
     summary_records = []
     for (date_iso, item_name), data in daily_aggregated.items():
         # Representative unit price (if consistent, otherwise average)
-        avg_unit_price = data['total'] / data['qty'] if data['qty'] else 0
-        if avg_unit_price.is_integer():
+        avg_unit_price = data['total'] / data['qty'] if data['qty'] else 0.0
+        if isinstance(avg_unit_price, float) and avg_unit_price.is_integer():
             avg_unit_price = int(avg_unit_price)
         else:
             avg_unit_price = round(avg_unit_price, 2)

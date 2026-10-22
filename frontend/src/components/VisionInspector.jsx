@@ -2392,23 +2392,6 @@ export default function VisionInspector({ zones = [], onRefreshTelemetry, onInsp
             ))}
           </div>
 
-          {/* Optical Metrics Bar */}
-          <div className="grid grid-cols-3 gap-2 text-center text-xs">
-            <div className="p-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
-              <span className="text-[10px] text-slate-500 dark:text-slate-400 font-bold block">Browning</span>
-              <span className="font-black text-slate-900 dark:text-white">{cvResult?.discoloration_score || 3.2}%</span>
-            </div>
-            <div className="p-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
-              <span className="text-[10px] text-slate-500 dark:text-slate-400 font-bold block">Mould Colony</span>
-              <span className={`font-black ${cvResult?.mould_detected ? 'text-rose-600' : 'text-emerald-600'}`}>
-                {cvResult?.mould_detected ? 'Detected!' : '0% Clear'}
-              </span>
-            </div>
-            <div className="p-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
-              <span className="text-[10px] text-slate-500 dark:text-slate-400 font-bold block">Tissue Degradation</span>
-              <span className="font-black text-slate-900 dark:text-white">{cvResult?.texture_degradation || 6}%</span>
-            </div>
-          </div>
 
           {/* Surface Texture, Color & Spoilage Progression Diagnostics */}
           {cvResult && (

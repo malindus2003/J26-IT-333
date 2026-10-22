@@ -146,7 +146,8 @@ def get_all_staff_from_firebase() -> Optional[Dict[str, Any]]:
     try:
         ref = get_realtime_db()
         if ref:
-            return ref.child("kitchen_staff").get()
+            val = ref.child("kitchen_staff").get()
+            return val if isinstance(val, dict) else None
     except Exception as e:
         logger.error(f"Failed to fetch staff from Firebase: {e}")
     return None
